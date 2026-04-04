@@ -1,0 +1,15 @@
+{
+  "name": "superbucin",
+  "version": "1.0.0",
+  "description": "SUPERBUCIN — A couples minigame collection",
+  "private": true,
+  "scripts": {
+    "dev:client": "cd client && npx vite --host",
+    "dev:server": "cd server && node index.js",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "build": "cd client && npx vite build"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

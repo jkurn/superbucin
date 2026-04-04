@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+
+# Kenney asset packs (not used at runtime, too large for git)
+kenney_*/
