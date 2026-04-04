@@ -7,7 +7,7 @@
     "dev:client": "cd client && npx vite --host",
     "dev:server": "cd server && node index.js",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "build": "cd client && npm install && npx vite build",
+    "build": "cd server && npm install && cd ../client && npm install && npx vite build",
     "start": "cd server && node index.js"
   },
   "dependencies": {
