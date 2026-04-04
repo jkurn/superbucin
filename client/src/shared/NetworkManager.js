@@ -14,7 +14,9 @@ export class NetworkManager {
     this.ui = ui;
     this.sceneManager = sceneManager;
 
-    const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+    const serverUrl = window.location.hostname === 'localhost'
+      ? 'http://localhost:3000'
+      : window.location.origin;
 
     this.socket = io(serverUrl, { transports: ['websocket', 'polling'] });
 

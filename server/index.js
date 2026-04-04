@@ -1,17 +1,23 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import { fileURLToPath } from 'url';
+import path from 'path';
 import { RoomManager } from './rooms/RoomManager.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+
+// Serve built client files in production
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+app.use(express.static(clientDist));
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: [
       'http://localhost:5173',
       'http://localhost:4173',
-      'https://superbucin.pages.dev',
-      /\.superbucin\.pages\.dev$/,
     ],
     methods: ['GET', 'POST'],
   },
@@ -46,6 +52,11 @@ io.on('connection', (socket) => {
     console.log(`Player disconnected: ${socket.id}`);
     roomManager.handleDisconnect(socket);
   });
+});
+
+// SPA fallback — serve index.html for any unmatched route
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientDist, 'index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
