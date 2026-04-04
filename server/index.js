@@ -36,6 +36,10 @@ io.on('connection', (socket) => {
     roomManager.joinRoom(socket, data.roomCode);
   });
 
+  socket.on('rejoin-room', (data) => {
+    roomManager.rejoinRoom(socket, data.roomCode);
+  });
+
   socket.on('select-side', (data) => {
     roomManager.selectSide(socket, data.side);
   });

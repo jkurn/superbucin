@@ -1,4 +1,4 @@
-const GAME_CONFIG = {
+export const GAME_CONFIG = {
   NUM_LANES: 5,
   LANE_HEIGHT: 10,
   PLAYER_HP: 100,
@@ -48,6 +48,19 @@ export class GameState {
       clearInterval(this.interval);
       this.interval = null;
     }
+  }
+
+  pause() {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+  }
+
+  resume() {
+    if (!this.active || this.interval) return;
+    const dt = 1 / GAME_CONFIG.TICK_RATE;
+    this.interval = setInterval(() => this.tick(dt), 1000 / GAME_CONFIG.TICK_RATE);
   }
 
   tick(dt) {

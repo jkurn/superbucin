@@ -1,5 +1,5 @@
 import { PigVsChickScene } from '../games/pig-vs-chick/PigVsChickScene.js';
-import { GAME_CONFIG } from '../games/pig-vs-chick/config.js';
+import { GAME_CONFIG, applyServerConfig } from '../games/pig-vs-chick/config.js';
 
 export class UIManager {
   constructor() {
@@ -123,6 +123,7 @@ export class UIManager {
 
   // ==================== GAME ====================
   startGame(data) {
+    applyServerConfig(data.gameConfig);
     this.clear();
     this.gameScene = new PigVsChickScene(this.sceneManager, this.network, this, data);
     this.gameScene.init();
@@ -271,7 +272,10 @@ export class UIManager {
       </div>
     `;
     document.getElementById('btn-rematch').addEventListener('click', () => this.network.requestRematch());
-    document.getElementById('btn-lobby').addEventListener('click', () => window.location.reload());
+    document.getElementById('btn-lobby').addEventListener('click', () => {
+      this.gameScene = null;
+      this.showLobby();
+    });
   }
 
   showDisconnect() {
@@ -283,8 +287,38 @@ export class UIManager {
         <button class="btn btn-pink" id="btn-lobby" style="margin-top:1.5rem;">Back to Lobby</button>
       </div>
     `;
-    document.getElementById('btn-lobby').addEventListener('click', () => window.location.reload());
+    document.getElementById('btn-lobby').addEventListener('click', () => {
+      this.gameScene = null;
+      this.showLobby();
+    });
   }
 
-  updateScore() {} // Not used in HP pool mode
+  showReconnecting() {
+    // Show overlay on top of game — don't destroy the scene
+    let overlay = document.getElementById('reconnect-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'reconnect-overlay';
+      overlay.className = 'reconnect-overlay';
+      overlay.innerHTML = `
+        <div class="reconnect-text">Sayang disconnected...</div>
+        <div class="reconnect-sub">Waiting for reconnect ⏳</div>
+      `;
+      this.overlay.appendChild(overlay);
+    }
+  }
+
+  hideReconnecting() {
+    const overlay = document.getElementById('reconnect-overlay');
+    if (overlay) overlay.remove();
+    this.showError('Sayang reconnected! 💕');
+  }
+
+  showError(message) {
+    const toast = document.createElement('div');
+    toast.className = 'error-toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
 }

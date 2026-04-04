@@ -16,6 +16,14 @@ export class PigVsChickScene {
     this.myDirection = gameData.yourDirection; // 1 = bottom-to-top, -1 = top-to-bottom
     this.gameActive = false;
 
+    // Shared particle geometry/materials (reused for all death particles)
+    this._particleGeo = new THREE.SphereGeometry(0.06, 6, 6);
+    this._particleMats = {
+      pig: new THREE.MeshToonMaterial({ color: 0xffb0c8 }),
+      chicken: new THREE.MeshToonMaterial({ color: 0xffe066 }),
+      chick: new THREE.MeshToonMaterial({ color: 0xffe066 }),
+    };
+
     // Lane positions (x coordinates for 5 lanes)
     const totalWidth = GAME_CONFIG.NUM_LANES * GAME_CONFIG.LANE_WIDTH;
     this.laneXPositions = [];
@@ -64,7 +72,12 @@ export class PigVsChickScene {
       myDirection: this.myDirection,
     });
 
-    this.startCountdown();
+    // Skip countdown on reconnect — jump straight into the game
+    if (this.gameData.reconnect) {
+      this.gameActive = true;
+    } else {
+      this.startCountdown();
+    }
   }
 
   createBattlefield() {
@@ -218,8 +231,9 @@ export class PigVsChickScene {
     // Remove units that server no longer tracks
     for (const [id, unit] of this.units) {
       if (!serverIds.has(id)) {
+        if (unit._fightFlash) clearInterval(unit._fightFlash);
         this.spawnDeathParticles(unit.model.position.clone(), unit.side);
-        this.scene.remove(unit.model);
+        this.disposeModel(unit.model);
         this.units.delete(id);
       }
     }
@@ -268,27 +282,17 @@ export class PigVsChickScene {
     if (state.playerHP) {
       this.ui.updateHP(state.playerHP, this.gameData);
     }
-    if (state.energies) {
-      const myEnergy = state.energies[this.network.playerId];
-      if (myEnergy !== undefined) {
-        this.ui.updateEnergy(myEnergy, GAME_CONFIG.MAX_ENERGY);
-        this.ui.updateSpawnButtons(myEnergy);
-      }
+    if (state.energy !== undefined) {
+      this.ui.updateEnergy(state.energy, GAME_CONFIG.MAX_ENERGY);
+      this.ui.updateSpawnButtons(state.energy);
     }
   }
 
-  onRoundEnd(data) {
-    // Not used in HP-pool mode — game ends when HP reaches 0
-  }
-
   spawnDeathParticles(pos, side) {
-    const color = side === 'pig' ? 0xffb0c8 : 0xffe066;
+    const mat = this._particleMats[side] || this._particleMats.pig;
     const particles = [];
     for (let i = 0; i < 6; i++) {
-      const p = new THREE.Mesh(
-        new THREE.SphereGeometry(0.06, 6, 6),
-        new THREE.MeshToonMaterial({ color })
-      );
+      const p = new THREE.Mesh(this._particleGeo, mat);
       p.position.copy(pos);
       p.velocity = new THREE.Vector3(
         (Math.random() - 0.5) * 3,
@@ -315,13 +319,26 @@ export class PigVsChickScene {
     animate();
   }
 
+  disposeModel(model) {
+    this.scene.remove(model);
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.geometry.dispose();
+        child.material.dispose();
+      }
+    });
+  }
+
   destroy() {
     this.gameActive = false;
     this.sceneManager.onUpdate = null;
     for (const [, unit] of this.units) {
       if (unit._fightFlash) clearInterval(unit._fightFlash);
-      this.scene.remove(unit.model);
+      this.disposeModel(unit.model);
     }
     this.units.clear();
+    // Dispose shared particle resources
+    this._particleGeo.dispose();
+    Object.values(this._particleMats).forEach((m) => m.dispose());
   }
 }

@@ -23,6 +23,20 @@ export class NetworkManager {
     this.socket.on('connect', () => {
       this.playerId = this.socket.id;
       console.log('Connected:', this.playerId);
+
+      // Auto-rejoin if we had an active room (reconnection after brief disconnect)
+      if (this.roomCode && this._wasInGame) {
+        console.log('Attempting rejoin:', this.roomCode);
+        this.socket.emit('rejoin-room', { roomCode: this.roomCode });
+        this._wasInGame = false;
+      }
+    });
+
+    this.socket.on('disconnect', () => {
+      // Mark that we were in a game so we can auto-rejoin on reconnect
+      if (this.roomCode && this.ui.gameScene) {
+        this._wasInGame = true;
+      }
     });
 
     this.socket.on('room-created', (data) => {
@@ -54,22 +68,24 @@ export class NetworkManager {
       }
     });
 
-    this.socket.on('round-end', (data) => {
-      if (this.ui.gameScene) {
-        this.ui.gameScene.onRoundEnd(data);
-      }
-    });
-
     this.socket.on('match-end', (data) => {
       this.ui.showVictory(data);
     });
 
-    this.socket.on('opponent-disconnected', () => {
-      this.ui.showDisconnect();
+    this.socket.on('opponent-disconnected', (data) => {
+      if (data && data.reconnecting) {
+        this.ui.showReconnecting();
+      } else {
+        this.ui.showDisconnect();
+      }
+    });
+
+    this.socket.on('opponent-reconnected', () => {
+      this.ui.hideReconnecting();
     });
 
     this.socket.on('error', (data) => {
-      alert(data.message || 'Something went wrong');
+      this.ui.showError(data.message || 'Something went wrong');
     });
   }
 
