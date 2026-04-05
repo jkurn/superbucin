@@ -90,6 +90,7 @@ export class RoomManager {
     } else if (otherPlayer) {
       otherPlayer.socket.emit('side-selected', {
         message: `Opponent picked ${side}! Your turn~`,
+        opponentSide: side,
       });
     }
   }

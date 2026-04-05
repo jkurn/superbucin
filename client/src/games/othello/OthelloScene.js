@@ -85,7 +85,7 @@ export class OthelloScene {
     // Board base
     const base = new THREE.Mesh(
       new THREE.BoxGeometry(boardWidth + 0.4, 0.2, boardWidth + 0.4),
-      new THREE.MeshToonMaterial({ color: 0x1a6b37 })
+      new THREE.MeshToonMaterial({ color: 0x2e8b57 })
     );
     base.position.y = -0.1;
     base.receiveShadow = true;
@@ -119,7 +119,7 @@ export class OthelloScene {
         const isEven = (r + c) % 2 === 0;
         const cellMesh = new THREE.Mesh(
           new THREE.PlaneGeometry(cell - 0.02, cell - 0.02),
-          new THREE.MeshToonMaterial({ color: isEven ? 0x1d7d3f : 0x1a6b37 })
+          new THREE.MeshToonMaterial({ color: isEven ? 0x339966 : 0x2e8b57 })
         );
         cellMesh.rotation.x = -Math.PI / 2;
         cellMesh.position.set(x, 0.01, z);
@@ -131,7 +131,7 @@ export class OthelloScene {
     }
 
     // Grid lines
-    const lineMat = new THREE.MeshBasicMaterial({ color: 0x0d4f22 });
+    const lineMat = new THREE.MeshBasicMaterial({ color: 0x1a6b37 });
     for (let i = 0; i <= size; i++) {
       const pos = -half + i * cell;
       const hLine = new THREE.Mesh(new THREE.PlaneGeometry(boardWidth, 0.02), lineMat);
@@ -146,7 +146,7 @@ export class OthelloScene {
     }
 
     // Center dot markers (standard Othello positions)
-    const dotMat = new THREE.MeshBasicMaterial({ color: 0x0d4f22 });
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0x1a6b37 });
     const dotGeo = new THREE.CircleGeometry(0.06, 16);
     for (const [r, c] of [[2, 2], [2, 6], [6, 2], [6, 6]]) {
       const dot = new THREE.Mesh(dotGeo, dotMat);
@@ -363,7 +363,7 @@ export class OthelloScene {
 
     // Pulse valid move indicators
     if (this.validMoveIndicators.length > 0) {
-      const pulse = 0.2 + Math.sin(Date.now() * 0.004) * 0.15;
+      const pulse = 0.45 + Math.sin(Date.now() * 0.005) * 0.25;
       this._indicatorMat.opacity = pulse;
     }
   }
@@ -414,7 +414,7 @@ export class OthelloScene {
     // Update HUD
     if (this.ui.activeHUD) {
       if (this.ui.activeHUD.updateScore) this.ui.activeHUD.updateScore(state.scores);
-      if (this.ui.activeHUD.updateTurn) this.ui.activeHUD.updateTurn(state.currentTurn === this.myId);
+      if (this.ui.activeHUD.updateTurn) this.ui.activeHUD.updateTurn(state.currentTurn === this.myId, this.mySide);
     }
 
     // Pass toast
@@ -436,13 +436,13 @@ export class OthelloScene {
     // Create shared material (reuse for pulse animation)
     if (!this._indicatorMat) {
       this._indicatorMat = new THREE.MeshBasicMaterial({
-        color: this.mySide === 'black' ? 0x444444 : 0xcccccc,
+        color: 0xffee55,
         transparent: true,
-        opacity: 0.3,
+        opacity: 0.6,
       });
     }
 
-    const geo = new THREE.CircleGeometry(DISPLAY_CONFIG.DISC_RADIUS * 0.5, 16);
+    const geo = new THREE.CircleGeometry(DISPLAY_CONFIG.DISC_RADIUS * 0.6, 16);
     for (const [r, c] of moves) {
       const { x, z } = this.getCellPos(r, c);
       const ind = new THREE.Mesh(geo, this._indicatorMat);

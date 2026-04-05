@@ -64,9 +64,12 @@ export const othelloGame = {
         }
       },
 
-      updateTurn(isMyTurn) {
+      updateTurn(isMyTurn, mySide) {
         const el = document.getElementById('turn-text');
-        if (el) el.textContent = isMyTurn ? 'Your turn' : "Opponent's turn";
+        if (el) {
+          const disc = mySide === 'black' ? '⚫' : '⚪';
+          el.textContent = isMyTurn ? `${disc} Your turn — tap to place` : "Waiting for opponent...";
+        }
         const bar = document.getElementById('othello-turn-bar');
         if (bar) {
           bar.classList.toggle('my-turn', isMyTurn);

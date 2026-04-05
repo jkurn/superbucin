@@ -147,6 +147,16 @@ export class UIManager {
   updateSideSelect(data) {
     const el = document.getElementById('side-status');
     if (el && data.message) el.textContent = data.message;
+
+    // Auto-highlight remaining side when opponent picks
+    if (data.opponentSide && !this.selectedSide) {
+      const options = document.querySelectorAll('.side-option');
+      options.forEach((opt) => {
+        if (opt.dataset.side !== data.opponentSide) {
+          opt.classList.add('suggested');
+        }
+      });
+    }
   }
 
   // ==================== GAME ====================
