@@ -427,7 +427,7 @@ export class UIManager {
       </div>
     `).join('');
 
-    const padHTML = Array(3).fill(`
+    const padHTML = Array(1).fill(`
       <div class="game-card disabled">
         <div class="game-card-icon">🔒</div>
         <div class="game-card-title">Coming Soon</div>
