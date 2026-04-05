@@ -1829,6 +1829,68 @@
       flex-shrink: 0;
     }
 
+    /* Rivals */
+    .rivals-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .rival-card {
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 0.6rem 0.75rem;
+    }
+    .rival-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .rival-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .rival-avatar-placeholder {
+      width: 32px;
+      height: 32px;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .rival-info { flex: 1; min-width: 0; }
+    .rival-name {
+      color: white;
+      font-weight: 800;
+      font-size: 0.8rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .rival-record {
+      color: #a0a0c0;
+      font-size: 0.65rem;
+      margin-top: 0.1rem;
+    }
+    .rival-winrate {
+      font-size: 0.85rem;
+      font-weight: 900;
+      flex-shrink: 0;
+    }
+    .rival-winrate.positive { color: #7dffb3; }
+    .rival-winrate.negative { color: #ffb3c0; }
+    .rival-bar {
+      display: flex;
+      height: 4px;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 0.4rem;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .rival-bar-win { background: #7dffb3; }
+    .rival-bar-tie { background: #ffd86b; }
+    .rival-bar-loss { background: #ff6b9d; }
+
     /* Settings */
     .settings-form {
       display: flex;

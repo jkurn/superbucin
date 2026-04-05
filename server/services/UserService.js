@@ -27,6 +27,7 @@ export class UserService {
     });
 
     const newAchievements = {};
+    const pointsByPlayer = {};
 
     for (const player of [p1, p2]) {
       const isAuth = !player.identity?.isGuest && player.identity?.userId;
@@ -43,13 +44,14 @@ export class UserService {
 
       await this._updateStats(userId, gameType, isWinner, isTie, points);
       await this._addPoints(userId, points);
+      pointsByPlayer[player.id] = points;
       const earned = await this._checkAchievements(userId, gameType);
       if (earned.length > 0) {
         newAchievements[player.id] = earned;
       }
     }
 
-    return { newAchievements };
+    return { newAchievements, pointsByPlayer };
   }
 
   static async _updateStats(userId, gameType, isWinner, isTie, points) {

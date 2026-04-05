@@ -116,6 +116,7 @@ export class NetworkManager {
     this.socket.on('match-end', (data) => {
       this._inGame = false;
       this.ui.showVictory(data);
+      this.userManager.refreshProfile();
     });
 
     this.socket.on('achievement-unlocked', (data) => {

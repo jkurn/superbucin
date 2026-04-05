@@ -323,7 +323,7 @@ export class RoomManager {
     room.game.handleAction(socket.id, action);
   }
 
-  handleGameEvent(room, event, data) {
+  async handleGameEvent(room, event, data) {
     const connected = room.players.filter((p) => !p.disconnected);
 
     switch (event) {
@@ -403,9 +403,13 @@ export class RoomManager {
         room.state = 'finished';
         const p1 = room.players[0];
 
-        this._recordMatchResult(room, data).catch((err) => {
+        let pointsByPlayer = {};
+        try {
+          const result = await this._recordMatchResult(room, data);
+          pointsByPlayer = result.pointsByPlayer || {};
+        } catch (err) {
           console.error('Failed to record match:', err);
-        });
+        }
 
         connected.forEach((p) => {
           const isP1 = p.id === p1.id;
@@ -419,6 +423,7 @@ export class RoomManager {
             yourScore,
             oppScore,
             isWinner: data.winnerId !== null && data.winnerId === p.id,
+            pointsEarned: pointsByPlayer[p.id] || 0,
           });
         });
         break;
@@ -430,25 +435,23 @@ export class RoomManager {
     const p1 = room.players[0];
     const p2 = room.players[1];
 
-    try {
-      const { newAchievements } = await UserService.recordMatch({
-        gameType: room.gameType,
-        p1,
-        p2,
-        winnerId: data.winnerId,
-        scores: data.scores,
-        isTie: !!data.tie,
-      });
+    const { newAchievements, pointsByPlayer } = await UserService.recordMatch({
+      gameType: room.gameType,
+      p1,
+      p2,
+      winnerId: data.winnerId,
+      scores: data.scores,
+      isTie: !!data.tie,
+    });
 
-      for (const [playerId, achievements] of Object.entries(newAchievements)) {
-        const player = room.players.find((p) => p.id === playerId);
-        if (player && !player.disconnected) {
-          player.socket.emit('achievement-unlocked', { achievements });
-        }
+    for (const [playerId, achievements] of Object.entries(newAchievements)) {
+      const player = room.players.find((p) => p.id === playerId);
+      if (player && !player.disconnected) {
+        player.socket.emit('achievement-unlocked', { achievements });
       }
-    } catch (err) {
-      console.error('UserService.recordMatch error:', err);
     }
+
+    return { pointsByPlayer };
   }
 
   rematch(socket) {

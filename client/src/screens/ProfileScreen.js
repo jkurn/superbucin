@@ -23,6 +23,7 @@ export async function render(overlay, deps, options) {
         </div>
         <div class="profile-section-tabs">
           <button class="profile-tab active" data-section="stats">Stats</button>
+          <button class="profile-tab" data-section="rivals">Rivals</button>
           <button class="profile-tab" data-section="achievements">Achievements</button>
           <button class="profile-tab" data-section="history">History</button>
           <button class="profile-tab" data-section="settings">Settings</button>
@@ -55,6 +56,7 @@ function bindTabs(overlay, userManager) {
       tab.classList.add('active');
       const section = tab.dataset.section;
       if (section === 'stats') showStatsSection(userManager);
+      else if (section === 'rivals') showRivalsSection(userManager);
       else if (section === 'achievements') showAchievementsSection(userManager);
       else if (section === 'history') showHistorySection(userManager);
       else if (section === 'settings') showSettingsSection(userManager);
@@ -67,6 +69,8 @@ const GAME_NAMES = {
   'word-scramble-race': '\ud83d\udcdd Word Scramble',
   'doodle-guess': '\ud83c\udfa8 Doodle Guess',
   'memory-match': '\ud83e\udde0 Memory Match',
+  'speed-match': '\u26a1 Speed Match',
+  'othello': '\u26ab Othello',
 };
 
 async function showStatsSection(userManager) {
@@ -99,6 +103,45 @@ async function showStatsSection(userManager) {
           <div class="stat-card-row"><span>Points</span><strong>${s.total_points}</strong></div>
         </div>
       `).join('')}
+    </div>
+  `;
+}
+
+async function showRivalsSection(userManager) {
+  const container = document.getElementById('profile-content');
+  container.innerHTML = '<div class="profile-loading">Loading rivals...</div>';
+
+  const rivals = await userManager.fetchHeadToHead();
+  if (!rivals.length) {
+    container.innerHTML = '<div class="profile-empty">No rivals yet! Play some games first \ud83c\udfae</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="rivals-list">
+      ${rivals.map((r) => {
+    const winRate = r.total > 0 ? Math.round((r.wins / r.total) * 100) : 0;
+    const barW = winRate;
+    const barL = r.total > 0 ? Math.round((r.losses / r.total) * 100) : 0;
+    const barT = 100 - barW - barL;
+    return `
+          <div class="rival-card">
+            <div class="rival-header">
+              ${r.avatar ? `<img class="rival-avatar" src="${r.avatar}" />` : '<div class="rival-avatar-placeholder">\ud83d\udc64</div>'}
+              <div class="rival-info">
+                <div class="rival-name">${r.name}</div>
+                <div class="rival-record">${r.wins}W \u2013 ${r.losses}L${r.ties > 0 ? ` \u2013 ${r.ties}T` : ''} (${r.total} games)</div>
+              </div>
+              <div class="rival-winrate ${winRate >= 50 ? 'positive' : 'negative'}">${winRate}%</div>
+            </div>
+            <div class="rival-bar">
+              <div class="rival-bar-win" style="width:${barW}%"></div>
+              <div class="rival-bar-tie" style="width:${barT}%"></div>
+              <div class="rival-bar-loss" style="width:${barL}%"></div>
+            </div>
+          </div>
+        `;
+  }).join('')}
     </div>
   `;
 }
@@ -143,6 +186,7 @@ async function showHistorySection(userManager) {
   const gameIcons = {
     'pig-vs-chick': '\ud83d\udc37', 'word-scramble-race': '\ud83d\udcdd',
     'doodle-guess': '\ud83c\udfa8', 'memory-match': '\ud83e\udde0',
+    'speed-match': '\u26a1', 'othello': '\u26ab',
   };
 
   container.innerHTML = `

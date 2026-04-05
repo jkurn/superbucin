@@ -213,6 +213,19 @@ export class UserManager {
     this._loadGuest();
   }
 
+  async refreshProfile() {
+    if (!supabase || this.isGuest || !this.user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', this.user.id)
+      .single();
+    if (data) {
+      this.profile.points = data.points || 0;
+      this._notify();
+    }
+  }
+
   async updateProfile(updates) {
     if (!supabase || this.isGuest) return;
 
@@ -268,6 +281,40 @@ export class UserManager {
       .limit(limit);
 
     return data || [];
+  }
+
+  async fetchHeadToHead() {
+    if (!supabase || this.isGuest) return [];
+    const myId = this.profile.id;
+
+    const { data } = await supabase
+      .from('match_history')
+      .select('*')
+      .or(`player1_id.eq.${myId},player2_id.eq.${myId}`)
+      .order('played_at', { ascending: false });
+
+    if (!data || !data.length) return [];
+
+    const opponents = {};
+    for (const m of data) {
+      const isP1 = m.player1_id === myId;
+      const oppId = isP1 ? m.player2_id : m.player1_id;
+      const oppName = isP1 ? m.player2_name : m.player1_name;
+      const oppAvatar = isP1 ? m.player2_avatar : m.player1_avatar;
+      const won = m.winner_id === myId;
+      const tie = m.is_tie;
+
+      const key = oppId || oppName;
+      if (!opponents[key]) {
+        opponents[key] = { name: oppName, avatar: oppAvatar, wins: 0, losses: 0, ties: 0, total: 0, lastPlayed: m.played_at };
+      }
+      opponents[key].total += 1;
+      if (tie) opponents[key].ties += 1;
+      else if (won) opponents[key].wins += 1;
+      else opponents[key].losses += 1;
+    }
+
+    return Object.values(opponents).sort((a, b) => b.total - a.total);
   }
 
   onChange(fn) {
