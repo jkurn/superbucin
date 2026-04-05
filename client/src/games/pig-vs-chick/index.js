@@ -11,6 +11,14 @@ export const pigVsChickGame = {
     name: 'Pig vs Chick',
     icon: '🐷⚔️🐔',
     badge: '2 Players',
+    sides: [
+      { id: 'pig', label: 'Pig', emoji: '🐷' },
+      { id: 'chicken', label: 'Chicken', emoji: '🐔' },
+    ],
+  },
+  victoryMessages: {
+    win: ['SAYANG MENANG! 🤣🤣🤣', 'GG sayang~ kamu hebat!', 'LUCU BANGET menangnya! 💕'],
+    lose: ['Yahhh kalah~ 😭', 'Nanti revenge ya say!', 'GG sayang~ next time!'],
   },
   Scene: PigVsChickScene,
   applyConfig: applyServerConfig,

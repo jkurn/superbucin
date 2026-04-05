@@ -3,9 +3,11 @@ import { NetworkManager } from './shared/NetworkManager.js';
 import { UIManager } from './shared/UIManager.js';
 import { GameRegistry } from './shared/GameRegistry.js';
 import { pigVsChickGame } from './games/pig-vs-chick/index.js';
+import { othelloGame } from './games/othello/index.js';
 
 // Register all games
 GameRegistry.register('pig-vs-chick', pigVsChickGame);
+GameRegistry.register('othello', othelloGame);
 
 const app = {
   sceneManager: null,

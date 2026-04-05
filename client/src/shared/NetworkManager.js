@@ -7,6 +7,7 @@ export class NetworkManager {
     this.ui = null;
     this.sceneManager = null;
     this.roomCode = null;
+    this.gameType = null;
     this.playerId = null;
     this.isHost = false;
     this._inGame = false;
@@ -44,12 +45,14 @@ export class NetworkManager {
 
     this.socket.on('room-created', (data) => {
       this.roomCode = data.roomCode;
+      if (data.gameType) this.gameType = data.gameType;
       this.isHost = true;
       this.ui.showWaitingRoom(data.roomCode);
     });
 
     this.socket.on('room-joined', (data) => {
       this.roomCode = data.roomCode;
+      if (data.gameType) this.gameType = data.gameType;
       this.ui.showSideSelect(data.roomCode);
     });
 
@@ -88,6 +91,11 @@ export class NetworkManager {
       this.ui.hideReconnecting();
     });
 
+    this.socket.on('action-error', (data) => {
+      EventBus.emit('game:action-error', data);
+      this.ui.showError(data.message);
+    });
+
     this.socket.on('error', (data) => {
       this.ui.showError(data.message || 'Something went wrong');
     });
@@ -107,6 +115,10 @@ export class NetworkManager {
 
   spawnUnit(tier, lane) {
     this.socket.emit('spawn-unit', { tier, lane });
+  }
+
+  sendGameAction(action) {
+    this.socket.emit('game-action', action);
   }
 
   requestRematch() {

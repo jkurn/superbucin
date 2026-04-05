@@ -21,20 +21,7 @@ export const GameFactory = {
   getConfig(gameType) {
     const entry = games.get(gameType);
     if (!entry) return null;
-    const config = entry.config;
-    return {
-      NUM_LANES: config.NUM_LANES,
-      LANE_HEIGHT: config.LANE_HEIGHT,
-      PLAYER_HP: config.PLAYER_HP,
-      MAX_ENERGY: config.MAX_ENERGY,
-      STARTING_ENERGY: config.STARTING_ENERGY,
-      ENERGY_REGEN: config.ENERGY_REGEN,
-      BASE_DAMAGE: config.BASE_DAMAGE,
-      UNITS: config.UNITS.map((u) => ({
-        tier: u.tier, hp: u.hp, atk: u.atk,
-        speed: u.speed, cost: u.cost, attackRate: u.attackRate,
-      })),
-    };
+    return { ...entry.config };
   },
 
   has(gameType) {

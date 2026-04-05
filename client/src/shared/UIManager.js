@@ -60,11 +60,21 @@ export class UIManager {
       </div>
     `;
 
-    // For now, first registered game is the default
-    const defaultGameType = registered[0]?.type || 'pig-vs-chick';
+    // Game card selection — click to select, first is default
+    let selectedGameType = registered[0]?.type || 'pig-vs-chick';
+    const gameCards = document.querySelectorAll('.game-card.active');
+    if (gameCards.length > 0) gameCards[0].classList.add('selected');
+
+    gameCards.forEach((card) => {
+      card.addEventListener('click', () => {
+        gameCards.forEach((c) => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedGameType = card.dataset.gameType;
+      });
+    });
 
     document.getElementById('btn-create').addEventListener('click', () => {
-      this.network.createRoom(defaultGameType);
+      this.network.createRoom(selectedGameType);
     });
     document.getElementById('btn-join').addEventListener('click', () => {
       const code = document.getElementById('input-code').value.trim();
@@ -92,21 +102,31 @@ export class UIManager {
   showSideSelect(roomCode) {
     this.clear();
     this.selectedSide = null;
+
+    // Data-driven: read sides from game module
+    const gameType = this.network.gameType || 'pig-vs-chick';
+    const game = GameRegistry.get(gameType);
+    const sides = game?.lobby?.sides || [
+      { id: 'side-a', label: 'Side A', emoji: '❓' },
+      { id: 'side-b', label: 'Side B', emoji: '❓' },
+    ];
+    const gameName = game?.lobby?.name || gameType;
+
+    const sidesHTML = sides.map((s) => `
+      <div class="side-option" data-side="${s.id}">
+        <div class="emoji">${s.emoji}</div>
+        <div class="label">${s.label}</div>
+      </div>
+    `).join('');
+
     this.overlay.innerHTML = `
       <div class="lobby-ui">
-        <div class="lobby-title" style="font-size:1.5rem;">PIG vs CHICK</div>
+        <div class="lobby-title" style="font-size:1.5rem;">${gameName.toUpperCase()}</div>
         <div class="lobby-subtitle">Room: ${roomCode}</div>
         <div class="side-select">
           <h2>Pick your side!</h2>
           <div class="sides-row">
-            <div class="side-option" data-side="pig">
-              <div class="emoji">🐷</div>
-              <div class="label">Pig</div>
-            </div>
-            <div class="side-option" data-side="chicken">
-              <div class="emoji">🐔</div>
-              <div class="label">Chicken</div>
-            </div>
+            ${sidesHTML}
           </div>
           <div id="side-status" class="waiting-text" style="min-height:1.5rem;"></div>
         </div>
@@ -184,17 +204,30 @@ export class UIManager {
     this.activeHUD = null;
     this.clear();
 
-    const isWinner = data.winner === this.network.playerId;
-    const messages = isWinner
-      ? ['SAYANG MENANG! 🤣🤣🤣', 'GG sayang~ kamu hebat!', 'LUCU BANGET menangnya! 💕']
-      : ['Yahhh kalah~ 😭', 'Nanti revenge ya say!', 'GG sayang~ next time!'];
-    const msg = messages[Math.floor(Math.random() * messages.length)];
+    // Game-specific victory messages
+    const game = GameRegistry.get(this.network.gameType);
+    const msgs = game?.victoryMessages;
+    let msg, sub;
+
+    if (data.isDraw) {
+      const pool = msgs?.draw || ["It's a draw!"];
+      msg = pool[Math.floor(Math.random() * pool.length)];
+      sub = `${data.p1Score} — ${data.p2Score}`;
+    } else if (data.isWinner) {
+      const pool = msgs?.win || ['You won!'];
+      msg = pool[Math.floor(Math.random() * pool.length)];
+      sub = 'You won!';
+    } else {
+      const pool = msgs?.lose || ['Better luck next time!'];
+      msg = pool[Math.floor(Math.random() * pool.length)];
+      sub = 'Better luck next time~';
+    }
 
     this.overlay.innerHTML = `
       <div class="victory-overlay">
         <div class="victory-text">${msg}</div>
-        <div class="victory-sub">${isWinner ? 'You won!' : 'Better luck next time~'}</div>
-        <button class="btn btn-pink" id="btn-rematch">Play Again 💕</button>
+        <div class="victory-sub">${sub}</div>
+        <button class="btn btn-pink" id="btn-rematch">Play Again</button>
         <button class="btn btn-blue btn-small" id="btn-lobby" style="margin-top:0.75rem;">Back to Lobby</button>
       </div>
     `;

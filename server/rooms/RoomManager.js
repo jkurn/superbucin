@@ -32,7 +32,7 @@ export class RoomManager {
     this.playerRooms.set(socket.id, code);
     socket.join(code);
 
-    socket.emit('room-created', { roomCode: code });
+    socket.emit('room-created', { roomCode: code, gameType });
     console.log(`Room ${code} created by ${socket.id}`);
   }
 
@@ -58,7 +58,7 @@ export class RoomManager {
     room.state = 'side-select';
 
     // Notify both players
-    this.io.to(roomCode).emit('room-joined', { roomCode });
+    this.io.to(roomCode).emit('room-joined', { roomCode, gameType: room.gameType });
     room.players[0].socket.emit('player-joined', {});
     console.log(`${socket.id} joined room ${roomCode}`);
   }
@@ -142,6 +142,16 @@ export class RoomManager {
     room.game.requestSpawn(socket.id, tier, lane);
   }
 
+  handleAction(socket, action) {
+    const roomCode = this.playerRooms.get(socket.id);
+    const room = this.rooms.get(roomCode);
+    if (!room || !room.game) return;
+
+    if (typeof room.game.handleAction === 'function') {
+      room.game.handleAction(socket.id, action);
+    }
+  }
+
   handleGameEvent(room, event, data) {
     // Only emit to connected players
     const connected = room.players.filter((p) => !p.disconnected);
@@ -149,11 +159,17 @@ export class RoomManager {
     switch (event) {
       case 'state-update':
         connected.forEach((p) => {
-          p.socket.emit('game-state', {
-            units: data.units,
-            playerHP: data.playerHP,
-            energy: data.energies[p.id],
-          });
+          if (data.energies) {
+            // Per-player format (Pig vs Chick)
+            p.socket.emit('game-state', {
+              units: data.units,
+              playerHP: data.playerHP,
+              energy: data.energies[p.id],
+            });
+          } else {
+            // Broadcast format (Othello, etc.)
+            p.socket.emit('game-state', { ...data, yourId: p.id });
+          }
         });
         break;
 
@@ -165,9 +181,18 @@ export class RoomManager {
             p1Score: data.scores[0],
             p2Score: data.scores[1],
             isWinner: data.winnerId === p.id,
+            isDraw: data.winnerId === null,
           });
         });
         break;
+
+      case 'action-error': {
+        const target = connected.find((p) => p.id === data.playerId);
+        if (target) {
+          target.socket.emit('action-error', { code: data.code, message: data.message });
+        }
+        break;
+      }
     }
   }
 
@@ -184,7 +209,7 @@ export class RoomManager {
     });
     room.state = 'side-select';
 
-    this.io.to(roomCode).emit('room-joined', { roomCode });
+    this.io.to(roomCode).emit('room-joined', { roomCode, gameType: room.gameType });
   }
 
   rejoinRoom(socket, roomCode) {
@@ -218,25 +243,9 @@ export class RoomManager {
     this.playerRooms.set(socket.id, roomCode);
     socket.join(roomCode);
 
-    // Update GameState player ID references
-    if (room.game) {
-      if (room.game.p1.id === oldId) {
-        room.game.p1 = dcPlayer;
-        // Migrate energy and HP keys
-        room.game.energies[socket.id] = room.game.energies[oldId];
-        delete room.game.energies[oldId];
-        room.game.playerHP[socket.id] = room.game.playerHP[oldId];
-        delete room.game.playerHP[oldId];
-        // Migrate unit ownership
-        room.game.units.forEach((u) => { if (u.ownerId === oldId) u.ownerId = socket.id; });
-      } else if (room.game.p2.id === oldId) {
-        room.game.p2 = dcPlayer;
-        room.game.energies[socket.id] = room.game.energies[oldId];
-        delete room.game.energies[oldId];
-        room.game.playerHP[socket.id] = room.game.playerHP[oldId];
-        delete room.game.playerHP[oldId];
-        room.game.units.forEach((u) => { if (u.ownerId === oldId) u.ownerId = socket.id; });
-      }
+    // Delegate player ID migration to game
+    if (room.game && typeof room.game.migratePlayer === 'function') {
+      room.game.migratePlayer(oldId, socket.id, dcPlayer);
     }
 
     // Notify opponent

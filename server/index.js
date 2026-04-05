@@ -6,9 +6,11 @@ import path from 'path';
 import { RoomManager } from './rooms/RoomManager.js';
 import { GameFactory } from './games/GameFactory.js';
 import { GameState, GAME_CONFIG } from './games/pig-vs-chick/GameState.js';
+import { GameState as OthelloGameState, GAME_CONFIG as OTHELLO_CONFIG } from './games/othello/GameState.js';
 
 // Register all games
 GameFactory.register('pig-vs-chick', GameState, GAME_CONFIG);
+GameFactory.register('othello', OthelloGameState, OTHELLO_CONFIG);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -51,6 +53,10 @@ io.on('connection', (socket) => {
 
   socket.on('spawn-unit', (data) => {
     roomManager.spawnUnit(socket, data.tier, data.lane);
+  });
+
+  socket.on('game-action', (data) => {
+    roomManager.handleAction(socket, data);
   });
 
   socket.on('rematch', () => {

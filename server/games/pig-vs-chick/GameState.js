@@ -63,6 +63,16 @@ export class GameState {
     this.interval = setInterval(() => this.tick(dt), 1000 / GAME_CONFIG.TICK_RATE);
   }
 
+  migratePlayer(oldId, newId, playerObj) {
+    if (this.p1.id === oldId) this.p1 = playerObj;
+    else if (this.p2.id === oldId) this.p2 = playerObj;
+    this.energies[newId] = this.energies[oldId];
+    delete this.energies[oldId];
+    this.playerHP[newId] = this.playerHP[oldId];
+    delete this.playerHP[oldId];
+    this.units.forEach((u) => { if (u.ownerId === oldId) u.ownerId = newId; });
+  }
+
   tick(dt) {
     if (!this.active) return;
 
