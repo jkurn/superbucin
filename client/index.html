@@ -1503,6 +1503,7 @@
     .profile-screen {
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
+      padding-bottom: 5rem; /* space for sticky action bar */
     }
     .profile-header {
       display: flex;
@@ -1560,6 +1561,7 @@
       width: 100%;
       max-width: 360px;
       min-height: 200px;
+      padding-bottom: 0.5rem;
     }
     .profile-loading, .profile-empty {
       text-align: center;
@@ -1570,7 +1572,16 @@
     .profile-actions {
       display: flex;
       gap: 0.5rem;
-      margin-top: 1rem;
+      position: sticky;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      max-width: 360px;
+      padding: 0.75rem 0 max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
+      background: linear-gradient(to top, #0d0d1a 70%, transparent);
+      margin-top: auto;
+      justify-content: center;
     }
 
     /* Stats */
