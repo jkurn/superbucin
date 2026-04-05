@@ -27,10 +27,17 @@ Before pushing to main (auto-deploys to Render):
 - [ ] Health check responds: `curl https://superbucin.pricylia.com/health`
 
 ### Pre-push Quality Checks
+- [ ] Run `npm run lint` — must exit with 0 errors (warnings OK; **errors block commit via husky**)
 - [ ] Run `npx vite build` in `client/` — verify zero errors
 - [ ] Open preview on mobile viewport — check profile, lobby, game screens
 - [ ] If adding a new game: verify `side` property (not `id`) in sideSelect options
 - [ ] If adding a new external service: add env vars to BOTH `.env` AND Render dashboard
+
+### Linting
+- ESLint 9 configured in `eslint.config.js` (flat config)
+- **Pre-commit hook** (husky + lint-staged) auto-runs `eslint --fix` on staged JS files — errors block the commit
+- Convention: prefix intentionally-unused params/vars with `_` (e.g. `_roomOptions`, `_network`) to satisfy the linter
+- `console.*` in client code generates warnings (not errors) — NetworkManager/UIManager are exempt in practice
 
 ### Notes
 - WebSocket (Socket.io) server — incompatible with Vercel, Netlify, GitHub Pages, Cloudflare Pages/Workers free

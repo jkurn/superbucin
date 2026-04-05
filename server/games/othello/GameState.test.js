@@ -329,7 +329,7 @@ describe('Othello GameState', () => {
 
   describe('full game simulation', () => {
     it('plays a sequence of valid moves without crashing', () => {
-      const { game, events } = createGame();
+      const { game } = createGame();
       game.start();
 
       let moves = 0;

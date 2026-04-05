@@ -14,7 +14,7 @@ export const memoryMatchGame = {
   Scene: MemoryMatchScene,
   applyConfig: applyServerConfig,
 
-  createHUD(overlay, data, network) {
+  createHUD(overlay, data, _network) {
     const packId = data.memoryRoom?.packId || GAME_CONFIG.defaultPack || 'nickname';
     const grid = data.memoryRoom?.gridSize || 4;
     const speed = data.memoryRoom?.speedMode ? 'On' : 'Off';

@@ -33,7 +33,7 @@ function matchRoute(pathname) {
   return { route: 'lobby' };
 }
 
-function resolve(matched, { replace: isReplace = false } = {}) {
+function resolve(matched, { replace: _isReplace = false } = {}) {
   const { route } = matched;
 
   if (route === 'lobby') {

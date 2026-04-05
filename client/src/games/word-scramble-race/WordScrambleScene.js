@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 /** Minimal 3D scene — gameplay is DOM (grid) in the overlay HUD. */
 export class WordScrambleScene {
-  constructor(sceneManager, network, ui, gameData) {
+  constructor(sceneManager, _network, _ui, _gameData) {
     this.sceneManager = sceneManager;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x12121f);

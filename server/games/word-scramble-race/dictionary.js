@@ -18,7 +18,7 @@ export async function isValidEnglishWord(word) {
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
     ok = res.ok;
   } catch {
-    ok = false;
+    // ok stays false on network error or timeout
   }
 
   if (cache.size >= CACHE_MAX) {

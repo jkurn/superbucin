@@ -266,7 +266,7 @@ export class DoodleGuessGameState {
     else if (s2 > s1) winnerId = this.p2.id;
     this.emit('match-end', {
       winnerId,
-      tie: winnerId == null,
+      tie: winnerId === null,
       scores: [s1, s2],
     });
   }

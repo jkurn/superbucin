@@ -384,7 +384,6 @@ export class RoomManager {
 
       case 'memory-state': {
         const p1p = room.players[0];
-        const p2p = room.players[1];
         connected.forEach((p) => {
           const slice = p.id === p1p.id ? data.p1 : data.p2;
           if (slice) p.socket.emit('memory-state', slice);
@@ -403,7 +402,6 @@ export class RoomManager {
       case 'match-end': {
         room.state = 'finished';
         const p1 = room.players[0];
-        const p2 = room.players[1];
 
         this._recordMatchResult(room, data).catch((err) => {
           console.error('Failed to record match:', err);
@@ -420,7 +418,7 @@ export class RoomManager {
             p2Score: data.scores[1],
             yourScore,
             oppScore,
-            isWinner: data.winnerId != null && data.winnerId === p.id,
+            isWinner: data.winnerId !== null && data.winnerId === p.id,
           });
         });
         break;

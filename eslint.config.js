@@ -17,6 +17,12 @@ export default [
     rules: {
       eqeqeq: ['error', 'always'],
       'no-console': 'warn',
+      'no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_',
+      }],
     },
   },
 
@@ -32,6 +38,12 @@ export default [
     },
     rules: {
       eqeqeq: ['error', 'always'],
+      'no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_',
+      }],
     },
   },
 

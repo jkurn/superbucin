@@ -260,8 +260,6 @@ export const doodleGuessGame = {
     function scoreLine(scores) {
       const ids = Object.keys(scores);
       if (ids.length < 2) return '0 — 0';
-      const a = scores[ids[0]] ?? 0;
-      const b = scores[ids[1]] ?? 0;
       const mine = scores[myId] ?? 0;
       const theirs = ids.filter((id) => id !== myId).map((id) => scores[id] ?? 0)[0] ?? 0;
       return `${mine} — ${theirs}`;
