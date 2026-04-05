@@ -101,12 +101,26 @@ export class RoomManager {
       return;
     }
 
+    // Clear the waiting timer if someone joins a persisted room
+    if (room._waitingTimer) {
+      clearTimeout(room._waitingTimer);
+      room._waitingTimer = null;
+    }
+
     const joinerIdentity = this._getIdentity(socket.id);
     room.players.push({ id: socket.id, socket, side: null, ready: false, identity: joinerIdentity });
     this.playerRooms.set(socket.id, roomCode);
     socket.join(roomCode);
 
-    const hostIdentity = room.players[0].identity;
+    const hostIdentity = room.players.length > 1 ? room.players[0].identity : joinerIdentity;
+
+    // If this joiner is alone (host left), put them in waiting state
+    if (room.players.length === 1) {
+      room.state = 'waiting';
+      socket.emit('room-created', { roomCode, gameType: room.gameType });
+      console.log(`${this._getDisplayName(socket.id)} joined empty room ${roomCode}, waiting for opponent`);
+      return;
+    }
 
     const skipSides = GameFactory.skipSideSelect(room.gameType);
     if (skipSides) {
@@ -605,6 +619,7 @@ export class RoomManager {
     const player = room.players.find((p) => p.id === socket.id);
     const otherPlayer = room.players.find((p) => p.id !== socket.id);
 
+    // --- In-game disconnect: pause + 45s grace ---
     if (room.state === 'playing' && room.game && player) {
       player.disconnected = true;
       room.game.pause();
@@ -627,6 +642,33 @@ export class RoomManager {
       return;
     }
 
+    // --- Waiting/side-select: keep room alive for shared links ---
+    if (room.state === 'waiting' || room.state === 'side-select') {
+      // Remove the disconnected player from the room
+      room.players = room.players.filter((p) => p.id !== socket.id);
+      this.playerRooms.delete(socket.id);
+
+      if (otherPlayer) {
+        otherPlayer.socket.emit('opponent-disconnected', { reconnecting: true });
+      }
+
+      // If room is now empty, keep it alive for 10 minutes (shared link grace)
+      if (room.players.length === 0) {
+        if (room._waitingTimer) clearTimeout(room._waitingTimer);
+        room._waitingTimer = setTimeout(() => {
+          if (this.rooms.has(roomCode) && this.rooms.get(roomCode).players.length === 0) {
+            this.rooms.delete(roomCode);
+            console.log(`Room ${roomCode} destroyed (empty waiting timeout — 10 min)`);
+          }
+        }, 10 * 60 * 1000);
+        console.log(`Room ${roomCode} host left, keeping alive 10 min for shared links`);
+      } else {
+        console.log(`Player left room ${roomCode}, 1 player remaining`);
+      }
+      return;
+    }
+
+    // --- Finished/other states: destroy ---
     if (otherPlayer) {
       otherPlayer.socket.emit('opponent-disconnected', { reconnecting: false });
     }

@@ -21,7 +21,6 @@ function matchRoute(pathname) {
   const p = pathname.replace(/\/+$/, '') || '/';
 
   if (p === '/') return { route: 'lobby' };
-  if (p === '/profile') return { route: 'profile' };
   if (p === '/auth') return { route: 'auth' };
   if (p === '/reset-password') return { route: 'reset-password' };
 
@@ -43,9 +42,6 @@ function resolve(matched, { replace: isReplace = false } = {}) {
   } else if (route === 'auth') {
     _currentPath = '/auth';
     _ui.showAuthScreen({ fromRouter: true });
-  } else if (route === 'profile') {
-    _currentPath = '/profile';
-    _ui.showProfile({ fromRouter: true });
   } else if (route === 'user') {
     _currentPath = `/u/${matched.username}`;
     _ui.showPublicProfile(matched.username);

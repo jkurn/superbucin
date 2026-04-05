@@ -258,8 +258,9 @@ export class UIManager {
   // ==================== PROFILE SCREEN ====================
   async showProfile(options) {
     if (this.userManager.isGuest) { this.showAuthScreen(); return; }
+    const username = this.userManager.profile.username;
     if (this._router && !(options && options.fromRouter)) {
-      this._router.navigate('/profile');
+      this._router.navigate(`/u/${username}`);
     }
 
     this.clear();
@@ -518,6 +519,13 @@ export class UIManager {
 
   // ==================== PUBLIC PROFILE ====================
   async showPublicProfile(username) {
+    // If viewing own profile, show the editable version
+    const ownUsername = this.userManager.profile?.username;
+    if (!this.userManager.isGuest && ownUsername && ownUsername === username) {
+      this.showProfile({ fromRouter: true });
+      return;
+    }
+
     this.clear();
     this.overlay.innerHTML = `
       <div class="lobby-ui profile-screen">
