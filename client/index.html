@@ -449,7 +449,14 @@
     .victory-sub {
       font-size: 1.2rem;
       color: #a0a0c0;
+      margin-bottom: 0.75rem;
+    }
+    .victory-score {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: white;
       margin-bottom: 2rem;
+      letter-spacing: 0.1em;
     }
 
     /* Reconnecting overlay */
@@ -593,8 +600,18 @@
       justify-content: center;
       gap: 1.5rem;
       padding: 0.75rem 1rem;
-      background: linear-gradient(0deg, rgba(0,0,0,0.6) 0%, transparent 100%);
+      background: rgba(0,0,0,0.5);
       z-index: 20;
+      transition: all 0.4s ease;
+    }
+    .othello-score-bar.my-turn {
+      background: linear-gradient(90deg, rgba(80,200,120,0.6) 0%, rgba(40,160,80,0.6) 100%);
+      box-shadow: 0 -2px 20px rgba(80,200,120,0.4);
+      animation: turnPulseBottom 1.5s ease-in-out infinite;
+    }
+    @keyframes turnPulseBottom {
+      0%, 100% { box-shadow: 0 -2px 20px rgba(80,200,120,0.3); }
+      50% { box-shadow: 0 -2px 30px rgba(80,200,120,0.6); }
     }
     .score-side {
       display: flex;

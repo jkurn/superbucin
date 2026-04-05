@@ -219,10 +219,12 @@ export class UIManager {
     const msgs = game?.victoryMessages;
     let msg, sub;
 
+    const hasScores = data.p1Score != null && data.p2Score != null;
+
     if (data.isDraw) {
       const pool = msgs?.draw || ["It's a draw!"];
       msg = pool[Math.floor(Math.random() * pool.length)];
-      sub = `${data.p1Score} — ${data.p2Score}`;
+      sub = "It's a draw!";
     } else if (data.isWinner) {
       const pool = msgs?.win || ['You won!'];
       msg = pool[Math.floor(Math.random() * pool.length)];
@@ -233,10 +235,15 @@ export class UIManager {
       sub = 'Better luck next time~';
     }
 
+    const scoreHTML = hasScores
+      ? `<div class="victory-score">${data.p1Score} — ${data.p2Score}</div>`
+      : '';
+
     this.overlay.innerHTML = `
       <div class="victory-overlay">
         <div class="victory-text">${msg}</div>
         <div class="victory-sub">${sub}</div>
+        ${scoreHTML}
         <button class="btn btn-pink" id="btn-rematch">Play Again</button>
         <button class="btn btn-blue btn-small" id="btn-lobby" style="margin-top:0.75rem;">Back to Lobby</button>
       </div>

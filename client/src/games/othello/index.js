@@ -75,6 +75,10 @@ export const othelloGame = {
           bar.classList.toggle('my-turn', isMyTurn);
           bar.classList.toggle('opp-turn', !isMyTurn);
         }
+        const scoreBar = document.getElementById('othello-score-bar');
+        if (scoreBar) {
+          scoreBar.classList.toggle('my-turn', isMyTurn);
+        }
       },
     };
   },
