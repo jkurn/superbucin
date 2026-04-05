@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   root: '.',
-  // publicDir not needed — all models are procedural
+  envDir: '..',
   server: {
     host: true,
     port: 5173,
