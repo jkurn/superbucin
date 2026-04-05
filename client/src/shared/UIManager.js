@@ -267,23 +267,25 @@ export class UIManager {
     const profile = this.userManager.profile;
 
     this.overlay.innerHTML = `
-      <div class="lobby-ui profile-screen">
-        <div class="profile-header">
-          <img class="profile-avatar" src="${profile.avatarUrl}" alt="avatar" />
-          <div class="profile-name">${this.userManager.getDisplayLabel()}</div>
-          <div class="profile-bio">${profile.bio || 'No bio yet~'}</div>
-          <div class="profile-points">${profile.points} points ⭐</div>
+      <div class="profile-layout">
+        <div class="profile-scroll">
+          <div class="profile-header">
+            <img class="profile-avatar" src="${profile.avatarUrl}" alt="avatar" />
+            <div class="profile-name">${this.userManager.getDisplayLabel()}</div>
+            <div class="profile-bio">${profile.bio || 'No bio yet~'}</div>
+            <div class="profile-points">${profile.points} points ⭐</div>
+          </div>
+          <div class="profile-section-tabs">
+            <button class="profile-tab active" data-section="stats">Stats</button>
+            <button class="profile-tab" data-section="achievements">Achievements</button>
+            <button class="profile-tab" data-section="history">History</button>
+            <button class="profile-tab" data-section="settings">Settings</button>
+          </div>
+          <div class="profile-content" id="profile-content">
+            <div class="profile-loading">Loading...</div>
+          </div>
         </div>
-        <div class="profile-section-tabs">
-          <button class="profile-tab active" data-section="stats">Stats</button>
-          <button class="profile-tab" data-section="achievements">Achievements</button>
-          <button class="profile-tab" data-section="history">History</button>
-          <button class="profile-tab" data-section="settings">Settings</button>
-        </div>
-        <div class="profile-content" id="profile-content">
-          <div class="profile-loading">Loading...</div>
-        </div>
-        <div class="profile-actions">
+        <div class="profile-bottom-bar">
           <button class="btn btn-blue btn-small" id="btn-back-lobby-profile">← Lobby</button>
           <button class="btn btn-small" id="btn-signout" style="background:rgba(255,255,255,0.1);color:#ff6b9d;">Sign Out</button>
         </div>
