@@ -1,0 +1,86 @@
+{
+  "auditDate": "2026-04-05",
+  "project": "superbucin",
+  "scope": "full codebase (read-only CSO audit)",
+  "priorReport": null,
+  "trend": "baseline",
+  "filterStats": {
+    "candidatesConsidered": 18,
+    "filteredFalsePositives": 14,
+    "reported": 3,
+    "filterNotes": "Excluded: generic DoS/rate limits; SSRF path-only (dictionary API); room code guessing; npm audit clean (server + client); missing CSP as best-practice-only; production Socket.io CORS ambiguity without runtime proof."
+  },
+  "supplyChain": {
+    "serverNpmAudit": "0 vulnerabilities",
+    "clientNpmAudit": "0 vulnerabilities"
+  },
+  "countsBySeverity": {
+    "critical": 0,
+    "high": 3,
+    "medium": 0,
+    "low": 0
+  },
+  "findings": [
+    {
+      "id": 1,
+      "title": "Supabase RLS policies allow unrestricted row access for granted API roles",
+      "severity": "HIGH",
+      "confidence": 9,
+      "confidenceVerification": "independent",
+      "category": "Broken access control",
+      "owasp": "A01",
+      "files": [
+        { "path": "supabase-schema.sql", "line": 66 },
+        { "path": "supabase-schema.sql", "line": 69 },
+        { "path": "supabase-schema.sql", "line": 91 },
+        { "path": "supabase-schema.sql", "line": 94 },
+        { "path": "supabase-schema.sql", "line": 144 },
+        { "path": "supabase-schema.sql", "line": 147 }
+      ],
+      "description": "Policies use `using (true)` / `with check (true)` on SELECT for match_history and FOR ALL on user_stats and user_achievements. For any database role that PostgREST exposes (typically authenticated, and sometimes anon depending on GRANTs), RLS does not restrict which rows are visible or mutable—only table-level privileges apply.",
+      "exploitScenario": "1) Extract Supabase URL and anon key from the built client. 2) As an authenticated user (or anon if inserts are granted), call the REST API or use the Supabase client. 3) SELECT all rows from match_history, user_stats, or user_achievements without filtering by user. 4) Optionally issue UPDATE/INSERT/DELETE on user_stats or user_achievements if those privileges exist, affecting arbitrary user_id rows (e.g. inflate wins or forge achievements).",
+      "impact": "Mass disclosure of match and stats data; potential integrity loss for leaderboards and achievements if DML is granted to browser-facing roles.",
+      "recommendation": "Replace `using (true)` on mutating policies with server-only access: revoke INSERT/UPDATE/DELETE from anon/authenticated on these tables and perform all writes via service_role from Node; or use restrictive policies (e.g. `auth.uid() = user_id` for user_stats rows, deny client INSERT on match_history entirely). Narrow SELECT on match_history to participants only if privacy matters.",
+      "verificationNotes": "Read schema lines only; PostgreSQL RLS semantics: FOR ALL USING (true) does not scope rows. Exploit requires role has DML—common in hand-rolled Supabase grants; confirm in Dashboard → Table → Policies + privileges."
+    },
+    {
+      "id": 2,
+      "title": "Socket identify trusts client-supplied userId for server-side stats and match rows",
+      "severity": "HIGH",
+      "confidence": 9,
+      "confidenceVerification": "independent",
+      "category": "Identification and authentication failures",
+      "owasp": "A07",
+      "files": [
+        { "path": "server/rooms/RoomManager.js", "line": 26 },
+        { "path": "server/services/UserService.js", "line": 9 }
+      ],
+      "description": "RoomManager.setIdentity copies userId, displayName, avatarUrl, and isGuest from the socket payload with no cryptographic verification. UserService.recordMatch uses that identity when inserting match_history and updating user_stats/profiles via the service-role Supabase client.",
+      "exploitScenario": "1) Obtain a victim's profile UUID (e.g. from public profiles, leaked match rows, or social engineering). 2) Open the game client or a custom Socket.io client. 3) Emit identify with `{ isGuest: false, userId: '<victim-uuid>', displayName: '...', ... }`. 4) Complete games so the server calls recordMatch; wins, points, achievements, and match_history rows are attributed to the victim (or grief their stats).",
+      "impact": "Integrity and reputation damage: forged stats, leaderboard manipulation, incorrect match history attribution; pairs with weak RLS can worsen data exposure.",
+      "recommendation": "On connect or identify, require a Supabase JWT (access token); verify signature and expiry server-side; bind socket identity to `sub` from the token. Ignore client-sent userId for authenticated flows. Guests should have null userId server-side.",
+      "verificationNotes": "Read RoomManager setIdentity and UserService recordMatch paths; no JWT check present in index.js identify handler."
+    },
+    {
+      "id": 3,
+      "title": "Profile UI uses innerHTML with unsanitized DB and opponent fields (XSS)",
+      "severity": "HIGH",
+      "confidence": 8,
+      "confidenceVerification": "independent",
+      "category": "Injection / XSS",
+      "owasp": "A03",
+      "files": [
+        { "path": "client/src/shared/UIManager.js", "line": 302 },
+        { "path": "client/src/shared/UIManager.js", "line": 340 }
+      ],
+      "description": "Match history renders opponent name and avatar URL inside template literals assigned to innerHTML. Settings pre-fills display name in a double-quoted value attribute and bio inside a textarea without escaping. Opponent display names and avatars are written server-side from socket identity fields that originated on the client and are stored in match_history.",
+      "exploitScenario": "1) Attacker sets malicious displayName or avatarUrl via identify (or profile if saved) containing HTML/script payloads or attribute breakouts (e.g. `\\\" onload=alert(1)` in src, or `</textarea><img src=x onerror=alert(1)>` in bio). 2) Victim plays a match; server persists strings to match_history. 3) Victim opens Profile → History or Settings; innerHTML/textarea parsing executes attacker-controlled markup in the victim's browser session.",
+      "impact": "Session takeover or phishing within the app origin (cookie theft if applicable, UI defacement, malicious redirects) depending on what the app stores in cookies/localStorage.",
+      "recommendation": "Stop using innerHTML for user-derived strings; use textContent for names, validate avatar URLs (https only, allowed host/path prefix), or build DOM nodes with safe APIs. Escape HTML entities for attribute and textarea contexts; consider DOMPurify if rich text is required.",
+      "verificationNotes": "Read UIManager _showHistorySection and _showSettingsSection; React escape hatch equivalent is raw innerHTML with interpolated data."
+    }
+  ],
+  "resolvedSinceLastAudit": [],
+  "persistentFromLastAudit": [],
+  "newThisAudit": [1, 2, 3]
+}

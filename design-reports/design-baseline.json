@@ -1,0 +1,41 @@
+{
+  "date": "2026-04-05",
+  "url": "https://superbucin.pricylia.com",
+  "designScore": "B+",
+  "aiSlopScore": "A-",
+  "categoryGrades": {
+    "hierarchy": "B+",
+    "typography": "B",
+    "spacing": "B",
+    "color": "B+",
+    "interaction": "B-",
+    "responsive": "B+",
+    "content": "A-",
+    "aiSlop": "A-",
+    "motion": "B",
+    "performanceFeel": "B"
+  },
+  "findings": [
+    {
+      "id": "FINDING-001",
+      "title": "Lobby clipped on small viewports",
+      "impact": "high",
+      "category": "responsive",
+      "fixStatus": "fixed"
+    },
+    {
+      "id": "FINDING-002",
+      "title": "Game cards and side options not semantic buttons",
+      "impact": "medium",
+      "category": "accessibility",
+      "fixStatus": "deferred"
+    },
+    {
+      "id": "FINDING-003",
+      "title": "Viewport prevents user zoom",
+      "impact": "medium",
+      "category": "accessibility",
+      "fixStatus": "deferred"
+    }
+  ]
+}

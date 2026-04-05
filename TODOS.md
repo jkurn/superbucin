@@ -22,6 +22,22 @@
 - [x] ~~Add weight-based unit system (10kg/20kg/50kg/70kg)~~ — Done: server + client configs aligned, units have weight/hp/speed/cost
 - [x] ~~Add 3D floating HP bars on units~~ — Done: subtle canvas sprite bars above each unit, auto-updates per tick
 
+## Backlog — next games (/autoplan 2026-04-05)
+
+See `planning/2026-04-05-next-three-games.md` for CEO/Design/Eng rationale and test matrix.
+
+- [ ] **Connect Four** (“Stack for Us”) — 7×6, server-authoritative drops, reuse `game-action` or dedicated event
+- [ ] **Mini Battleship** (“Sink Squad”) — 5×5, 3 ships, place → battle; **no opponent grid leakage**
+- [ ] **Quiz Race** (“Blitz Trivia”) — host JSON pack, first-correct wins round, server timestamps
+
+Suggested build order in plan: Connect Four → Quiz Race → Battleship (complexity). Override in plan gate if you prefer.
+
+## Deferred from /design-review (2026-04-05)
+
+- [ ] Semantic lobby/side controls — replace `.game-card` / `.side-option` divs with `<button>` or `role="button"` + keyboard (FINDING-002)
+- [ ] Revisit viewport meta (`user-scalable=no`) for a11y vs game input (FINDING-003)
+- [x] ~~Lobby scroll on small screens~~ — Fixed: `.lobby-ui` `overflow-y: auto`, safe-area padding, `touch-action: pan-y` (FINDING-001)
+
 ## Deferred from plan-eng-review (2026-04-05)
 
 - [ ] Path-scoped `.claude/rules/` — enforce "no hardcoded numbers in game logic", "no direct game imports in UI", "server-authoritative networking". Prevention, not blocker.

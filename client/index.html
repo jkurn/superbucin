@@ -59,7 +59,7 @@
       50% { opacity: 1; }
     }
 
-    /* Lobby UI */
+    /* Lobby UI — scrollable so all game cards reach small viewports */
     .lobby-ui {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -67,6 +67,12 @@
       flex-direction: column;
       align-items: center;
       padding: 2rem 1rem;
+      padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+      touch-action: pan-y;
     }
     .lobby-title {
       font-size: 2.5rem;
