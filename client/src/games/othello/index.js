@@ -11,8 +11,8 @@ export const othelloGame = {
     icon: '⚫',
     badge: '2 Players',
     sides: [
-      { id: 'black', label: 'Black', emoji: '⚫' },
-      { id: 'white', label: 'White', emoji: '⚪' },
+      { side: 'black', label: 'Black', emoji: '⚫' },
+      { side: 'white', label: 'White', emoji: '⚪' },
     ],
   },
   victoryMessages: {
@@ -24,8 +24,8 @@ export const othelloGame = {
     title: 'OTHELLO',
     pickTitle: 'Pick your disc color!',
     options: [
-      { id: 'black', label: 'Black', emoji: '⚫' },
-      { id: 'white', label: 'White', emoji: '⚪' },
+      { side: 'black', label: 'Black', emoji: '⚫' },
+      { side: 'white', label: 'White', emoji: '⚪' },
     ],
   },
   Scene: OthelloScene,
