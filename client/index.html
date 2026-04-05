@@ -183,9 +183,6 @@
     }
     .game-card:active { transform: scale(0.95); }
     .game-card.active {
-      border-color: rgba(255, 255, 255, 0.2);
-    }
-    .game-card.active.selected {
       border-color: #ff6b9d;
       box-shadow: 0 0 20px rgba(255, 107, 157, 0.3);
     }
@@ -1372,7 +1369,8 @@
       align-items: center;
       justify-content: space-between;
       padding: 0.45rem 0.75rem;
-      background: linear-gradient(180deg, rgba(15,12,28,0.95) 0%, rgba(15,12,28,0.7) 80%, transparent 100%);
+      background: rgba(15,12,28,0.98);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
       z-index: 30;
       pointer-events: auto;
     }
