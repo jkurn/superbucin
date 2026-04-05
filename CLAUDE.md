@@ -16,6 +16,22 @@
 ### Project reference
 - **Game / art inventory:** [ASSETS.md](./ASSETS.md) — local Kenney packs (`kenney_*/`, gitignored), 2D vs 3D, runtime asset paths. Use `@ASSETS.md` when adding or wiring art.
 
+### Deploy Checklist
+Before pushing to main (auto-deploys to Render):
+- [ ] Render env vars match local `.env` — all 4 Supabase vars: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`
+- [ ] CORS origins in `server/index.js` include `https://superbucin.pricylia.com`
+- [ ] Supabase Auth redirect URLs include production domain (Supabase dashboard > Auth > URL Configuration)
+- [ ] Render env group is linked to this web service
+- [ ] Test on a real mobile phone (iOS Safari) before announcing to users
+- [ ] Verify JS bundle contains Supabase URL: `curl -s https://superbucin.pricylia.com/assets/*.js | grep -o 'SUPABASE_URL\|supabase\.co'`
+- [ ] Health check responds: `curl https://superbucin.pricylia.com/health`
+
+### Pre-push Quality Checks
+- [ ] Run `npx vite build` in `client/` — verify zero errors
+- [ ] Open preview on mobile viewport — check profile, lobby, game screens
+- [ ] If adding a new game: verify `side` property (not `id`) in sideSelect options
+- [ ] If adding a new external service: add env vars to BOTH `.env` AND Render dashboard
+
 ### Notes
 - WebSocket (Socket.io) server — incompatible with Vercel, Netlify, GitHub Pages, Cloudflare Pages/Workers free
 - Render serves built Vite client (`client/dist/`) as static files via Express

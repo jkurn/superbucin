@@ -1,5 +1,7 @@
 // Doodle Guess — draw & guess with relationship-themed prompts
 
+/** @typedef {import('../../shared/GameTypes.js').GameDefinition} GameDefinition */
+
 import { DoodleGuessScene } from './DoodleGuessScene.js';
 import { DOODLE_CONFIG, applyServerConfig } from './config.js';
 
@@ -32,6 +34,7 @@ export const DOODLE_PROMPT_PACKS = [
   { id: 'custom', name: 'Custom only', emoji: '✨' },
 ];
 
+/** @type {GameDefinition} */
 export const doodleGuessGame = {
   type: 'doodle-guess',
   lobby: {

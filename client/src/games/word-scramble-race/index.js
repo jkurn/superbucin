@@ -1,5 +1,7 @@
 // Word Scramble Race — Boggle-style grid, dictionary validation on server
 
+/** @typedef {import('../../shared/GameTypes.js').GameDefinition} GameDefinition */
+
 import { WordScrambleScene } from './WordScrambleScene.js';
 import { GAME_CONFIG, applyServerConfig } from './config.js';
 import { EventBus } from '../../shared/EventBus.js';
@@ -11,6 +13,7 @@ function isAdjacent(a, b) {
   return dr <= 1 && dc <= 1 && !(dr === 0 && dc === 0);
 }
 
+/** @type {GameDefinition} */
 export const wordScrambleRaceGame = {
   type: 'word-scramble-race',
   lobby: {

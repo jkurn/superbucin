@@ -1,6 +1,9 @@
+/** @typedef {import('../../shared/GameTypes.js').GameDefinition} GameDefinition */
+
 import { MemoryMatchScene } from './MemoryMatchScene.js';
 import { GAME_CONFIG, applyServerConfig, MEMORY_PACK_CHOICES } from './config.js';
 
+/** @type {GameDefinition} */
 export const memoryMatchGame = {
   type: 'memory-match',
   lobby: {

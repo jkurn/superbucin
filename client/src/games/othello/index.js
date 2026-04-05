@@ -1,9 +1,12 @@
 // Othello — game module registration
 // Exports everything needed for GameRegistry
 
+/** @typedef {import('../../shared/GameTypes.js').GameDefinition} GameDefinition */
+
 import { OthelloScene } from './OthelloScene.js';
 import { applyServerConfig } from './config.js';
 
+/** @type {GameDefinition} */
 export const othelloGame = {
   type: 'othello',
   lobby: {

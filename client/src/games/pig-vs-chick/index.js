@@ -1,10 +1,13 @@
 // Pig vs Chick — game module registration
 // Exports everything needed for GameRegistry
 
+/** @typedef {import('../../shared/GameTypes.js').GameDefinition} GameDefinition */
+
 import { PigVsChickScene } from './PigVsChickScene.js';
 import { GAME_CONFIG, applyServerConfig } from './config.js';
 import { EventBus } from '../../shared/EventBus.js';
 
+/** @type {GameDefinition} */
 export const pigVsChickGame = {
   type: 'pig-vs-chick',
   lobby: {

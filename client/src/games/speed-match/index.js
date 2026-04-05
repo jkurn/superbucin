@@ -1,3 +1,5 @@
+/** @typedef {import('../../shared/GameTypes.js').GameDefinition} GameDefinition */
+
 import { SpeedMatchScene } from './SpeedMatchScene.js';
 import { GAME_CONFIG, applyServerConfig } from './config.js';
 import { EventBus } from '../../shared/EventBus.js';
@@ -10,6 +12,7 @@ const CATEGORY_LABELS = {
   partner: '💕 Sayang Says',
 };
 
+/** @type {GameDefinition} */
 export const speedMatchGame = {
   type: 'speed-match',
   lobby: {
