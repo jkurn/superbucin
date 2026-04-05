@@ -2,7 +2,7 @@
 // Exports everything needed for GameRegistry
 
 import { PigVsChickScene } from './PigVsChickScene.js';
-import { GAME_CONFIG, DISPLAY_CONFIG, applyServerConfig } from './config.js';
+import { GAME_CONFIG, applyServerConfig } from './config.js';
 
 export const pigVsChickGame = {
   type: 'pig-vs-chick',

@@ -2,15 +2,22 @@
   "name": "superbucin",
   "version": "1.0.0",
   "description": "SUPERBUCIN — A couples minigame collection",
+  "type": "module",
   "private": true,
   "scripts": {
     "dev:client": "cd client && npx vite --host",
     "dev:server": "cd server && node index.js",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build": "cd server && npm install && cd ../client && npm install && npx vite build",
-    "start": "cd server && node index.js"
+    "start": "cd server && node index.js",
+    "lint": "eslint client/src/ server/"
   },
   "dependencies": {
     "concurrently": "^8.2.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.2.0",
+    "globals": "^17.4.0"
   }
 }

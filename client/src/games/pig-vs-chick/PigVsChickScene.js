@@ -115,8 +115,7 @@ export class PigVsChickScene {
     }
 
     // Base zones (top = enemy or player depending on direction)
-    const baseColors = [0xff6b9d, 0x6bc5ff]; // pink, blue
-    [halfLane + 0.5, -halfLane - 0.5].forEach((z, i) => {
+    [halfLane + 0.5, -halfLane - 0.5].forEach((z) => {
       // Fence
       const fenceGeo = new THREE.PlaneGeometry(totalWidth, 0.8);
       const fenceMat = new THREE.MeshToonMaterial({
@@ -208,7 +207,7 @@ export class PigVsChickScene {
     this.units.set(id, unit);
   }
 
-  update(dt) {
+  update() {
     if (!this.gameActive) return;
 
     // Animate units — gentle bob
