@@ -621,9 +621,9 @@ export class RoomManager {
         this.rooms.delete(roomCode);
         room.players.forEach((p) => this.playerRooms.delete(p.id));
         console.log(`Room ${roomCode} destroyed (reconnect timeout)`);
-      }, 15000);
+      }, 45000);
 
-      console.log(`Player disconnected from room ${roomCode}, waiting 15s for reconnect...`);
+      console.log(`Player disconnected from room ${roomCode}, waiting 45s for reconnect...`);
       return;
     }
 

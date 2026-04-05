@@ -26,7 +26,14 @@ export class NetworkManager {
       ? 'http://localhost:3000'
       : window.location.origin;
 
-    this.socket = io(serverUrl, { transports: ['websocket', 'polling'] });
+    this.socket = io(serverUrl, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      reconnectionAttempts: 20,
+      timeout: 30000,
+    });
 
     this.socket.on('connect', () => {
       this.playerId = this.socket.id;
@@ -41,10 +48,15 @@ export class NetworkManager {
       }
     });
 
-    this.socket.on('disconnect', () => {
+    this.socket.on('disconnect', (reason) => {
+      console.log('Disconnected:', reason);
       if (this.roomCode && this._inGame) {
         this._wasInGame = true;
       }
+    });
+
+    this.socket.on('connect_error', (err) => {
+      console.warn('Connection error:', err.message);
     });
 
     this.socket.on('room-created', (data) => {

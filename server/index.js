@@ -24,15 +24,23 @@ const app = express();
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 app.use(express.static(clientDist));
 
+app.get('/health', (_req, res) => res.send('ok'));
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: [
       'http://localhost:5173',
       'http://localhost:4173',
+      'https://superbucin.pricylia.com',
+      'https://superbucin.onrender.com',
     ],
     methods: ['GET', 'POST'],
   },
+  pingInterval: 30000,
+  pingTimeout: 60000,
+  upgradeTimeout: 30000,
+  transports: ['websocket', 'polling'],
 });
 
 const roomManager = new RoomManager(io);
