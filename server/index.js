@@ -10,11 +10,13 @@ import { GameState as WordScrambleState, GAME_CONFIG as WORD_SCRAMBLE_CONFIG } f
 import { DoodleGuessGameState, DOODLE_GAME_CONFIG } from './games/doodle-guess/GameState.js';
 import { MemoryMatchGameState } from './games/memory-match/GameState.js';
 import { MEMORY_MATCH_CONFIG } from './games/memory-match/config.js';
+import { GameState as OthelloState, GAME_CONFIG as OTHELLO_CONFIG } from './games/othello/GameState.js';
 
 GameFactory.register('pig-vs-chick', GameState, GAME_CONFIG);
 GameFactory.register('word-scramble-race', WordScrambleState, WORD_SCRAMBLE_CONFIG);
 GameFactory.register('doodle-guess', DoodleGuessGameState, DOODLE_GAME_CONFIG);
 GameFactory.register('memory-match', MemoryMatchGameState, MEMORY_MATCH_CONFIG);
+GameFactory.register('othello', OthelloState, OTHELLO_CONFIG);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -80,6 +82,10 @@ io.on('connection', (socket) => {
 
   socket.on('memory-flip', (data) => {
     roomManager.memoryFlip(socket, data?.index);
+  });
+
+  socket.on('game-action', (data) => {
+    roomManager.handleAction(socket, data);
   });
 
   socket.on('rematch', () => {

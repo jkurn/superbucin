@@ -7,11 +7,13 @@ import { pigVsChickGame } from './games/pig-vs-chick/index.js';
 import { wordScrambleRaceGame } from './games/word-scramble-race/index.js';
 import { doodleGuessGame } from './games/doodle-guess/index.js';
 import { memoryMatchGame } from './games/memory-match/index.js';
+import { othelloGame } from './games/othello/index.js';
 
 GameRegistry.register('pig-vs-chick', pigVsChickGame);
 GameRegistry.register('word-scramble-race', wordScrambleRaceGame);
 GameRegistry.register('doodle-guess', doodleGuessGame);
 GameRegistry.register('memory-match', memoryMatchGame);
+GameRegistry.register('othello', othelloGame);
 
 const app = {
   sceneManager: null,

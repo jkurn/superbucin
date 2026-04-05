@@ -20,6 +20,14 @@ export const othelloGame = {
     lose: ['Better luck next time!', 'GG! Close game!', 'Almost had it!'],
     draw: ["It's a draw! Rematch?", 'Perfectly balanced!'],
   },
+  sideSelect: {
+    title: 'OTHELLO',
+    pickTitle: 'Pick your disc color!',
+    options: [
+      { id: 'black', label: 'Black', emoji: '⚫' },
+      { id: 'white', label: 'White', emoji: '⚪' },
+    ],
+  },
   Scene: OthelloScene,
   applyConfig: applyServerConfig,
 

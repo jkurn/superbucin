@@ -3,7 +3,7 @@ export const GAME_CONFIG = {
 };
 
 export class GameState {
-  constructor(player1, player2, emitCallback) {
+  constructor(player1, player2, emitCallback, _roomOptions = {}) {
     this.p1 = player1;
     this.p2 = player2;
     this.emit = emitCallback;

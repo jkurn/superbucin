@@ -50,6 +50,12 @@ export const GameFactory = {
       };
     }
 
+    if (gameType === 'othello') {
+      return {
+        BOARD_SIZE: config.BOARD_SIZE,
+      };
+    }
+
     if (gameType === 'word-scramble-race') {
       return {
         ROUND_DURATION_MS: config.ROUND_DURATION_MS,

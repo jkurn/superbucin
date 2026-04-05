@@ -157,7 +157,9 @@ export class RoomManager {
         ? ['p1', 'p2']
         : room.gameType === 'word-scramble-race'
           ? ['sprout', 'blossom']
-          : ['pig', 'chicken'];
+          : room.gameType === 'othello'
+            ? ['black', 'white']
+            : ['pig', 'chicken'];
     if (!validSides.includes(side)) {
       socket.emit('side-selected', { message: 'Pick a valid role!' });
       return;
@@ -300,6 +302,13 @@ export class RoomManager {
     room.game.tryFlip(socket.id, index);
   }
 
+  handleAction(socket, action) {
+    const roomCode = this.playerRooms.get(socket.id);
+    const room = this.rooms.get(roomCode);
+    if (!room?.game || typeof room.game.handleAction !== 'function') return;
+    room.game.handleAction(socket.id, action);
+  }
+
   handleGameEvent(room, event, data) {
     const connected = room.players.filter((p) => !p.disconnected);
 
@@ -368,6 +377,14 @@ export class RoomManager {
         });
         break;
       }
+
+      case 'action-error':
+        connected.forEach((p) => {
+          if (p.id === data.playerId) {
+            p.socket.emit('action-error', data);
+          }
+        });
+        break;
 
       case 'match-end': {
         room.state = 'finished';
