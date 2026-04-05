@@ -23,6 +23,7 @@ function matchRoute(pathname) {
   if (p === '/') return { route: 'lobby' };
   if (p === '/profile') return { route: 'profile' };
   if (p === '/auth') return { route: 'auth' };
+  if (p === '/reset-password') return { route: 'reset-password' };
 
   const roomMatch = p.match(/^\/room\/([A-Za-z0-9]{1,6})$/);
   if (roomMatch) return { route: 'room', code: roomMatch[1].toUpperCase() };
@@ -48,6 +49,9 @@ function resolve(matched, { replace: isReplace = false } = {}) {
   } else if (route === 'user') {
     _currentPath = `/u/${matched.username}`;
     _ui.showPublicProfile(matched.username);
+  } else if (route === 'reset-password') {
+    _currentPath = '/reset-password';
+    _ui.showResetPassword();
   } else if (route === 'room') {
     const code = matched.code;
     _currentPath = `/room/${code}`;

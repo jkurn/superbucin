@@ -42,6 +42,16 @@ const app = {
     // Let the Router decide which screen to show based on the URL
     Router.init(this.ui, this.network, this.userManager);
     this.ui.setRouter(Router);
+
+    // Listen for password recovery event from Supabase
+    this.userManager.onChange(() => {
+      if (this.userManager._passwordRecoveryPending) {
+        this.userManager._passwordRecoveryPending = false;
+        Router.replace('/reset-password');
+        this.ui.showResetPassword();
+      }
+    });
+
     this.sceneManager.startLoop();
   },
 };

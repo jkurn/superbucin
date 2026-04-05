@@ -63,7 +63,12 @@ export class UserManager {
       this._loadGuest();
     }
 
-    supabase.auth.onAuthStateChange(async (_event, session) => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        this._passwordRecoveryPending = true;
+        this._notify();
+        return;
+      }
       if (session?.user) {
         await this._loadAuthUser(session.user);
       } else {
@@ -192,6 +197,20 @@ export class UserManager {
 
     if (error) throw error;
     return data;
+  }
+
+  async resetPassword(email) {
+    if (!supabase) throw new Error('Supabase not configured');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) throw error;
+  }
+
+  async updatePassword(newPassword) {
+    if (!supabase) throw new Error('Supabase not configured');
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
   }
 
   async signOut() {

@@ -101,6 +101,7 @@ export class UIManager {
           <input class="auth-input" id="auth-email" type="email" placeholder="Email" autocomplete="email" />
           <input class="auth-input" id="auth-password" type="password" placeholder="Password" autocomplete="current-password" />
           <button class="btn btn-pink" id="btn-login">Log In</button>
+          <button class="auth-link" id="btn-forgot" type="button">Forgot password?</button>
           <div id="auth-error" class="auth-error"></div>
         </div>
 
@@ -176,7 +177,82 @@ export class UIManager {
       }
     });
 
+    document.getElementById('btn-forgot').addEventListener('click', () => this.showForgotPassword());
     document.getElementById('btn-back-lobby').addEventListener('click', () => this.showLobby());
+  }
+
+  // ==================== FORGOT / RESET PASSWORD ====================
+  showForgotPassword() {
+    this.clear();
+    this.overlay.innerHTML = `
+      <div class="lobby-ui">
+        <div class="lobby-title" style="font-size:1.8rem;">RESET PASSWORD</div>
+        <div class="lobby-subtitle">Enter your email and we'll send a reset link</div>
+        <div class="auth-form">
+          <input class="auth-input" id="reset-email" type="email" placeholder="Email" autocomplete="email" />
+          <button class="btn btn-pink" id="btn-send-reset">Send Reset Link</button>
+          <div id="reset-msg" class="auth-error"></div>
+        </div>
+        <button class="btn btn-blue btn-small" id="btn-back-auth" style="margin-top:1rem;">← Back to Sign In</button>
+      </div>
+    `;
+
+    document.getElementById('btn-send-reset').addEventListener('click', async () => {
+      const email = document.getElementById('reset-email').value.trim();
+      const msgEl = document.getElementById('reset-msg');
+      msgEl.style.color = '';
+      msgEl.textContent = '';
+
+      if (!email) { msgEl.textContent = 'Please enter your email'; return; }
+
+      try {
+        await this.userManager.resetPassword(email);
+        msgEl.style.color = '#7dffb3';
+        msgEl.textContent = 'Reset link sent! Check your email 💕';
+        document.getElementById('btn-send-reset').disabled = true;
+        document.getElementById('btn-send-reset').textContent = 'Sent!';
+      } catch (e) {
+        msgEl.textContent = e.message || 'Failed to send reset link';
+      }
+    });
+
+    document.getElementById('btn-back-auth').addEventListener('click', () => this.showAuthScreen());
+  }
+
+  showResetPassword() {
+    this.clear();
+    this.overlay.innerHTML = `
+      <div class="lobby-ui">
+        <div class="lobby-title" style="font-size:1.8rem;">NEW PASSWORD</div>
+        <div class="lobby-subtitle">Pick a new password for your account</div>
+        <div class="auth-form">
+          <input class="auth-input" id="new-password" type="password" placeholder="New password (min 6 chars)" autocomplete="new-password" />
+          <input class="auth-input" id="confirm-password" type="password" placeholder="Confirm password" autocomplete="new-password" />
+          <button class="btn btn-pink" id="btn-update-password">Update Password</button>
+          <div id="reset-pw-msg" class="auth-error"></div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('btn-update-password').addEventListener('click', async () => {
+      const pw = document.getElementById('new-password').value;
+      const confirmPw = document.getElementById('confirm-password').value;
+      const msgEl = document.getElementById('reset-pw-msg');
+      msgEl.style.color = '';
+      msgEl.textContent = '';
+
+      if (!pw || pw.length < 6) { msgEl.textContent = 'Password must be at least 6 characters'; return; }
+      if (pw !== confirmPw) { msgEl.textContent = 'Passwords do not match'; return; }
+
+      try {
+        await this.userManager.updatePassword(pw);
+        msgEl.style.color = '#7dffb3';
+        msgEl.textContent = 'Password updated! Redirecting... 💕';
+        setTimeout(() => this.showLobby(), 1500);
+      } catch (e) {
+        msgEl.textContent = e.message || 'Failed to update password';
+      }
+    });
   }
 
   // ==================== PROFILE SCREEN ====================
