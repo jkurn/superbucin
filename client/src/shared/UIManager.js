@@ -19,6 +19,11 @@ export class UIManager {
     this.selectedSide = null;
   }
 
+  /**
+   * @param {import('./NetworkManager.js').NetworkManager} network
+   * @param {import('./SceneManager.js').SceneManager} sceneManager
+   * @param {import('./UserManager.js').UserManager} userManager — profile UI, identify payload, history
+   */
   init(network, sceneManager, userManager) {
     this.network = network;
     this.sceneManager = sceneManager;
@@ -423,8 +428,7 @@ export class UIManager {
       </div>
     `).join('');
 
-    const padCount = Math.max(0, 4 - registered.length);
-    const padHTML = Array(padCount).fill(`
+    const padHTML = Array(3).fill(`
       <div class="game-card disabled">
         <div class="game-card-icon">🔒</div>
         <div class="game-card-title">Coming Soon</div>
