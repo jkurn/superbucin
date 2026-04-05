@@ -17,6 +17,12 @@ export class UIManager {
     this.gameScene = null;
     this.activeHUD = null;
     this.selectedSide = null;
+    this._router = null;
+  }
+
+  /** Called by main.js after Router.init() to give UIManager a reference. */
+  setRouter(router) {
+    this._router = router;
   }
 
   /**
@@ -77,7 +83,10 @@ export class UIManager {
   }
 
   // ==================== AUTH SCREEN ====================
-  showAuthScreen() {
+  showAuthScreen(options) {
+    if (this._router && !(options && options.fromRouter)) {
+      this._router.navigate('/auth');
+    }
     this.clear();
     this.overlay.innerHTML = `
       <div class="lobby-ui">
@@ -171,8 +180,11 @@ export class UIManager {
   }
 
   // ==================== PROFILE SCREEN ====================
-  async showProfile() {
+  async showProfile(options) {
     if (this.userManager.isGuest) { this.showAuthScreen(); return; }
+    if (this._router && !(options && options.fromRouter)) {
+      this._router.navigate('/profile');
+    }
 
     this.clear();
     const profile = this.userManager.profile;
@@ -414,8 +426,135 @@ export class UIManager {
     });
   }
 
+  // ==================== JOINING ROOM (deep-link loading screen) ====================
+  showJoiningRoom(code) {
+    this.clear();
+    this.overlay.innerHTML = `
+      <div class="lobby-ui">
+        <div class="lobby-title">SUPERBUCIN</div>
+        <div class="lobby-subtitle">sayang's game collection</div>
+        <div class="room-section">
+          <div class="waiting-text">Joining room ${code}...</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ==================== PUBLIC PROFILE ====================
+  async showPublicProfile(username) {
+    this.clear();
+    this.overlay.innerHTML = `
+      <div class="lobby-ui profile-screen">
+        <div class="profile-header">
+          <div class="profile-loading">Loading profile...</div>
+        </div>
+      </div>
+    `;
+
+    try {
+      const res = await fetch(`/api/profile/${encodeURIComponent(username)}`);
+      if (!res.ok) {
+        this.overlay.innerHTML = `
+          <div class="lobby-ui profile-screen">
+            <div class="profile-header">
+              <div class="profile-name">Player not found</div>
+              <div class="profile-bio">No player with username "${username}" exists.</div>
+            </div>
+            <div class="profile-actions">
+              <button class="btn btn-blue btn-small" id="btn-back-lobby-pub">\u2190 Back to Lobby</button>
+            </div>
+          </div>
+        `;
+        document.getElementById('btn-back-lobby-pub').addEventListener('click', () => this.showLobby());
+        return;
+      }
+
+      const data = await res.json();
+      const p = data.profile;
+      const stats = data.stats || [];
+      const achievements = data.achievements || [];
+
+      const gameNames = {
+        'pig-vs-chick': '\ud83d\udc37 Pig vs Chick',
+        'word-scramble-race': '\ud83d\udcdd Word Scramble',
+        'doodle-guess': '\ud83c\udfa8 Doodle Guess',
+        'memory-match': '\ud83e\udde0 Memory Match',
+      };
+
+      const totalWins = stats.reduce((s, x) => s + (x.wins || 0), 0);
+      const totalGames = stats.reduce((s, x) => s + (x.games_played || 0), 0);
+      const winRate = totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0;
+
+      const statsHtml = stats.length ? `
+        <div class="stats-summary">
+          <div class="stat-big"><span class="stat-big-num">${totalGames}</span><span class="stat-big-label">Games</span></div>
+          <div class="stat-big"><span class="stat-big-num">${totalWins}</span><span class="stat-big-label">Wins</span></div>
+          <div class="stat-big"><span class="stat-big-num">${winRate}%</span><span class="stat-big-label">Win Rate</span></div>
+        </div>
+        <div class="stats-grid">
+          ${stats.map((s) => `
+            <div class="stat-card">
+              <div class="stat-card-title">${gameNames[s.game_type] || s.game_type}</div>
+              <div class="stat-card-row"><span>Wins</span><strong>${s.wins}</strong></div>
+              <div class="stat-card-row"><span>Losses</span><strong>${s.losses}</strong></div>
+              <div class="stat-card-row"><span>Ties</span><strong>${s.ties}</strong></div>
+            </div>
+          `).join('')}
+        </div>
+      ` : '<div class="profile-empty">No games played yet!</div>';
+
+      const achievementsHtml = achievements.length ? `
+        <div class="achievements-grid" style="margin-top:1rem;">
+          ${achievements.map((ach) => `
+            <div class="achievement-card earned">
+              <div class="achievement-icon">${ach.icon || '\ud83c\udfc6'}</div>
+              <div class="achievement-info">
+                <div class="achievement-name">${ach.name}</div>
+                <div class="achievement-desc">${ach.description || ''}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : '';
+
+      this.overlay.innerHTML = `
+        <div class="lobby-ui profile-screen">
+          <div class="profile-header">
+            <img class="profile-avatar" src="${p.avatar_url || '/avatars/panda.png'}" alt="avatar" />
+            <div class="profile-name">${p.display_name || p.username}</div>
+            <div class="profile-bio">${p.bio || ''}</div>
+            <div class="profile-points">${p.points || 0} points \u2b50</div>
+          </div>
+          ${statsHtml}
+          ${achievementsHtml}
+          <div class="profile-actions" style="margin-top:1rem;">
+            <button class="btn btn-blue btn-small" id="btn-back-lobby-pub">\u2190 Back to Lobby</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('btn-back-lobby-pub').addEventListener('click', () => this.showLobby());
+    } catch (err) {
+      console.error('Failed to load public profile:', err);
+      this.overlay.innerHTML = `
+        <div class="lobby-ui profile-screen">
+          <div class="profile-header">
+            <div class="profile-name">Error</div>
+            <div class="profile-bio">Could not load profile. Try again later.</div>
+          </div>
+          <div class="profile-actions">
+            <button class="btn btn-blue btn-small" id="btn-back-lobby-pub">\u2190 Back to Lobby</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('btn-back-lobby-pub').addEventListener('click', () => this.showLobby());
+    }
+  }
+
   // ==================== LOBBY ====================
-  showLobby() {
+  showLobby(options) {
+    if (this._router && !(options && options.fromRouter)) {
+      this._router.navigate('/');
+    }
     this.clear();
 
     const registered = GameRegistry.list();
@@ -561,14 +700,23 @@ export class UIManager {
   }
 
   showWaitingRoom(roomCode) {
+    if (this._router) {
+      this._router.replace('/room/' + roomCode);
+    }
     this.clear();
     const profile = this.userManager.profile;
+    const shareUrl = `${window.location.origin}/room/${roomCode}`;
     this.overlay.innerHTML = `
       <div class="lobby-ui">
         <div class="lobby-title">SUPERBUCIN</div>
         <div class="lobby-subtitle">Share this code with sayang~</div>
         <div class="room-section">
           <div class="room-code-display">${roomCode}</div>
+          <div class="share-link-section">
+            <input class="share-link-input" id="share-link-url" value="${shareUrl}" readonly onclick="this.select()" />
+            <button class="btn btn-pink btn-small" id="btn-share-link">Share Link</button>
+            <div class="share-link-feedback" id="share-link-feedback"></div>
+          </div>
           <div class="waiting-player-card">
             <img class="waiting-player-avatar" src="${profile.avatarUrl}" alt="avatar" />
             <div class="waiting-player-name">${this.userManager.getDisplayLabel()}</div>
@@ -577,6 +725,26 @@ export class UIManager {
         </div>
       </div>
     `;
+
+    document.getElementById('btn-share-link').addEventListener('click', () => {
+      const urlInput = document.getElementById('share-link-url');
+      const feedback = document.getElementById('share-link-feedback');
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          feedback.textContent = 'Copied! \ud83d\udc95';
+          setTimeout(() => { if (feedback) feedback.textContent = ''; }, 2000);
+        }).catch(() => {
+          urlInput.select();
+          feedback.textContent = 'Select & copy the link above';
+          setTimeout(() => { if (feedback) feedback.textContent = ''; }, 2000);
+        });
+      } else {
+        urlInput.select();
+        document.execCommand('copy');
+        feedback.textContent = 'Copied! \ud83d\udc95';
+        setTimeout(() => { if (feedback) feedback.textContent = ''; }, 2000);
+      }
+    });
   }
 
   showSideSelect(roomCode) {

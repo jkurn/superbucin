@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { supabase as supabaseAdmin } from './supabaseAdmin.js';
 import { RoomManager } from './rooms/RoomManager.js';
 import { GameFactory } from './games/GameFactory.js';
 import { GameState, GAME_CONFIG } from './games/pig-vs-chick/GameState.js';
@@ -104,6 +105,60 @@ io.on('connection', (socket) => {
     console.log(`Player disconnected: ${socket.id}`);
     roomManager.handleDisconnect(socket);
   });
+});
+
+// ==================== REST API ====================
+
+app.get('/api/profile/:username', async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Database not configured' });
+  }
+
+  const { username } = req.params;
+
+  try {
+    // Look up the profile by username
+    const { data: profile, error: profileErr } = await supabaseAdmin
+      .from('profiles')
+      .select('id, username, display_name, avatar_url, bio, points')
+      .eq('username', username)
+      .single();
+
+    if (profileErr || !profile) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    // Fetch stats for this user
+    const { data: stats } = await supabaseAdmin
+      .from('user_stats')
+      .select('*')
+      .eq('user_id', profile.id);
+
+    // Fetch earned achievements with details
+    const { data: userAchievements } = await supabaseAdmin
+      .from('user_achievements')
+      .select('achievement_id, earned_at')
+      .eq('user_id', profile.id);
+
+    let achievements = [];
+    if (userAchievements && userAchievements.length > 0) {
+      const ids = userAchievements.map((ua) => ua.achievement_id);
+      const { data: achDetails } = await supabaseAdmin
+        .from('achievements')
+        .select('*')
+        .in('id', ids);
+      achievements = achDetails || [];
+    }
+
+    res.json({
+      profile,
+      stats: stats || [],
+      achievements,
+    });
+  } catch (err) {
+    console.error('Error fetching profile:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.get('*', (req, res) => {

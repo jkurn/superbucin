@@ -2,6 +2,7 @@ import { SceneManager } from './shared/SceneManager.js';
 import { NetworkManager } from './shared/NetworkManager.js';
 import { UIManager } from './shared/UIManager.js';
 import { UserManager } from './shared/UserManager.js';
+import { Router } from './shared/Router.js';
 import { GameRegistry } from './shared/GameRegistry.js';
 import { pigVsChickGame } from './games/pig-vs-chick/index.js';
 import { othelloGame } from './games/othello/index.js';
@@ -38,7 +39,9 @@ const app = {
     loading.classList.add('hidden');
     setTimeout(() => loading.remove(), 500);
 
-    this.ui.showLobby();
+    // Let the Router decide which screen to show based on the URL
+    Router.init(this.ui, this.network, this.userManager);
+    this.ui.setRouter(Router);
     this.sceneManager.startLoop();
   },
 };

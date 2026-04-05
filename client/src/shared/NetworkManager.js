@@ -15,6 +15,7 @@ export class NetworkManager {
     this._wasInGame = false;
     this.roomGameType = 'pig-vs-chick';
     this.opponentIdentity = null;
+    this.pendingJoinCode = null;
   }
 
   init(ui, sceneManager, userManager) {
@@ -45,6 +46,11 @@ export class NetworkManager {
         console.log('Attempting rejoin:', this.roomCode);
         this.socket.emit('rejoin-room', { roomCode: this.roomCode });
         this._wasInGame = false;
+      } else if (this.pendingJoinCode) {
+        const code = this.pendingJoinCode;
+        this.pendingJoinCode = null;
+        console.log('Deep-link join:', code);
+        this.joinRoom(code);
       }
     });
 
@@ -137,7 +143,18 @@ export class NetworkManager {
     });
 
     this.socket.on('error', (data) => {
-      this.ui.showError(data.message || 'Something went wrong');
+      const msg = data.message || 'Something went wrong';
+      this.ui.showError(msg);
+
+      // If the error relates to a room not found (deep link), go back to lobby
+      const lower = msg.toLowerCase();
+      if (lower.includes('room not found') || lower.includes('room is full') || lower.includes('no room')) {
+        // Lazy import to avoid circular dependency
+        import('./Router.js').then(({ Router }) => {
+          Router.navigate('/');
+          this.ui.showLobby({ fromRouter: true });
+        });
+      }
     });
   }
 
