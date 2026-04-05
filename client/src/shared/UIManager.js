@@ -843,8 +843,8 @@ export class UIManager {
     const options = ss?.options?.length
       ? ss.options
       : [
-          { side: 'pig', emoji: '🐷', label: 'Pig' },
-          { side: 'chicken', emoji: '🐔', label: 'Chicken' },
+          { id: 'pig', emoji: '🐷', label: 'Pig' },
+          { id: 'chicken', emoji: '🐔', label: 'Chicken' },
         ];
 
     const opp = this.network.opponentIdentity;
@@ -865,7 +865,7 @@ export class UIManager {
     const optionsHtml = options
       .map(
         (o) => `
-            <div class="side-option" data-side="${o.side}">
+            <div class="side-option" data-side="${o.id || o.side}">
               <div class="emoji">${o.emoji}</div>
               <div class="label">${o.label}</div>
             </div>`,
