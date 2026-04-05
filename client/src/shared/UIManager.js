@@ -444,27 +444,42 @@ export class UIManager {
       <div class="lobby-ui" style="padding-top:3.5rem;">
         <div class="lobby-title">SUPERBUCIN</div>
         <div class="lobby-subtitle">sayang's game collection 💕</div>
+        <div class="game-grid">
+          ${cardsHTML}${padHTML}
+        </div>
+        <div class="game-options-panel" id="game-options-panel" style="display:none;">
+          <button class="game-options-toggle" id="game-options-toggle" type="button">
+            <span id="game-options-label">Game Options</span>
+            <span class="game-options-chevron" id="game-options-chevron">›</span>
+          </button>
+          <div class="game-options-body" id="game-options-body" style="display:none;">
+            <div id="memory-room-options" style="display:none;">
+              <div class="game-options-group">
+                <label class="game-options-field-label">Card pack</label>
+                <select id="memory-pack" class="memory-pack-select">${packOptionsHtml}</select>
+              </div>
+              <div class="game-options-group">
+                <label class="game-options-field-label">Difficulty</label>
+                <div class="game-options-pills">
+                  <label class="game-options-pill"><input type="radio" name="memgrid" value="4" checked /><span>Easy 4×4</span></label>
+                  <label class="game-options-pill"><input type="radio" name="memgrid" value="6" /><span>Hard 6×6</span></label>
+                </div>
+              </div>
+              <label class="game-options-check"><input type="checkbox" id="memory-speed" /><span>Speed mode (timer)</span></label>
+            </div>
+            <div id="doodle-custom-wrap" style="display:none;">
+              <div class="game-options-group">
+                <label class="game-options-field-label">Custom prompts <span style="color:#666;">(optional)</span></label>
+                <textarea class="doodle-custom-textarea" id="doodle-custom-prompts" placeholder="Inside jokes, memories, nicknames… one per line" rows="3" maxlength="8000"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="room-section">
           <button class="btn btn-pink" id="btn-create">Create Room</button>
           <div class="or-divider">— or —</div>
           <input class="room-code-input" id="input-code" placeholder="Enter code" maxlength="4" />
           <button class="btn btn-blue btn-small" id="btn-join">Join Room</button>
-        </div>
-        <div class="game-grid">
-          ${cardsHTML}${padHTML}
-        </div>
-        <div id="memory-room-options" class="memory-room-options hidden">
-          <div class="memory-room-label">Memory Match — host picks pack & size</div>
-          <select id="memory-pack" class="memory-pack-select">${packOptionsHtml}</select>
-          <div class="memory-grid-pick">
-            <label class="memory-radio"><input type="radio" name="memgrid" value="4" checked /> Easy 4×4 (8 pairs)</label>
-            <label class="memory-radio"><input type="radio" name="memgrid" value="6" /> Hard 6×6 (18 pairs)</label>
-          </div>
-          <label class="memory-speed-label"><input type="checkbox" id="memory-speed" /> Speed mode (timer)</label>
-        </div>
-        <div class="doodle-custom-wrap" id="doodle-custom-wrap" style="display:none;">
-          <label class="doodle-custom-label" for="doodle-custom-prompts">Custom prompts (one per line, optional)</label>
-          <textarea class="doodle-custom-textarea" id="doodle-custom-prompts" placeholder="Inside jokes, memories, nicknames…" rows="4" maxlength="8000"></textarea>
         </div>
       </div>
     `;
@@ -472,12 +487,37 @@ export class UIManager {
     this._bindUserBar();
 
     let selectedGameType = registered[0]?.type || 'pig-vs-chick';
+    const optionsPanel = document.getElementById('game-options-panel');
+    const optionsToggle = document.getElementById('game-options-toggle');
+    const optionsBody = document.getElementById('game-options-body');
+    const optionsChevron = document.getElementById('game-options-chevron');
+    const optionsLabel = document.getElementById('game-options-label');
     const customWrap = document.getElementById('doodle-custom-wrap');
     const memOpts = document.getElementById('memory-room-options');
+    let optionsOpen = false;
+
+    const GAME_OPTION_LABELS = {
+      'memory-match': 'Memory Match Options',
+      'doodle-guess': 'Doodle Options',
+    };
+
+    optionsToggle.addEventListener('click', () => {
+      optionsOpen = !optionsOpen;
+      optionsBody.style.display = optionsOpen ? 'block' : 'none';
+      optionsChevron.classList.toggle('open', optionsOpen);
+    });
 
     const syncGameOptionPanels = () => {
+      const hasOptions = selectedGameType === 'doodle-guess' || selectedGameType === 'memory-match';
+      optionsPanel.style.display = hasOptions ? 'block' : 'none';
+      optionsLabel.textContent = GAME_OPTION_LABELS[selectedGameType] || 'Game Options';
       if (customWrap) customWrap.style.display = selectedGameType === 'doodle-guess' ? 'block' : 'none';
-      if (memOpts) memOpts.classList.toggle('hidden', selectedGameType !== 'memory-match');
+      if (memOpts) memOpts.style.display = selectedGameType === 'memory-match' ? 'block' : 'none';
+      if (!hasOptions) {
+        optionsOpen = false;
+        optionsBody.style.display = 'none';
+        optionsChevron.classList.remove('open');
+      }
     };
 
     this.overlay.querySelectorAll('.game-card[data-game-type]').forEach((card) => {

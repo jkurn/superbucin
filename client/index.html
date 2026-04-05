@@ -718,18 +718,98 @@
     }
 
     /* Doodle Guess */
-    .doodle-custom-wrap {
+    /* Game Options — collapsible panel */
+    .game-options-panel {
       width: 100%;
       max-width: 320px;
-      margin-top: 1rem;
+      margin-top: 0.75rem;
       pointer-events: auto;
     }
-    .doodle-custom-label {
+    .game-options-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 1rem;
+      border-radius: 14px;
+      border: 1.5px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.04);
+      color: #a0a0c0;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .game-options-toggle:active {
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .game-options-chevron {
+      font-size: 1rem;
+      transition: transform 0.25s ease;
+      display: inline-block;
+    }
+    .game-options-chevron.open {
+      transform: rotate(90deg);
+    }
+    .game-options-body {
+      margin-top: 0.5rem;
+      padding: 0.75rem 0.85rem;
+      border-radius: 14px;
+      border: 1.5px solid rgba(255, 107, 157, 0.2);
+      background: rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .game-options-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .game-options-field-label {
+      color: #a0a0c0;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .game-options-pills {
+      display: flex;
+      gap: 0.4rem;
+    }
+    .game-options-pill {
+      flex: 1;
+      cursor: pointer;
+    }
+    .game-options-pill input { display: none; }
+    .game-options-pill span {
       display: block;
+      text-align: center;
+      padding: 0.4rem 0.5rem;
+      border-radius: 10px;
+      border: 1.5px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
       color: #a0a0c0;
       font-size: 0.75rem;
-      margin-bottom: 0.35rem;
       font-weight: 600;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+    .game-options-pill input:checked + span {
+      border-color: #ff6b9d;
+      color: #ff6b9d;
+      background: rgba(255, 107, 157, 0.1);
+    }
+    .game-options-check {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: #a0a0c0;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+    .doodle-custom-wrap {
+      width: 100%;
+      pointer-events: auto;
     }
     .doodle-pack-select {
       width: 100%;
@@ -777,52 +857,14 @@
     }
 
     /* Memory Match (lobby + in-game) */
-    .memory-room-options {
-      width: 100%;
-      max-width: 320px;
-      margin-top: 1rem;
-      padding: 0.75rem 1rem;
-      border-radius: 16px;
-      border: 2px solid rgba(255, 107, 157, 0.25);
-      background: rgba(0,0,0,0.2);
-      pointer-events: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-    .memory-room-options.hidden { display: none; }
-    .memory-room-label {
-      color: #ff8fb8;
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
     .memory-pack-select {
       width: 100%;
       padding: 0.5rem 0.65rem;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.15);
-      background: rgba(0,0,0,0.35);
+      border-radius: 10px;
+      border: 1.5px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.3);
       color: #f0f0f8;
       font-size: 0.8rem;
-    }
-    .memory-grid-pick {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-    .memory-radio {
-      color: #c8c8e0;
-      font-size: 0.78rem;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-    .memory-speed-label {
-      color: #a8a8c8;
-      font-size: 0.78rem;
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
     }
     .memory-hud {
       position: absolute;
