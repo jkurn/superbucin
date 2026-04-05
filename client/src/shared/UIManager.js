@@ -162,7 +162,6 @@ export class UIManager {
       try {
         await this.userManager.signUp(email, password, username, displayName, selectedAvatar);
         this.showLobby();
-        this.showError('Account created! Check email to verify 💕');
       } catch (e) {
         errEl.textContent = e.message || 'Signup failed';
       }
