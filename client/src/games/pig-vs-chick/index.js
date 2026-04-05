@@ -12,6 +12,14 @@ export const pigVsChickGame = {
     icon: '🐷⚔️🐔',
     badge: '2 Players',
   },
+  sideSelect: {
+    title: 'PIG vs CHICK',
+    pickTitle: 'Pick your side!',
+    options: [
+      { side: 'pig', emoji: '🐷', label: 'Pig' },
+      { side: 'chicken', emoji: '🐔', label: 'Chicken' },
+    ],
+  },
   Scene: PigVsChickScene,
   applyConfig: applyServerConfig,
 

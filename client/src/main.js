@@ -3,9 +3,15 @@ import { NetworkManager } from './shared/NetworkManager.js';
 import { UIManager } from './shared/UIManager.js';
 import { GameRegistry } from './shared/GameRegistry.js';
 import { pigVsChickGame } from './games/pig-vs-chick/index.js';
+import { wordScrambleRaceGame } from './games/word-scramble-race/index.js';
+import { doodleGuessGame } from './games/doodle-guess/index.js';
+import { memoryMatchGame } from './games/memory-match/index.js';
 
 // Register all games
 GameRegistry.register('pig-vs-chick', pigVsChickGame);
+GameRegistry.register('word-scramble-race', wordScrambleRaceGame);
+GameRegistry.register('doodle-guess', doodleGuessGame);
+GameRegistry.register('memory-match', memoryMatchGame);
 
 const app = {
   sceneManager: null,

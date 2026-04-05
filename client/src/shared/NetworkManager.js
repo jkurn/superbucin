@@ -11,6 +11,7 @@ export class NetworkManager {
     this.isHost = false;
     this._inGame = false;
     this._wasInGame = false;
+    this.roomGameType = 'pig-vs-chick';
   }
 
   init(ui, sceneManager) {
@@ -44,16 +45,21 @@ export class NetworkManager {
 
     this.socket.on('room-created', (data) => {
       this.roomCode = data.roomCode;
+      this.roomGameType = data.gameType || 'pig-vs-chick';
       this.isHost = true;
       this.ui.showWaitingRoom(data.roomCode);
     });
 
     this.socket.on('room-joined', (data) => {
       this.roomCode = data.roomCode;
+      if (data.gameType) this.roomGameType = data.gameType;
+      if (data.skipSideSelect) return;
       this.ui.showSideSelect(data.roomCode);
     });
 
-    this.socket.on('player-joined', () => {
+    this.socket.on('player-joined', (data) => {
+      if (data?.gameType) this.roomGameType = data.gameType;
+      if (data?.skipSideSelect) return;
       this.ui.showSideSelect(this.roomCode);
     });
 
@@ -68,6 +74,18 @@ export class NetworkManager {
 
     this.socket.on('game-state', (state) => {
       EventBus.emit('game:state', state);
+    });
+
+    this.socket.on('word-scramble-state', (state) => {
+      EventBus.emit('word:state', state);
+    });
+
+    this.socket.on('word-scramble-feedback', (payload) => {
+      EventBus.emit('word:feedback', payload);
+    });
+
+    this.socket.on('memory-state', (state) => {
+      EventBus.emit('memory:state', state);
     });
 
     this.socket.on('match-end', (data) => {
@@ -93,8 +111,23 @@ export class NetworkManager {
     });
   }
 
-  createRoom(gameType) {
-    this.socket.emit('create-room', { gameType });
+  createRoom(gameTypeOrPayload, customPrompts) {
+    let payload;
+    if (typeof gameTypeOrPayload === 'string') {
+      payload = { gameType: gameTypeOrPayload };
+      if (Array.isArray(customPrompts) && customPrompts.length > 0) {
+        payload.customPrompts = customPrompts;
+      }
+    } else {
+      payload = gameTypeOrPayload && typeof gameTypeOrPayload === 'object'
+        ? { ...gameTypeOrPayload }
+        : { gameType: 'pig-vs-chick' };
+    }
+    this.socket.emit('create-room', payload);
+  }
+
+  memoryFlip(index) {
+    this.socket.emit('memory-flip', { index });
   }
 
   joinRoom(code) {
@@ -111,5 +144,9 @@ export class NetworkManager {
 
   requestRematch() {
     this.socket.emit('rematch');
+  }
+
+  submitWord(path) {
+    this.socket.emit('submit-word', { path });
   }
 }
