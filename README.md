@@ -33,6 +33,10 @@ A 5-lane real-time battle game inspired by Hago's Sheep Fight.
 - **Server**: Node.js + Express + Socket.io (authoritative game loop at 20 ticks/sec)
 - **Deploy**: Render (free tier)
 
+## Assets & art reference
+
+Local Kenney packs and 2D/3D inventory (gitignored source folders, what to use for builds): **[ASSETS.md](./ASSETS.md)**.
+
 ## Run Locally
 
 ```bash

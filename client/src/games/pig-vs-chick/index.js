@@ -20,6 +20,14 @@ export const pigVsChickGame = {
     win: ['SAYANG MENANG! 🤣🤣🤣', 'GG sayang~ kamu hebat!', 'LUCU BANGET menangnya! 💕'],
     lose: ['Yahhh kalah~ 😭', 'Nanti revenge ya say!', 'GG sayang~ next time!'],
   },
+  sideSelect: {
+    title: 'PIG vs CHICK',
+    pickTitle: 'Pick your side!',
+    options: [
+      { side: 'pig', emoji: '🐷', label: 'Pig' },
+      { side: 'chicken', emoji: '🐔', label: 'Chicken' },
+    ],
+  },
   Scene: PigVsChickScene,
   applyConfig: applyServerConfig,
 

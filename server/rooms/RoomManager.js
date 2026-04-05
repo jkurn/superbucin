@@ -1,14 +1,62 @@
 import { generateRoomCode } from '../utils/generateRoomCode.js';
 import { GameFactory } from '../games/GameFactory.js';
+import { MEMORY_MATCH_CONFIG } from '../games/memory-match/config.js';
+import { UserService } from '../services/UserService.js';
+
+function normalizeMemoryOptions(data) {
+  if (!data || data.gameType !== 'memory-match') return {};
+  const packId = typeof data.packId === 'string' ? data.packId : MEMORY_MATCH_CONFIG.DEFAULT_PACK;
+  const rawGrid = Number(data.gridSize);
+  const gridSize = rawGrid >= 6 ? 6 : 4;
+  return {
+    packId,
+    gridSize,
+    speedMode: !!data.speedMode,
+  };
+}
 
 export class RoomManager {
   constructor(io) {
     this.io = io;
-    this.rooms = new Map();      // roomCode -> room
-    this.playerRooms = new Map(); // socketId -> roomCode
+    this.rooms = new Map();
+    this.playerRooms = new Map();
+    this.playerIdentities = new Map();
   }
 
-  createRoom(socket, gameType = 'pig-vs-chick') {
+  setIdentity(socket, data) {
+    if (!data) return;
+    this.playerIdentities.set(socket.id, {
+      userId: data.userId || null,
+      displayName: data.displayName || 'Guest',
+      username: data.username || null,
+      avatarUrl: data.avatarUrl || '/avatars/panda.png',
+      tag: data.tag || null,
+      isGuest: data.isGuest !== false,
+    });
+  }
+
+  _getIdentity(socketId) {
+    return this.playerIdentities.get(socketId) || {
+      userId: null,
+      displayName: 'Guest',
+      avatarUrl: '/avatars/panda.png',
+      isGuest: true,
+    };
+  }
+
+  _getDisplayName(socketId) {
+    const id = this._getIdentity(socketId);
+    if (id.username) return id.username;
+    if (id.tag) return `${id.displayName} #${id.tag}`;
+    return id.displayName;
+  }
+
+  createRoom(socket, data = {}) {
+    const gameType = typeof data === 'string' ? data : (data?.gameType || 'pig-vs-chick');
+    const customPrompts = Array.isArray(data?.customPrompts)
+      ? data.customPrompts.map((s) => String(s).trim()).filter(Boolean).slice(0, 80)
+      : [];
+
     if (!GameFactory.has(gameType)) {
       console.log(`Create failed: unknown game type '${gameType}'`);
       socket.emit('error', { message: 'Unknown game type!' });
@@ -23,9 +71,11 @@ export class RoomManager {
     const room = {
       code,
       gameType,
-      players: [{ id: socket.id, socket, side: null, ready: false }],
+      customPrompts,
+      gameOptions: normalizeMemoryOptions({ ...(typeof data === 'object' ? data : {}), gameType }),
+      players: [{ id: socket.id, socket, side: null, ready: false, identity: this._getIdentity(socket.id) }],
       game: null,
-      state: 'waiting', // waiting, side-select, playing, finished
+      state: 'waiting',
     };
 
     this.rooms.set(code, room);
@@ -33,7 +83,7 @@ export class RoomManager {
     socket.join(code);
 
     socket.emit('room-created', { roomCode: code, gameType });
-    console.log(`Room ${code} created by ${socket.id}`);
+    console.log(`Room ${code} created by ${this._getDisplayName(socket.id)}`);
   }
 
   joinRoom(socket, roomCode) {
@@ -51,16 +101,46 @@ export class RoomManager {
       return;
     }
 
-    room.players.push({ id: socket.id, socket, side: null, ready: false });
+    const joinerIdentity = this._getIdentity(socket.id);
+    room.players.push({ id: socket.id, socket, side: null, ready: false, identity: joinerIdentity });
     this.playerRooms.set(socket.id, roomCode);
     socket.join(roomCode);
 
-    room.state = 'side-select';
+    const hostIdentity = room.players[0].identity;
 
-    // Notify both players
-    this.io.to(roomCode).emit('room-joined', { roomCode, gameType: room.gameType });
-    room.players[0].socket.emit('player-joined', {});
-    console.log(`${socket.id} joined room ${roomCode}`);
+    const skipSides = GameFactory.skipSideSelect(room.gameType);
+    if (skipSides) {
+      room.players[0].side = 'p1';
+      room.players[0].ready = true;
+      room.players[1].side = 'p2';
+      room.players[1].ready = true;
+
+      socket.emit('room-joined', {
+        roomCode,
+        gameType: room.gameType,
+        skipSideSelect: true,
+        opponentIdentity: hostIdentity,
+      });
+      room.players[0].socket.emit('player-joined', {
+        gameType: room.gameType,
+        skipSideSelect: true,
+        opponentIdentity: joinerIdentity,
+      });
+      this.startGame(room);
+    } else {
+      room.state = 'side-select';
+      socket.emit('room-joined', {
+        roomCode,
+        gameType: room.gameType,
+        skipSideSelect: false,
+        opponentIdentity: hostIdentity,
+      });
+      room.players[0].socket.emit('player-joined', {
+        gameType: room.gameType,
+        opponentIdentity: joinerIdentity,
+      });
+    }
+    console.log(`${this._getDisplayName(socket.id)} joined room ${roomCode}`);
   }
 
   selectSide(socket, side) {
@@ -71,9 +151,20 @@ export class RoomManager {
     const player = room.players.find((p) => p.id === socket.id);
     if (!player) return;
 
+    const validSides = room.gameType === 'doodle-guess'
+      ? ['drawer', 'guesser']
+      : room.gameType === 'memory-match'
+        ? ['p1', 'p2']
+        : room.gameType === 'word-scramble-race'
+          ? ['sprout', 'blossom']
+          : ['pig', 'chicken'];
+    if (!validSides.includes(side)) {
+      socket.emit('side-selected', { message: 'Pick a valid role!' });
+      return;
+    }
+
     const otherPlayer = room.players.find((p) => p.id !== socket.id);
 
-    // Check if other player already has this side
     if (otherPlayer && otherPlayer.side === side) {
       socket.emit('side-selected', { message: `${side} is already taken! Pick the other one~` });
       return;
@@ -84,7 +175,6 @@ export class RoomManager {
 
     socket.emit('side-selected', { message: `You picked ${side}!` });
 
-    // If both players have selected sides, start the game
     if (room.players.length === 2 && room.players.every((p) => p.ready)) {
       this.startGame(room);
     } else if (otherPlayer) {
@@ -101,60 +191,116 @@ export class RoomManager {
     const p1 = room.players[0];
     const p2 = room.players[1];
 
-    room.game = GameFactory.create(room.gameType, p1, p2, (event, data) => {
-      this.handleGameEvent(room, event, data);
-    });
+    const createOpts = {
+      customPrompts: room.customPrompts || [],
+      ...(room.gameOptions || {}),
+    };
 
-    const gameConfig = GameFactory.getConfig(room.gameType);
+    room.game = GameFactory.create(
+      room.gameType,
+      p1,
+      p2,
+      (event, data) => {
+        this.handleGameEvent(room, event, data);
+      },
+      createOpts,
+    );
+
+    const gameConfig = GameFactory.getConfig(room.gameType, room.gameOptions || {});
+
+    const baseStart = {
+      gameType: room.gameType,
+      gameConfig,
+      memoryRoom: room.gameOptions || {},
+    };
+
+    const p1Name = this._getDisplayName(p1.id);
+    const p2Name = this._getDisplayName(p2.id);
 
     p1.socket.emit('game-start', {
-      gameType: room.gameType,
+      ...baseStart,
       yourSide: p1.side,
       yourDirection: 1,
       opponentSide: p2.side,
       p1Side: p1.side,
       p2Side: p2.side,
       p1Label: 'You',
-      p2Label: 'Sayang',
-      gameConfig,
+      p2Label: p2Name,
+      opponentIdentity: p2.identity,
     });
 
     p2.socket.emit('game-start', {
-      gameType: room.gameType,
+      ...baseStart,
       yourSide: p2.side,
       yourDirection: -1,
       opponentSide: p1.side,
       p1Side: p1.side,
       p2Side: p2.side,
-      p1Label: 'Sayang',
+      p1Label: p1Name,
       p2Label: 'You',
-      gameConfig,
+      opponentIdentity: p1.identity,
     });
 
     room.game.start();
-    console.log(`Game started in room ${room.code} [${room.gameType}]: ${p1.side} vs ${p2.side}`);
+    console.log(`Game started in room ${room.code} [${room.gameType}]: ${p1Name} (${p1.side}) vs ${p2Name} (${p2.side})`);
   }
 
   spawnUnit(socket, tier, lane) {
     const roomCode = this.playerRooms.get(socket.id);
     const room = this.rooms.get(roomCode);
     if (!room || !room.game) return;
+    if (typeof room.game.requestSpawn !== 'function') return;
 
     room.game.requestSpawn(socket.id, tier, lane);
   }
 
-  handleAction(socket, action) {
+  submitWord(socket, path) {
     const roomCode = this.playerRooms.get(socket.id);
     const room = this.rooms.get(roomCode);
-    if (!room || !room.game) return;
+    if (!room || !room.game || typeof room.game.submitWord !== 'function') return;
 
-    if (typeof room.game.handleAction === 'function') {
-      room.game.handleAction(socket.id, action);
-    }
+    room.game.submitWord(socket.id, path).catch((err) => {
+      console.error('submitWord error:', err);
+      socket.emit('word-scramble-feedback', {
+        targetId: socket.id,
+        ok: false,
+        message: 'Server error — try again.',
+      });
+    });
+  }
+
+  doodleStroke(socket, payload) {
+    const roomCode = this.playerRooms.get(socket.id);
+    const room = this.rooms.get(roomCode);
+    if (!room?.game || room.gameType !== 'doodle-guess') return;
+    if (typeof room.game.appendStroke !== 'function') return;
+    room.game.appendStroke(socket.id, payload);
+  }
+
+  doodleClear(socket) {
+    const roomCode = this.playerRooms.get(socket.id);
+    const room = this.rooms.get(roomCode);
+    if (!room?.game || room.gameType !== 'doodle-guess') return;
+    if (typeof room.game.clearCanvas !== 'function') return;
+    room.game.clearCanvas(socket.id);
+  }
+
+  doodleGuess(socket, text) {
+    const roomCode = this.playerRooms.get(socket.id);
+    const room = this.rooms.get(roomCode);
+    if (!room?.game || room.gameType !== 'doodle-guess') return;
+    if (typeof room.game.submitGuess !== 'function') return;
+    room.game.submitGuess(socket.id, text);
+  }
+
+  memoryFlip(socket, index) {
+    const roomCode = this.playerRooms.get(socket.id);
+    const room = this.rooms.get(roomCode);
+    if (!room?.game || typeof room.game.tryFlip !== 'function') return;
+    room.game.tryFlip(socket.id, index);
   }
 
   handleGameEvent(room, event, data) {
-    // Only emit to connected players
     const connected = room.players.filter((p) => !p.disconnected);
 
     switch (event) {
@@ -174,26 +320,105 @@ export class RoomManager {
         });
         break;
 
-      case 'match-end':
-        room.state = 'finished';
+      case 'word-scramble-state':
         connected.forEach((p) => {
-          p.socket.emit('match-end', {
-            winner: data.winnerId,
-            p1Score: data.scores[0],
-            p2Score: data.scores[1],
-            isWinner: data.winnerId === p.id,
-            isDraw: data.winnerId === null,
-          });
+          p.socket.emit('word-scramble-state', data);
         });
         break;
 
-      case 'action-error': {
-        const target = connected.find((p) => p.id === data.playerId);
-        if (target) {
-          target.socket.emit('action-error', { code: data.code, message: data.message });
-        }
+      case 'word-scramble-feedback':
+        connected.forEach((p) => {
+          if (p.id === data.targetId) {
+            p.socket.emit('word-scramble-feedback', data);
+          }
+        });
+        break;
+
+      case 'doodle-state':
+        connected.forEach((p) => {
+          const st = data.byPlayer[p.id];
+          if (st) p.socket.emit('doodle-state', st);
+        });
+        break;
+
+      case 'doodle-draw':
+        connected.forEach((p) => {
+          if (p.id === data.targetId) p.socket.emit('doodle-draw', data.payload);
+        });
+        break;
+
+      case 'doodle-clear':
+        connected.forEach((p) => {
+          if (p.id === data.targetId) p.socket.emit('doodle-clear', {});
+        });
+        break;
+
+      case 'doodle-guess-wrong':
+        connected.forEach((p) => {
+          if (p.id === data.targetId) p.socket.emit('doodle-guess-wrong', { guess: data.guess });
+        });
+        break;
+
+      case 'memory-state': {
+        const p1p = room.players[0];
+        const p2p = room.players[1];
+        connected.forEach((p) => {
+          const slice = p.id === p1p.id ? data.p1 : data.p2;
+          if (slice) p.socket.emit('memory-state', slice);
+        });
         break;
       }
+
+      case 'match-end': {
+        room.state = 'finished';
+        const p1 = room.players[0];
+        const p2 = room.players[1];
+
+        this._recordMatchResult(room, data).catch((err) => {
+          console.error('Failed to record match:', err);
+        });
+
+        connected.forEach((p) => {
+          const isP1 = p.id === p1.id;
+          const yourScore = isP1 ? data.scores[0] : data.scores[1];
+          const oppScore = isP1 ? data.scores[1] : data.scores[0];
+          p.socket.emit('match-end', {
+            winner: data.winnerId,
+            tie: Boolean(data.tie),
+            p1Score: data.scores[0],
+            p2Score: data.scores[1],
+            yourScore,
+            oppScore,
+            isWinner: data.winnerId != null && data.winnerId === p.id,
+          });
+        });
+        break;
+      }
+    }
+  }
+
+  async _recordMatchResult(room, data) {
+    const p1 = room.players[0];
+    const p2 = room.players[1];
+
+    try {
+      const { newAchievements } = await UserService.recordMatch({
+        gameType: room.gameType,
+        p1,
+        p2,
+        winnerId: data.winnerId,
+        scores: data.scores,
+        isTie: !!data.tie,
+      });
+
+      for (const [playerId, achievements] of Object.entries(newAchievements)) {
+        const player = room.players.find((p) => p.id === playerId);
+        if (player && !player.disconnected) {
+          player.socket.emit('achievement-unlocked', { achievements });
+        }
+      }
+    } catch (err) {
+      console.error('UserService.recordMatch error:', err);
     }
   }
 
@@ -202,15 +427,23 @@ export class RoomManager {
     const room = this.rooms.get(roomCode);
     if (!room) return;
 
-    // Reset
     if (room.game) room.game.stop();
     room.players.forEach((p) => {
       p.side = null;
       p.ready = false;
     });
-    room.state = 'side-select';
 
-    this.io.to(roomCode).emit('room-joined', { roomCode, gameType: room.gameType });
+    if (GameFactory.skipSideSelect(room.gameType)) {
+      room.players[0].side = 'p1';
+      room.players[0].ready = true;
+      room.players[1].side = 'p2';
+      room.players[1].ready = true;
+      this.startGame(room);
+      return;
+    }
+
+    room.state = 'side-select';
+    this.io.to(roomCode).emit('room-joined', { roomCode, gameType: room.gameType, skipSideSelect: false });
   }
 
   rejoinRoom(socket, roomCode) {
@@ -221,7 +454,6 @@ export class RoomManager {
       return;
     }
 
-    // Find the disconnected player slot
     const dcPlayer = room.players.find((p) => p.disconnected);
     if (!dcPlayer) {
       console.log(`Rejoin failed: room ${roomCode} has no open slot`);
@@ -229,58 +461,121 @@ export class RoomManager {
       return;
     }
 
-    // Clear the destruction timer
     if (room._disconnectTimer) {
       clearTimeout(room._disconnectTimer);
       room._disconnectTimer = null;
     }
 
-    // Swap in the new socket
     const oldId = dcPlayer.id;
     this.playerRooms.delete(oldId);
+
+    const oldIdentity = this.playerIdentities.get(oldId);
+    if (oldIdentity) {
+      this.playerIdentities.set(socket.id, oldIdentity);
+      this.playerIdentities.delete(oldId);
+    }
+
     dcPlayer.id = socket.id;
     dcPlayer.socket = socket;
     dcPlayer.disconnected = false;
     this.playerRooms.set(socket.id, roomCode);
     socket.join(roomCode);
 
-    // Delegate player ID migration to game
-    if (room.game && typeof room.game.migratePlayer === 'function') {
-      room.game.migratePlayer(oldId, socket.id, dcPlayer);
+    if (room.game) {
+      if (room.game.p1 === dcPlayer) {
+        room.game.p1 = dcPlayer;
+        if (room.game.energies) {
+          room.game.energies[socket.id] = room.game.energies[oldId];
+          delete room.game.energies[oldId];
+        }
+        if (room.game.playerHP) {
+          room.game.playerHP[socket.id] = room.game.playerHP[oldId];
+          delete room.game.playerHP[oldId];
+        }
+        if (room.game.units) {
+          room.game.units.forEach((u) => { if (u.ownerId === oldId) u.ownerId = socket.id; });
+        }
+        if (room.game.scores) {
+          room.game.scores[socket.id] = room.game.scores[oldId];
+          delete room.game.scores[oldId];
+        }
+        if (room.game.roundWords) {
+          room.game.roundWords[socket.id] = room.game.roundWords[oldId];
+          delete room.game.roundWords[oldId];
+        }
+        if (room.game.currentTurn === oldId) {
+          room.game.currentTurn = socket.id;
+        }
+      } else if (room.game.p2 === dcPlayer) {
+        room.game.p2 = dcPlayer;
+        if (room.game.energies) {
+          room.game.energies[socket.id] = room.game.energies[oldId];
+          delete room.game.energies[oldId];
+        }
+        if (room.game.playerHP) {
+          room.game.playerHP[socket.id] = room.game.playerHP[oldId];
+          delete room.game.playerHP[oldId];
+        }
+        if (room.game.units) {
+          room.game.units.forEach((u) => { if (u.ownerId === oldId) u.ownerId = socket.id; });
+        }
+        if (room.game.scores) {
+          room.game.scores[socket.id] = room.game.scores[oldId];
+          delete room.game.scores[oldId];
+        }
+        if (room.game.roundWords) {
+          room.game.roundWords[socket.id] = room.game.roundWords[oldId];
+          delete room.game.roundWords[oldId];
+        }
+        if (room.game.currentTurn === oldId) {
+          room.game.currentTurn = socket.id;
+        }
+      }
     }
 
-    // Notify opponent
     const otherPlayer = room.players.find((p) => p.id !== socket.id);
     if (otherPlayer) {
       otherPlayer.socket.emit('opponent-reconnected');
     }
 
-    // Resume game or restore state
     if (room.state === 'playing' && room.game) {
       const isP1 = room.game.p1.id === socket.id;
       const p1 = room.players[0];
       const p2 = room.players[1];
 
-      socket.emit('game-start', {
+      const rePayload = {
         gameType: room.gameType,
         yourSide: dcPlayer.side,
         yourDirection: isP1 ? 1 : -1,
         opponentSide: otherPlayer.side,
         p1Side: p1.side,
         p2Side: p2.side,
-        p1Label: isP1 ? 'You' : 'Sayang',
-        p2Label: isP1 ? 'Sayang' : 'You',
-        gameConfig: GameFactory.getConfig(room.gameType),
+        p1Label: isP1 ? 'You' : this._getDisplayName(p1.id),
+        p2Label: isP1 ? this._getDisplayName(p2.id) : 'You',
+        gameConfig: GameFactory.getConfig(room.gameType, room.gameOptions || {}),
+        memoryRoom: room.gameOptions || {},
         reconnect: true,
-      });
+        opponentIdentity: otherPlayer.identity,
+      };
+
+      if (typeof room.game.getReconnectPayload === 'function') {
+        Object.assign(rePayload, room.game.getReconnectPayload(socket.id));
+      }
+
+      socket.emit('game-start', rePayload);
+
+      if (room.gameType === 'doodle-guess' && room.game.getStrokeHistoryFor && room.game.getPersonalStateFor) {
+        const strokes = room.game.getStrokeHistoryFor(socket.id);
+        socket.emit('doodle-sync', { strokes });
+        socket.emit('doodle-state', room.game.getPersonalStateFor(socket.id));
+      }
 
       room.game.resume();
     } else {
-      // Not in a game — just put them back in the room
-      socket.emit('room-joined', { roomCode });
+      socket.emit('room-joined', { roomCode, gameType: room.gameType });
     }
 
-    console.log(`${socket.id} rejoined room ${roomCode}`);
+    console.log(`${this._getDisplayName(socket.id)} rejoined room ${roomCode}`);
   }
 
   handleDisconnect(socket) {
@@ -293,7 +588,6 @@ export class RoomManager {
     const player = room.players.find((p) => p.id === socket.id);
     const otherPlayer = room.players.find((p) => p.id !== socket.id);
 
-    // If game is active, give a 15-second grace period
     if (room.state === 'playing' && room.game && player) {
       player.disconnected = true;
       room.game.pause();
@@ -303,7 +597,6 @@ export class RoomManager {
       }
 
       room._disconnectTimer = setTimeout(() => {
-        // Grace period expired — destroy the room
         if (otherPlayer) {
           otherPlayer.socket.emit('opponent-disconnected', { reconnecting: false });
         }
@@ -317,7 +610,6 @@ export class RoomManager {
       return;
     }
 
-    // Not in a game — destroy immediately
     if (otherPlayer) {
       otherPlayer.socket.emit('opponent-disconnected', { reconnecting: false });
     }

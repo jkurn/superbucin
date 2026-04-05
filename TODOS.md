@@ -18,9 +18,9 @@
 
 ## Deferred from Othello build (2026-04-05)
 
-- [ ] Migrate Pig vs Chick from `spawn-unit` to `game-action` — remove backward-compat alias
-- [ ] Add corner capture celebration animation for Othello
-- [ ] Add `window.getGameState()` for Othello debug — depends on existing TODO item below
+- [x] ~~Rewrite combat to tug-of-war push~~ — Done: weight-based pushing in GameState.js, push shake visualization on client
+- [x] ~~Add weight-based unit system (10kg/20kg/50kg/70kg)~~ — Done: server + client configs aligned, units have weight/hp/speed/cost
+- [x] ~~Add 3D floating HP bars on units~~ — Done: subtle canvas sprite bars above each unit, auto-updates per tick
 
 ## Deferred from plan-eng-review (2026-04-05)
 

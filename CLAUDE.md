@@ -13,6 +13,9 @@
 - Deploy status: poll production URL
 - Health check: https://superbucin.pricylia.com
 
+### Project reference
+- **Game / art inventory:** [ASSETS.md](./ASSETS.md) — local Kenney packs (`kenney_*/`, gitignored), 2D vs 3D, runtime asset paths. Use `@ASSETS.md` when adding or wiring art.
+
 ### Notes
 - WebSocket (Socket.io) server — incompatible with Vercel, Netlify, GitHub Pages, Cloudflare Pages/Workers free
 - Render serves built Vite client (`client/dist/`) as static files via Express

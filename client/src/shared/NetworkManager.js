@@ -6,17 +6,21 @@ export class NetworkManager {
     this.socket = null;
     this.ui = null;
     this.sceneManager = null;
+    this.userManager = null;
     this.roomCode = null;
     this.gameType = null;
     this.playerId = null;
     this.isHost = false;
     this._inGame = false;
     this._wasInGame = false;
+    this.roomGameType = 'pig-vs-chick';
+    this.opponentIdentity = null;
   }
 
-  init(ui, sceneManager) {
+  init(ui, sceneManager, userManager) {
     this.ui = ui;
     this.sceneManager = sceneManager;
+    this.userManager = userManager;
 
     const serverUrl = window.location.hostname === 'localhost'
       ? 'http://localhost:3000'
@@ -28,7 +32,8 @@ export class NetworkManager {
       this.playerId = this.socket.id;
       console.log('Connected:', this.playerId);
 
-      // Auto-rejoin if we had an active room (reconnection after brief disconnect)
+      this.socket.emit('identify', this.userManager.getIdentity());
+
       if (this.roomCode && this._wasInGame) {
         console.log('Attempting rejoin:', this.roomCode);
         this.socket.emit('rejoin-room', { roomCode: this.roomCode });
@@ -37,7 +42,6 @@ export class NetworkManager {
     });
 
     this.socket.on('disconnect', () => {
-      // Mark that we were in a game so we can auto-rejoin on reconnect
       if (this.roomCode && this._inGame) {
         this._wasInGame = true;
       }
@@ -45,18 +49,23 @@ export class NetworkManager {
 
     this.socket.on('room-created', (data) => {
       this.roomCode = data.roomCode;
-      if (data.gameType) this.gameType = data.gameType;
+      this.roomGameType = data.gameType || 'pig-vs-chick';
       this.isHost = true;
       this.ui.showWaitingRoom(data.roomCode);
     });
 
     this.socket.on('room-joined', (data) => {
       this.roomCode = data.roomCode;
-      if (data.gameType) this.gameType = data.gameType;
+      if (data.gameType) this.roomGameType = data.gameType;
+      if (data.opponentIdentity) this.opponentIdentity = data.opponentIdentity;
+      if (data.skipSideSelect) return;
       this.ui.showSideSelect(data.roomCode);
     });
 
-    this.socket.on('player-joined', () => {
+    this.socket.on('player-joined', (data) => {
+      if (data?.gameType) this.roomGameType = data.gameType;
+      if (data?.opponentIdentity) this.opponentIdentity = data.opponentIdentity;
+      if (data?.skipSideSelect) return;
       this.ui.showSideSelect(this.roomCode);
     });
 
@@ -66,6 +75,7 @@ export class NetworkManager {
 
     this.socket.on('game-start', (data) => {
       this._inGame = true;
+      if (data.opponentIdentity) this.opponentIdentity = data.opponentIdentity;
       this.ui.startGame(data);
     });
 
@@ -73,9 +83,27 @@ export class NetworkManager {
       EventBus.emit('game:state', state);
     });
 
+    this.socket.on('word-scramble-state', (state) => {
+      EventBus.emit('word:state', state);
+    });
+
+    this.socket.on('word-scramble-feedback', (payload) => {
+      EventBus.emit('word:feedback', payload);
+    });
+
+    this.socket.on('memory-state', (state) => {
+      EventBus.emit('memory:state', state);
+    });
+
     this.socket.on('match-end', (data) => {
       this._inGame = false;
       this.ui.showVictory(data);
+    });
+
+    this.socket.on('achievement-unlocked', (data) => {
+      if (data.achievements && data.achievements.length > 0) {
+        this.ui.showAchievementToast(data.achievements);
+      }
     });
 
     this.socket.on('opponent-disconnected', (data) => {
@@ -101,8 +129,23 @@ export class NetworkManager {
     });
   }
 
-  createRoom(gameType) {
-    this.socket.emit('create-room', { gameType });
+  createRoom(gameTypeOrPayload, customPrompts) {
+    let payload;
+    if (typeof gameTypeOrPayload === 'string') {
+      payload = { gameType: gameTypeOrPayload };
+      if (Array.isArray(customPrompts) && customPrompts.length > 0) {
+        payload.customPrompts = customPrompts;
+      }
+    } else {
+      payload = gameTypeOrPayload && typeof gameTypeOrPayload === 'object'
+        ? { ...gameTypeOrPayload }
+        : { gameType: 'pig-vs-chick' };
+    }
+    this.socket.emit('create-room', payload);
+  }
+
+  memoryFlip(index) {
+    this.socket.emit('memory-flip', { index });
   }
 
   joinRoom(code) {
@@ -123,5 +166,9 @@ export class NetworkManager {
 
   requestRematch() {
     this.socket.emit('rematch');
+  }
+
+  submitWord(path) {
+    this.socket.emit('submit-word', { path });
   }
 }

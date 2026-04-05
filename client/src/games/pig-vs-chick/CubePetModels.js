@@ -4,36 +4,36 @@ import * as THREE from 'three';
 // Matching the Hago Sheep Fight aesthetic
 
 const COLORS = {
-  // Pig palette
-  pigPink: 0xffb0c8,
-  pigLightPink: 0xffd0e0,
-  pigDarkPink: 0xe8809a,
-  pigSnout: 0xffc0d0,
-  pigNostril: 0xd07090,
-  // Boar palette
-  boarBrown: 0x9b6b4a,
-  boarDark: 0x7a5035,
-  boarLight: 0xb88860,
-  boarTusk: 0xfffde8,
-  // Chicken palette
-  chickYellow: 0xffe066,
-  chickLight: 0xfff0a0,
-  chickOrange: 0xffa030,
+  // Pig palette — bright bubblegum
+  pigPink: 0xff9fd0,
+  pigLightPink: 0xffc8e8,
+  pigDarkPink: 0xff5ea0,
+  pigSnout: 0xffb0d5,
+  pigNostril: 0xf0508a,
+  // Boar palette — warm rich brown
+  boarBrown: 0xc88050,
+  boarDark: 0xa05a30,
+  boarLight: 0xe0a860,
+  boarTusk: 0xfffff0,
+  // Chicken palette — sunny vivid
+  chickYellow: 0xffe040,
+  chickLight: 0xfff080,
+  chickOrange: 0xffa020,
   chickBeak: 0xff8800,
-  chickComb: 0xe83030,
-  // Hen palette
-  henBrown: 0xd4944a,
-  henLight: 0xe8b070,
-  henWing: 0xc08040,
-  // Rooster palette
-  roosterBody: 0xffe880,
-  roosterComb: 0xd42020,
-  roosterTail: 0x2a7a3a,
-  roosterTailAlt: 0x3060c0,
+  chickComb: 0xff2020,
+  // Hen palette — warm golden
+  henBrown: 0xf09838,
+  henLight: 0xffb058,
+  henWing: 0xe08028,
+  // Rooster palette — bold & proud
+  roosterBody: 0xffea50,
+  roosterComb: 0xff1818,
+  roosterTail: 0x20a838,
+  roosterTailAlt: 0x3868ff,
   // Common
   eyeWhite: 0xffffff,
-  eyeBlack: 0x222222,
-  cheekPink: 0xffaaaa,
+  eyeBlack: 0x1a1a1a,
+  cheekPink: 0xffc0c0,
 };
 
 function makeMat(color) {

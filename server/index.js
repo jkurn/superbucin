@@ -6,16 +6,19 @@ import path from 'path';
 import { RoomManager } from './rooms/RoomManager.js';
 import { GameFactory } from './games/GameFactory.js';
 import { GameState, GAME_CONFIG } from './games/pig-vs-chick/GameState.js';
-import { GameState as OthelloGameState, GAME_CONFIG as OTHELLO_CONFIG } from './games/othello/GameState.js';
+import { GameState as WordScrambleState, GAME_CONFIG as WORD_SCRAMBLE_CONFIG } from './games/word-scramble-race/GameState.js';
+import { DoodleGuessGameState, DOODLE_GAME_CONFIG } from './games/doodle-guess/GameState.js';
+import { MemoryMatchGameState } from './games/memory-match/GameState.js';
+import { MEMORY_MATCH_CONFIG } from './games/memory-match/config.js';
 
-// Register all games
 GameFactory.register('pig-vs-chick', GameState, GAME_CONFIG);
-GameFactory.register('othello', OthelloGameState, OTHELLO_CONFIG);
+GameFactory.register('word-scramble-race', WordScrambleState, WORD_SCRAMBLE_CONFIG);
+GameFactory.register('doodle-guess', DoodleGuessGameState, DOODLE_GAME_CONFIG);
+GameFactory.register('memory-match', MemoryMatchGameState, MEMORY_MATCH_CONFIG);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
-// Serve built client files in production
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 app.use(express.static(clientDist));
 
@@ -35,8 +38,12 @@ const roomManager = new RoomManager(io);
 io.on('connection', (socket) => {
   console.log(`Player connected: ${socket.id}`);
 
+  socket.on('identify', (data) => {
+    roomManager.setIdentity(socket, data);
+  });
+
   socket.on('create-room', (data) => {
-    roomManager.createRoom(socket, data?.gameType);
+    roomManager.createRoom(socket, data);
   });
 
   socket.on('join-room', (data) => {
@@ -55,8 +62,24 @@ io.on('connection', (socket) => {
     roomManager.spawnUnit(socket, data.tier, data.lane);
   });
 
-  socket.on('game-action', (data) => {
-    roomManager.handleAction(socket, data);
+  socket.on('submit-word', (data) => {
+    roomManager.submitWord(socket, data?.path || []);
+  });
+
+  socket.on('doodle-stroke', (data) => {
+    roomManager.doodleStroke(socket, data);
+  });
+
+  socket.on('doodle-clear', () => {
+    roomManager.doodleClear(socket);
+  });
+
+  socket.on('doodle-guess', (data) => {
+    roomManager.doodleGuess(socket, data?.text);
+  });
+
+  socket.on('memory-flip', (data) => {
+    roomManager.memoryFlip(socket, data?.index);
   });
 
   socket.on('rematch', () => {
@@ -69,7 +92,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// SPA fallback — serve index.html for any unmatched route
 app.get('*', (req, res) => {
   res.sendFile(path.join(clientDist, 'index.html'));
 });
