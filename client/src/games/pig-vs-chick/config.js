@@ -22,7 +22,7 @@ export let GAME_CONFIG = {
   MAX_ENERGY: 100,
   STARTING_ENERGY: 20,
   ENERGY_REGEN: 3,
-  BASE_DAMAGE: [8, 18, 35, 60],
+  BASE_DAMAGE: [60, 35, 18, 8],
   UNITS: [
     { tier: 1, hp: 30, atk: 10, speed: 1.5, cost: 5, attackRate: 1.0, ...DISPLAY_CONFIG.UNITS[0] },
     { tier: 2, hp: 60, atk: 18, speed: 1.3, cost: 12, attackRate: 0.8, ...DISPLAY_CONFIG.UNITS[1] },

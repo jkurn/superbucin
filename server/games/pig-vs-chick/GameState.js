@@ -6,7 +6,7 @@ export const GAME_CONFIG = {
   STARTING_ENERGY: 20,
   ENERGY_REGEN: 3,
   TICK_RATE: 20,
-  BASE_DAMAGE: [8, 18, 35, 60],
+  BASE_DAMAGE: [60, 35, 18, 8],
 
   UNITS: [
     { tier: 1, hp: 30, atk: 10, speed: 1.5, cost: 5, attackRate: 1.0 },

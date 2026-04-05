@@ -3,6 +3,7 @@
 
 import { PigVsChickScene } from './PigVsChickScene.js';
 import { GAME_CONFIG, applyServerConfig } from './config.js';
+import { EventBus } from '../../shared/EventBus.js';
 
 export const pigVsChickGame = {
   type: 'pig-vs-chick',
@@ -56,24 +57,45 @@ export const pigVsChickGame = {
     spawnPanel.className = 'spawn-panel';
     spawnPanel.id = 'spawn-panel';
 
+    let selectedTier = null;
+
     config.UNITS.forEach((unit, i) => {
+      const tier = i + 1;
       const icon = mySide === 'pig' ? unit.pigIcon : unit.chickenIcon;
+      const dmg = config.BASE_DAMAGE ? config.BASE_DAMAGE[i] : '';
       const btn = document.createElement('div');
       btn.className = 'spawn-btn-circle';
-      btn.dataset.tier = i + 1;
+      btn.dataset.tier = tier;
       btn.innerHTML = `
         <div class="spawn-circle-icon">${icon}</div>
         <div class="spawn-circle-cost">${unit.cost}</div>
+        <div class="spawn-circle-power">${dmg}</div>
       `;
       btn.addEventListener('click', () => {
-        if (!btn.classList.contains('disabled')) {
-          const lane = Math.floor(Math.random() * config.NUM_LANES);
-          network.spawnUnit(i + 1, lane);
+        if (btn.classList.contains('disabled')) return;
+        // Toggle selection
+        if (selectedTier === tier) {
+          selectedTier = null;
+          btn.classList.remove('selected');
+        } else {
+          // Deselect previous
+          spawnPanel.querySelectorAll('.spawn-btn-circle').forEach((b) => b.classList.remove('selected'));
+          selectedTier = tier;
+          btn.classList.add('selected');
         }
       });
       spawnPanel.appendChild(btn);
     });
     overlay.appendChild(spawnPanel);
+
+    // Listen for lane taps from the 3D scene raycaster
+    const onLaneTap = (lane) => {
+      if (selectedTier === null) return;
+      const tierBtn = spawnPanel.querySelector(`.spawn-btn-circle[data-tier="${selectedTier}"]`);
+      if (tierBtn && tierBtn.classList.contains('disabled')) return;
+      network.spawnUnit(selectedTier, lane);
+    };
+    EventBus.on('lane:tapped', onLaneTap);
 
     // Energy display
     const energyDisplay = document.createElement('div');
@@ -112,11 +134,20 @@ export const pigVsChickGame = {
           if (buttons[i]) {
             if (energy < unit.cost) {
               buttons[i].classList.add('disabled');
+              // Auto-deselect if selected tier becomes unaffordable
+              if (selectedTier === i + 1) {
+                selectedTier = null;
+                buttons[i].classList.remove('selected');
+              }
             } else {
               buttons[i].classList.remove('disabled');
             }
           }
         });
+      },
+
+      destroy() {
+        EventBus.off('lane:tapped', onLaneTap);
       },
     };
   },

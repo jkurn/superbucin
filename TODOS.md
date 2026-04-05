@@ -16,6 +16,12 @@
 - [x] ~~Add 15-second reconnection grace period~~ — Done: RoomManager pauses game, auto-rejoin via room code
 - [ ] Add `window.getGameState()` for debugging/testing — expose game state as JSON for AI/Playwright QA
 
+## Sheep Fight clone — next steps
+
+- [ ] Rewrite combat to tug-of-war push — Replace stop-and-attack (HP/atk) with weight-based pushing. Stronger unit pushes weaker backward. Multiple weak can overwhelm one strong. ~110 lines in GameState.js `updateUnits()` + client fight visualization changes. Core gameplay change, test carefully.
+- [ ] Add weight-based unit system (10kg/20kg/50kg/70kg) — Replace tier numbers with weight labels. Requires rebalancing all unit stats. Bundle with combat rewrite.
+- [ ] Add 3D floating power/weight labels on units — TextSprite or CSS2DRenderer label above each unit showing its weight/power. Polish layer.
+
 ## Deferred from plan-eng-review (2026-04-05)
 
 - [ ] Path-scoped `.claude/rules/` — enforce "no hardcoded numbers in game logic", "no direct game imports in UI", "server-authoritative networking". Prevention, not blocker.

@@ -180,6 +180,7 @@ export class UIManager {
   showVictory(data) {
     if (this.gameScene) this.gameScene.destroy();
     this.gameScene = null;
+    if (this.activeHUD && this.activeHUD.destroy) this.activeHUD.destroy();
     this.activeHUD = null;
     this.clear();
 
@@ -208,6 +209,7 @@ export class UIManager {
   showDisconnect() {
     if (this.gameScene) this.gameScene.destroy();
     this.gameScene = null;
+    if (this.activeHUD && this.activeHUD.destroy) this.activeHUD.destroy();
     this.activeHUD = null;
     this.clear();
     this.overlay.innerHTML = `

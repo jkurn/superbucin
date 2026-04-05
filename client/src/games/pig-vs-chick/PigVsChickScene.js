@@ -37,6 +37,10 @@ export class PigVsChickScene {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x88cc55);
 
+    // Raycaster for lane tap detection
+    this._raycaster = new THREE.Raycaster();
+    this._pointer = new THREE.Vector2();
+
     // Camera — perspective with tilted view to see 3D models
     const aspect = window.innerWidth / window.innerHeight;
     this.camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 100);
@@ -60,6 +64,18 @@ export class PigVsChickScene {
     this.scene.add(sun);
 
     this.createBattlefield();
+
+    // Invisible ground plane for raycasting lane taps
+    const groundGeo = new THREE.PlaneGeometry(30, GAME_CONFIG.LANE_HEIGHT + 4);
+    const groundMat = new THREE.MeshBasicMaterial({ visible: false });
+    this._groundPlane = new THREE.Mesh(groundGeo, groundMat);
+    this._groundPlane.rotation.x = -Math.PI / 2;
+    this._groundPlane.position.y = 0;
+    this.scene.add(this._groundPlane);
+
+    // Lane tap handler
+    this._onCanvasTap = (e) => this._handleLaneTap(e);
+    this.sceneManager.renderer.domElement.addEventListener('pointerdown', this._onCanvasTap);
 
     this.sceneManager.setScene(this.scene, this.camera);
     this.sceneManager.onUpdate = (dt) => this.update(dt);
@@ -218,6 +234,37 @@ export class PigVsChickScene {
     }
   }
 
+  _handleLaneTap(e) {
+    if (!this.gameActive) return;
+
+    const canvas = this.sceneManager.renderer.domElement;
+    const rect = canvas.getBoundingClientRect();
+    this._pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this._pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    this._raycaster.setFromCamera(this._pointer, this.camera);
+    const hits = this._raycaster.intersectObject(this._groundPlane);
+    if (hits.length === 0) return;
+
+    const hitX = hits[0].point.x;
+
+    // Find closest lane
+    let bestLane = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < this.laneXPositions.length; i++) {
+      const dist = Math.abs(hitX - this.laneXPositions[i]);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestLane = i;
+      }
+    }
+
+    // Only accept taps within half a lane width of the nearest lane center
+    if (bestDist <= GAME_CONFIG.LANE_WIDTH / 2) {
+      EventBus.emit('lane:tapped', bestLane);
+    }
+  }
+
   onServerState(state) {
     if (!state.units) return;
 
@@ -328,6 +375,9 @@ export class PigVsChickScene {
     this.gameActive = false;
     this.sceneManager.onUpdate = null;
     EventBus.off('game:state', this._onState);
+    if (this._onCanvasTap) {
+      this.sceneManager.renderer.domElement.removeEventListener('pointerdown', this._onCanvasTap);
+    }
     for (const [, unit] of this.units) {
       if (unit._fightFlash) clearInterval(unit._fightFlash);
       this.disposeModel(unit.model);
