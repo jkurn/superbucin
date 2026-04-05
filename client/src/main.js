@@ -1,6 +1,11 @@
 import { SceneManager } from './shared/SceneManager.js';
 import { NetworkManager } from './shared/NetworkManager.js';
 import { UIManager } from './shared/UIManager.js';
+import { GameRegistry } from './shared/GameRegistry.js';
+import { pigVsChickGame } from './games/pig-vs-chick/index.js';
+
+// Register all games
+GameRegistry.register('pig-vs-chick', pigVsChickGame);
 
 const app = {
   sceneManager: null,

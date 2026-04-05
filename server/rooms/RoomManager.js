@@ -1,5 +1,5 @@
 import { generateRoomCode } from '../utils/generateRoomCode.js';
-import { GameState, GAME_CONFIG } from '../games/pig-vs-chick/GameState.js';
+import { GameFactory } from '../games/GameFactory.js';
 
 export class RoomManager {
   constructor(io) {
@@ -8,7 +8,12 @@ export class RoomManager {
     this.playerRooms = new Map(); // socketId -> roomCode
   }
 
-  createRoom(socket) {
+  createRoom(socket, gameType = 'pig-vs-chick') {
+    if (!GameFactory.has(gameType)) {
+      socket.emit('error', { message: 'Unknown game type!' });
+      return;
+    }
+
     let code = generateRoomCode();
     while (this.rooms.has(code)) {
       code = generateRoomCode();
@@ -16,6 +21,7 @@ export class RoomManager {
 
     const room = {
       code,
+      gameType,
       players: [{ id: socket.id, socket, side: null, ready: false }],
       game: null,
       state: 'waiting', // waiting, side-select, playing, finished
@@ -91,23 +97,14 @@ export class RoomManager {
     const p1 = room.players[0];
     const p2 = room.players[1];
 
-    room.game = new GameState(p1, p2, (event, data) => {
+    room.game = GameFactory.create(room.gameType, p1, p2, (event, data) => {
       this.handleGameEvent(room, event, data);
     });
 
-    // Send game start to each player with their perspective + authoritative config
-    const gameConfig = {
-      NUM_LANES: GAME_CONFIG.NUM_LANES,
-      LANE_HEIGHT: GAME_CONFIG.LANE_HEIGHT,
-      PLAYER_HP: GAME_CONFIG.PLAYER_HP,
-      MAX_ENERGY: GAME_CONFIG.MAX_ENERGY,
-      STARTING_ENERGY: GAME_CONFIG.STARTING_ENERGY,
-      ENERGY_REGEN: GAME_CONFIG.ENERGY_REGEN,
-      BASE_DAMAGE: GAME_CONFIG.BASE_DAMAGE,
-      UNITS: GAME_CONFIG.UNITS.map((u) => ({ tier: u.tier, hp: u.hp, atk: u.atk, speed: u.speed, cost: u.cost, attackRate: u.attackRate })),
-    };
+    const gameConfig = GameFactory.getConfig(room.gameType);
 
     p1.socket.emit('game-start', {
+      gameType: room.gameType,
       yourSide: p1.side,
       yourDirection: 1,
       opponentSide: p2.side,
@@ -119,6 +116,7 @@ export class RoomManager {
     });
 
     p2.socket.emit('game-start', {
+      gameType: room.gameType,
       yourSide: p2.side,
       yourDirection: -1,
       opponentSide: p1.side,
@@ -129,9 +127,8 @@ export class RoomManager {
       gameConfig,
     });
 
-    // Start the game loop
     room.game.start();
-    console.log(`Game started in room ${room.code}: ${p1.side} vs ${p2.side}`);
+    console.log(`Game started in room ${room.code} [${room.gameType}]: ${p1.side} vs ${p2.side}`);
   }
 
   spawnUnit(socket, tier, lane) {
@@ -249,18 +246,8 @@ export class RoomManager {
       const p1 = room.players[0];
       const p2 = room.players[1];
 
-      const gameConfig = {
-        NUM_LANES: GAME_CONFIG.NUM_LANES,
-        LANE_HEIGHT: GAME_CONFIG.LANE_HEIGHT,
-        PLAYER_HP: GAME_CONFIG.PLAYER_HP,
-        MAX_ENERGY: GAME_CONFIG.MAX_ENERGY,
-        STARTING_ENERGY: GAME_CONFIG.STARTING_ENERGY,
-        ENERGY_REGEN: GAME_CONFIG.ENERGY_REGEN,
-        BASE_DAMAGE: GAME_CONFIG.BASE_DAMAGE,
-        UNITS: GAME_CONFIG.UNITS.map((u) => ({ tier: u.tier, hp: u.hp, atk: u.atk, speed: u.speed, cost: u.cost, attackRate: u.attackRate })),
-      };
-
       socket.emit('game-start', {
+        gameType: room.gameType,
         yourSide: dcPlayer.side,
         yourDirection: isP1 ? 1 : -1,
         opponentSide: otherPlayer.side,
@@ -268,7 +255,7 @@ export class RoomManager {
         p2Side: p2.side,
         p1Label: isP1 ? 'You' : 'Sayang',
         p2Label: isP1 ? 'Sayang' : 'You',
-        gameConfig,
+        gameConfig: GameFactory.getConfig(room.gameType),
         reconnect: true,
       });
 

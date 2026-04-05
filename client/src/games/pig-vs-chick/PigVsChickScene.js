@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from './config.js';
 import { createUnitModel } from './CubePetModels.js';
+import { EventBus } from '../../shared/EventBus.js';
 
 export class PigVsChickScene {
   constructor(sceneManager, network, ui, gameData) {
@@ -63,14 +64,9 @@ export class PigVsChickScene {
     this.sceneManager.setScene(this.scene, this.camera);
     this.sceneManager.onUpdate = (dt) => this.update(dt);
 
-    // Show game UI
-    this.ui.showGameHUD({
-      p1Side: this.gameData.p1Side,
-      p2Side: this.gameData.p2Side,
-      p1Label: this.gameData.p1Label,
-      p2Label: this.gameData.p2Label,
-      myDirection: this.myDirection,
-    });
+    // Subscribe to server state updates via EventBus
+    this._onState = (state) => this.onServerState(state);
+    EventBus.on('game:state', this._onState);
 
     // Skip countdown on reconnect — jump straight into the game
     if (this.gameData.reconnect) {
@@ -332,6 +328,7 @@ export class PigVsChickScene {
   destroy() {
     this.gameActive = false;
     this.sceneManager.onUpdate = null;
+    EventBus.off('game:state', this._onState);
     for (const [, unit] of this.units) {
       if (unit._fightFlash) clearInterval(unit._fightFlash);
       this.disposeModel(unit.model);

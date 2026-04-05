@@ -4,6 +4,11 @@ import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { RoomManager } from './rooms/RoomManager.js';
+import { GameFactory } from './games/GameFactory.js';
+import { GameState, GAME_CONFIG } from './games/pig-vs-chick/GameState.js';
+
+// Register all games
+GameFactory.register('pig-vs-chick', GameState, GAME_CONFIG);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -28,8 +33,8 @@ const roomManager = new RoomManager(io);
 io.on('connection', (socket) => {
   console.log(`Player connected: ${socket.id}`);
 
-  socket.on('create-room', () => {
-    roomManager.createRoom(socket);
+  socket.on('create-room', (data) => {
+    roomManager.createRoom(socket, data?.gameType);
   });
 
   socket.on('join-room', (data) => {

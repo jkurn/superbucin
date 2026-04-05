@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client';
+import { EventBus } from './EventBus.js';
 
 export class NetworkManager {
   constructor() {
@@ -8,6 +9,8 @@ export class NetworkManager {
     this.roomCode = null;
     this.playerId = null;
     this.isHost = false;
+    this._inGame = false;
+    this._wasInGame = false;
   }
 
   init(ui, sceneManager) {
@@ -34,7 +37,7 @@ export class NetworkManager {
 
     this.socket.on('disconnect', () => {
       // Mark that we were in a game so we can auto-rejoin on reconnect
-      if (this.roomCode && this.ui.gameScene) {
+      if (this.roomCode && this._inGame) {
         this._wasInGame = true;
       }
     });
@@ -59,16 +62,16 @@ export class NetworkManager {
     });
 
     this.socket.on('game-start', (data) => {
+      this._inGame = true;
       this.ui.startGame(data);
     });
 
     this.socket.on('game-state', (state) => {
-      if (this.ui.gameScene) {
-        this.ui.gameScene.onServerState(state);
-      }
+      EventBus.emit('game:state', state);
     });
 
     this.socket.on('match-end', (data) => {
+      this._inGame = false;
       this.ui.showVictory(data);
     });
 
@@ -76,6 +79,7 @@ export class NetworkManager {
       if (data && data.reconnecting) {
         this.ui.showReconnecting();
       } else {
+        this._inGame = false;
         this.ui.showDisconnect();
       }
     });
@@ -89,8 +93,8 @@ export class NetworkManager {
     });
   }
 
-  createRoom() {
-    this.socket.emit('create-room');
+  createRoom(gameType) {
+    this.socket.emit('create-room', { gameType });
   }
 
   joinRoom(code) {
