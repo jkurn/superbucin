@@ -3,6 +3,10 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   root: '.',
   envDir: '..',
+  define: {
+    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL || ''),
+    'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY || ''),
+  },
   server: {
     host: true,
     port: 5173,
