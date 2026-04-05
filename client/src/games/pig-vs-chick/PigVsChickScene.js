@@ -3,6 +3,66 @@ import { GAME_CONFIG } from './config.js';
 import { createUnitModel } from './CubePetModels.js';
 import { EventBus } from '../../shared/EventBus.js';
 
+// ── Floating HP bar (canvas → Sprite) ────────────────────────
+function createHPLabel(weight, maxHp) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 48;
+  canvas.height = 8;
+  const ctx = canvas.getContext('2d');
+
+  drawHPLabel(ctx, 1.0); // full HP
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.6, depthTest: false });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(0.7, 0.12, 1);
+  sprite.renderOrder = 999;
+
+  return { sprite, canvas, ctx, texture, maxHp, _lastPct: 1.0 };
+}
+
+function drawHPLabel(ctx, pct) {
+  const w = 48, h = 8;
+  ctx.clearRect(0, 0, w, h);
+
+  // Thin bar background
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  roundRect(ctx, 0, 0, w, h, 3);
+
+  // HP fill
+  const fillW = Math.max(0, (w - 2) * pct);
+  const r = Math.floor(255 * (1 - pct));
+  const g = Math.floor(200 * pct);
+  ctx.fillStyle = `rgb(${r},${g},40)`;
+  roundRect(ctx, 1, 1, fillW, h - 2, 2);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function updateHPLabel(label, hp) {
+  const pct = Math.max(0, hp / label.maxHp);
+  if (Math.abs(pct - label._lastPct) < 0.01) return; // skip if unchanged
+  label._lastPct = pct;
+  drawHPLabel(label.ctx, pct);
+  label.texture.needsUpdate = true;
+}
+
+// ──────────────────────────────────────────────────────────────
+
 export class PigVsChickScene {
   constructor(sceneManager, network, ui, gameData) {
     this.sceneManager = sceneManager;
@@ -12,20 +72,18 @@ export class PigVsChickScene {
 
     this.scene = null;
     this.camera = null;
-    this.units = new Map(); // id -> unit
+    this.units = new Map();
     this.mySide = gameData.yourSide;
-    this.myDirection = gameData.yourDirection; // 1 = bottom-to-top, -1 = top-to-bottom
+    this.myDirection = gameData.yourDirection;
     this.gameActive = false;
 
-    // Shared particle geometry/materials (reused for all death particles)
     this._particleGeo = new THREE.SphereGeometry(0.06, 6, 6);
     this._particleMats = {
-      pig: new THREE.MeshToonMaterial({ color: 0xffb0c8 }),
-      chicken: new THREE.MeshToonMaterial({ color: 0xffe066 }),
-      chick: new THREE.MeshToonMaterial({ color: 0xffe066 }),
+      pig: new THREE.MeshToonMaterial({ color: 0xffc8e8 }),
+      chicken: new THREE.MeshToonMaterial({ color: 0xfff080 }),
+      chick: new THREE.MeshToonMaterial({ color: 0xfff080 }),
     };
 
-    // Lane positions (x coordinates for 5 lanes)
     const totalWidth = GAME_CONFIG.NUM_LANES * GAME_CONFIG.LANE_WIDTH;
     this.laneXPositions = [];
     for (let i = 0; i < GAME_CONFIG.NUM_LANES; i++) {
@@ -35,18 +93,24 @@ export class PigVsChickScene {
 
   init() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x88cc55);
+    this.scene.background = new THREE.Color(0xa0e870);
 
-    // Raycaster for lane tap detection
     this._raycaster = new THREE.Raycaster();
     this._pointer = new THREE.Vector2();
 
-    // Camera — perspective with tilted view to see 3D models
+    // Camera — flip for P2 so your units always appear at bottom
     const aspect = window.innerWidth / window.innerHeight;
     this.camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 100);
-    // Tilted angle — see both fences and 3D model shapes
-    this.camera.position.set(0, 13, 9);
-    this.camera.lookAt(0, 0, -1);
+
+    if (this.myDirection === 1) {
+      // P1: camera behind +Z, looking toward -Z
+      this.camera.position.set(0, 13, 9);
+      this.camera.lookAt(0, 0, -1);
+    } else {
+      // P2: camera behind -Z, looking toward +Z (flipped view)
+      this.camera.position.set(0, 13, -9);
+      this.camera.lookAt(0, 0, 1);
+    }
 
     // Lighting
     const ambient = new THREE.AmbientLight(0xffffff, 0.7);
@@ -64,8 +128,9 @@ export class PigVsChickScene {
     this.scene.add(sun);
 
     this.createBattlefield();
+    this.createLaneHighlights();
 
-    // Invisible ground plane for raycasting lane taps
+    // Invisible ground plane for raycasting
     const groundGeo = new THREE.PlaneGeometry(30, GAME_CONFIG.LANE_HEIGHT + 4);
     const groundMat = new THREE.MeshBasicMaterial({ visible: false });
     this._groundPlane = new THREE.Mesh(groundGeo, groundMat);
@@ -73,18 +138,15 @@ export class PigVsChickScene {
     this._groundPlane.position.y = 0;
     this.scene.add(this._groundPlane);
 
-    // Lane tap handler
     this._onCanvasTap = (e) => this._handleLaneTap(e);
     this.sceneManager.renderer.domElement.addEventListener('pointerdown', this._onCanvasTap);
 
     this.sceneManager.setScene(this.scene, this.camera);
-    this.sceneManager.onUpdate = (dt) => this.update(dt);
+    this.sceneManager.onUpdate = () => this.update();
 
-    // Subscribe to server state updates via EventBus
     this._onState = (state) => this.onServerState(state);
     EventBus.on('game:state', this._onState);
 
-    // Skip countdown on reconnect — jump straight into the game
     if (this.gameData.reconnect) {
       this.gameActive = true;
     } else {
@@ -96,33 +158,30 @@ export class PigVsChickScene {
     const halfLane = GAME_CONFIG.LANE_HEIGHT / 2;
     const totalWidth = GAME_CONFIG.NUM_LANES * GAME_CONFIG.LANE_WIDTH + 2;
 
-    // Main grass field
     const fieldGeo = new THREE.PlaneGeometry(totalWidth + 4, GAME_CONFIG.LANE_HEIGHT + 4);
-    const fieldMat = new THREE.MeshToonMaterial({ color: 0x7ec850 });
+    const fieldMat = new THREE.MeshToonMaterial({ color: 0x98e468 });
     const field = new THREE.Mesh(fieldGeo, fieldMat);
     field.rotation.x = -Math.PI / 2;
     field.position.y = -0.02;
     field.receiveShadow = true;
     this.scene.add(field);
 
-    // Lane stripes (darker grass lines, like the reference)
     for (let i = 0; i <= GAME_CONFIG.NUM_LANES; i++) {
       const x = -totalWidth / 2 + 1 + i * GAME_CONFIG.LANE_WIDTH;
       const lineGeo = new THREE.PlaneGeometry(0.04, GAME_CONFIG.LANE_HEIGHT);
-      const lineMat = new THREE.MeshToonMaterial({ color: 0x6ab842 });
+      const lineMat = new THREE.MeshToonMaterial({ color: 0x80d058 });
       const line = new THREE.Mesh(lineGeo, lineMat);
       line.rotation.x = -Math.PI / 2;
       line.position.set(x, -0.01, 0);
       this.scene.add(line);
     }
 
-    // Vertical grass texture lines within each lane
     for (let lane = 0; lane < GAME_CONFIG.NUM_LANES; lane++) {
       const lx = this.laneXPositions[lane];
       for (let s = -3; s <= 3; s++) {
         const stripe = new THREE.Mesh(
           new THREE.PlaneGeometry(0.015, GAME_CONFIG.LANE_HEIGHT - 1),
-          new THREE.MeshToonMaterial({ color: 0x72b848, transparent: true, opacity: 0.4 })
+          new THREE.MeshToonMaterial({ color: 0x80c858, transparent: true, opacity: 0.4 })
         );
         stripe.rotation.x = -Math.PI / 2;
         stripe.position.set(lx + s * 0.22, -0.005, 0);
@@ -130,19 +189,13 @@ export class PigVsChickScene {
       }
     }
 
-    // Base zones (top = enemy or player depending on direction)
     [halfLane + 0.5, -halfLane - 0.5].forEach((z) => {
-      // Fence
       const fenceGeo = new THREE.PlaneGeometry(totalWidth, 0.8);
-      const fenceMat = new THREE.MeshToonMaterial({
-        color: 0x8B6914,
-        side: THREE.DoubleSide,
-      });
+      const fenceMat = new THREE.MeshToonMaterial({ color: 0x8B6914, side: THREE.DoubleSide });
       const fence = new THREE.Mesh(fenceGeo, fenceMat);
       fence.position.set(0, 0.4, z);
       this.scene.add(fence);
 
-      // Fence posts
       for (let p = 0; p < 6; p++) {
         const post = new THREE.Mesh(
           new THREE.CylinderGeometry(0.06, 0.06, 0.9, 8),
@@ -153,7 +206,6 @@ export class PigVsChickScene {
       }
     });
 
-    // Side grass decoration — small, far from lanes
     [-totalWidth / 2 - 1.5, totalWidth / 2 + 1.5].forEach((x) => {
       for (let z = -4; z <= 4; z += 2.5) {
         const bush = new THREE.Mesh(
@@ -166,6 +218,37 @@ export class PigVsChickScene {
       }
     });
   }
+
+  // ── Lane highlights ─────────────────────────────────────────
+  createLaneHighlights() {
+    this._laneHighlights = [];
+    for (let i = 0; i < GAME_CONFIG.NUM_LANES; i++) {
+      const geo = new THREE.PlaneGeometry(GAME_CONFIG.LANE_WIDTH - 0.1, GAME_CONFIG.LANE_HEIGHT);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xaaffaa,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(this.laneXPositions[i], 0.005, 0);
+      this.scene.add(mesh);
+      this._laneHighlights.push(mesh);
+    }
+  }
+
+  _flashLane(lane) {
+    this._laneHighlights.forEach((h, i) => {
+      h.material.opacity = i === lane ? 0.18 : 0;
+    });
+    if (this._laneFlashTimer) clearTimeout(this._laneFlashTimer);
+    this._laneFlashTimer = setTimeout(() => {
+      this._laneHighlights.forEach((h) => { h.material.opacity = 0; });
+    }, 500);
+  }
+
+  // ──────────────────────────────────────────────────────────────
 
   startCountdown() {
     let count = 3;
@@ -188,24 +271,29 @@ export class PigVsChickScene {
     const config = GAME_CONFIG.UNITS[tier - 1];
 
     const model = createUnitModel(side, tier);
-    // Scale based on tier
     const baseScale = 1.4 + (tier - 1) * 0.3;
     model.scale.setScalar(baseScale);
 
-    // Position in the correct lane
     const laneX = this.laneXPositions[lane] || 0;
     const halfLane = GAME_CONFIG.LANE_HEIGHT / 2;
     const startZ = direction === 1 ? halfLane : -halfLane;
 
     model.position.set(laneX, 0, startZ);
 
-    // Face march direction — P1 marches toward -Z (top), P2 toward +Z (bottom)
     if (direction === 1) {
-      model.rotation.y = Math.PI; // face -Z (toward top/enemy base)
+      model.rotation.y = Math.PI;
     }
-    // direction === -1: default orientation faces +Z (toward bottom/enemy base)
 
     this.scene.add(model);
+
+    // Floating HP bar + weight label
+    const weight = data.weight || config.weight || 10;
+    const maxHp = data.maxHp || config.hp;
+    const hpLabel = createHPLabel(weight, maxHp);
+    hpLabel._weight = weight;
+    const labelHeight = 1.0 + (tier - 1) * 0.22;
+    hpLabel.sprite.position.set(0, labelHeight, 0);
+    model.add(hpLabel.sprite);
 
     const unit = {
       id,
@@ -214,10 +302,12 @@ export class PigVsChickScene {
       tier,
       direction,
       lane,
-      hp: data.hp || config.hp,
-      maxHp: config.hp,
+      hp: data.hp || maxHp,
+      maxHp,
+      weight,
       state: data.state || 'march',
       z: startZ,
+      hpLabel,
     };
 
     this.units.set(id, unit);
@@ -226,10 +316,14 @@ export class PigVsChickScene {
   update() {
     if (!this.gameActive) return;
 
-    // Animate units — gentle bob
     for (const [, unit] of this.units) {
       if (unit.state !== 'dead') {
-        unit.model.position.y = Math.sin(Date.now() * 0.005 + unit.id * 50) * 0.04;
+        // Gentle bob when marching, faster shake when pushing
+        if (unit.state === 'push') {
+          unit.model.position.y = Math.sin(Date.now() * 0.015 + unit.id * 50) * 0.06;
+        } else {
+          unit.model.position.y = Math.sin(Date.now() * 0.005 + unit.id * 50) * 0.04;
+        }
       }
     }
   }
@@ -248,7 +342,6 @@ export class PigVsChickScene {
 
     const hitX = hits[0].point.x;
 
-    // Find closest lane
     let bestLane = 0;
     let bestDist = Infinity;
     for (let i = 0; i < this.laneXPositions.length; i++) {
@@ -259,8 +352,8 @@ export class PigVsChickScene {
       }
     }
 
-    // Only accept taps within half a lane width of the nearest lane center
     if (bestDist <= GAME_CONFIG.LANE_WIDTH / 2) {
+      this._flashLane(bestLane);
       EventBus.emit('lane:tapped', bestLane);
     }
   }
@@ -270,11 +363,16 @@ export class PigVsChickScene {
 
     const serverIds = new Set(state.units.map((u) => u.id));
 
-    // Remove units that server no longer tracks
+    // Remove dead units
     for (const [id, unit] of this.units) {
       if (!serverIds.has(id)) {
-        if (unit._fightFlash) clearInterval(unit._fightFlash);
+        if (unit._pushShake) clearInterval(unit._pushShake);
         this.spawnDeathParticles(unit.model.position.clone(), unit.side);
+        // Dispose HP label
+        if (unit.hpLabel) {
+          unit.hpLabel.texture.dispose();
+          unit.hpLabel.sprite.material.dispose();
+        }
         this.disposeModel(unit.model);
         this.units.delete(id);
       }
@@ -285,13 +383,11 @@ export class PigVsChickScene {
       let unit = this.units.get(su.id);
 
       if (!unit) {
-        // New unit — spawn it
         this.spawnUnit(su);
         unit = this.units.get(su.id);
       }
 
       if (unit) {
-        // Update position
         const laneX = this.laneXPositions[su.lane] || 0;
         unit.model.position.x = laneX;
         unit.model.position.z = su.z;
@@ -299,28 +395,32 @@ export class PigVsChickScene {
         unit.hp = su.hp;
         unit.state = su.state;
 
-        // Flash red when fighting
-        if (su.state === 'fight' && !unit._fighting) {
-          unit._fighting = true;
-          unit._fightFlash = setInterval(() => {
-            if (unit.state !== 'fight') {
-              clearInterval(unit._fightFlash);
-              unit._fighting = false;
+        // Update floating HP bar
+        if (unit.hpLabel) {
+          updateHPLabel(unit.hpLabel, su.hp);
+        }
+
+        // Push shake effect
+        if (su.state === 'push' && !unit._pushing) {
+          unit._pushing = true;
+          unit._pushShake = setInterval(() => {
+            if (unit.state !== 'push') {
+              clearInterval(unit._pushShake);
+              unit._pushing = false;
+              unit.model.position.x = laneX;
               return;
             }
-            // Quick shake
-            unit.model.position.x = laneX + (Math.random() - 0.5) * 0.08;
-          }, 100);
+            unit.model.position.x = laneX + (Math.random() - 0.5) * 0.06;
+          }, 80);
         }
-        if (su.state !== 'fight' && unit._fighting) {
-          clearInterval(unit._fightFlash);
-          unit._fighting = false;
+        if (su.state !== 'push' && unit._pushing) {
+          clearInterval(unit._pushShake);
+          unit._pushing = false;
           unit.model.position.x = laneX;
         }
       }
     }
 
-    // Update UI
     if (state.playerHP) {
       this.ui.updateHP(state.playerHP, this.gameData);
     }
@@ -378,13 +478,24 @@ export class PigVsChickScene {
     if (this._onCanvasTap) {
       this.sceneManager.renderer.domElement.removeEventListener('pointerdown', this._onCanvasTap);
     }
+    if (this._laneFlashTimer) clearTimeout(this._laneFlashTimer);
     for (const [, unit] of this.units) {
-      if (unit._fightFlash) clearInterval(unit._fightFlash);
+      if (unit._pushShake) clearInterval(unit._pushShake);
+      if (unit.hpLabel) {
+        unit.hpLabel.texture.dispose();
+        unit.hpLabel.sprite.material.dispose();
+      }
       this.disposeModel(unit.model);
     }
     this.units.clear();
-    // Dispose shared particle resources
     this._particleGeo.dispose();
     Object.values(this._particleMats).forEach((m) => m.dispose());
+    // Dispose lane highlights
+    if (this._laneHighlights) {
+      this._laneHighlights.forEach((h) => {
+        h.geometry.dispose();
+        h.material.dispose();
+      });
+    }
   }
 }

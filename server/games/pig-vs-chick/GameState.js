@@ -8,16 +8,22 @@ export const GAME_CONFIG = {
   TICK_RATE: 20,
   BASE_DAMAGE: [60, 35, 18, 8],
 
+  // Tug-of-war push combat
+  PUSH_SPEED: 0.015,        // push speed per weight-difference unit
+  PUSH_DAMAGE: 0.3,         // HP damage/sec per weight-difference unit
+  EQUAL_PUSH_DAMAGE: 3,     // HP damage/sec when weights are equal
+  COLLISION_DIST: 1.0,      // distance at which units begin pushing
+
   UNITS: [
-    { tier: 1, hp: 30, atk: 10, speed: 1.5, cost: 5, attackRate: 1.0 },
-    { tier: 2, hp: 60, atk: 18, speed: 1.3, cost: 12, attackRate: 0.8 },
-    { tier: 3, hp: 120, atk: 30, speed: 1.0, cost: 25, attackRate: 0.6 },
-    { tier: 4, hp: 250, atk: 50, speed: 0.8, cost: 50, attackRate: 0.5 },
+    { tier: 1, weight: 10, hp: 40, speed: 1.8, cost: 5 },
+    { tier: 2, weight: 20, hp: 70, speed: 1.4, cost: 12 },
+    { tier: 3, weight: 50, hp: 130, speed: 1.0, cost: 25 },
+    { tier: 4, weight: 70, hp: 200, speed: 0.7, cost: 50 },
   ],
 };
 
 export class GameState {
-  constructor(player1, player2, emitCallback) {
+  constructor(player1, player2, emitCallback, _roomOptions = {}) {
     this.p1 = player1;
     this.p2 = player2;
     this.emit = emitCallback;
@@ -92,6 +98,8 @@ export class GameState {
         lane: u.lane,
         z: u.z,
         hp: u.hp,
+        maxHp: u.maxHp,
+        weight: u.weight,
         state: u.state,
       })),
       energies: this.energies,
@@ -106,58 +114,121 @@ export class GameState {
     }
   }
 
+  // ── Tug-of-war push combat ──────────────────────────────────
+  //
+  //  march ──► collision ──► push (weight determines direction)
+  //                            │
+  //            ┌───────────────┤
+  //            ▼               ▼
+  //     weaker loses HP   stronger advances
+  //            │
+  //     hp ≤ 0 → dead     reaches base → base damage
+  //
   updateUnits(dt) {
     const halfLane = GAME_CONFIG.LANE_HEIGHT / 2;
     const alive = this.units.filter((u) => u.state !== 'dead');
 
+    // Phase 1: Detect new collisions (march → push)
     for (const unit of alive) {
-      if (unit.state === 'march') {
-        // Find closest opponent in SAME lane, ahead of us
-        const opponent = this.findClosestOpponent(unit, alive);
+      if (unit.state !== 'march') continue;
 
-        if (opponent && Math.abs(unit.z - opponent.z) < 0.9) {
-          unit.state = 'fight';
-          unit.targetId = opponent.id;
-          if (opponent.state === 'march') {
-            opponent.state = 'fight';
-            opponent.targetId = unit.id;
-          }
-        } else {
-          // March: direction=1 means bottom-to-top (positive z to negative z)
-          // P1 goes from +halfLane toward -halfLane
-          // P2 goes from -halfLane toward +halfLane
-          unit.z -= unit.speed * unit.direction * dt;
-
-          // Check if reached enemy base
-          if (unit.direction === 1 && unit.z <= -halfLane) {
-            this.onUnitReachedBase(unit);
-          } else if (unit.direction === -1 && unit.z >= halfLane) {
-            this.onUnitReachedBase(unit);
-          }
+      const opponent = this.findClosestOpponent(unit, alive);
+      if (opponent && Math.abs(unit.z - opponent.z) < GAME_CONFIG.COLLISION_DIST) {
+        unit.state = 'push';
+        unit.targetId = opponent.id;
+        if (opponent.state === 'march') {
+          opponent.state = 'push';
+          opponent.targetId = unit.id;
         }
-      } else if (unit.state === 'fight') {
-        const target = alive.find((u) => u.id === unit.targetId);
-        if (!target || target.state === 'dead') {
-          unit.state = 'march';
-          unit.targetId = null;
-          continue;
+      }
+    }
+
+    // Phase 2: March (only marching units)
+    for (const unit of alive) {
+      if (unit.state !== 'march') continue;
+
+      unit.z -= unit.speed * unit.direction * dt;
+
+      if (unit.direction === 1 && unit.z <= -halfLane) {
+        this.onUnitReachedBase(unit);
+      } else if (unit.direction === -1 && unit.z >= halfLane) {
+        this.onUnitReachedBase(unit);
+      }
+    }
+
+    // Phase 3: Resolve pushes (each pair processed once)
+    const processed = new Set();
+
+    for (const unit of alive) {
+      if (unit.state !== 'push') continue;
+
+      const target = alive.find((u) => u.id === unit.targetId);
+      if (!target || target.state === 'dead') {
+        unit.state = 'march';
+        unit.targetId = null;
+        continue;
+      }
+
+      // Process each pair once
+      const pairKey = Math.min(unit.id, target.id) + ':' + Math.max(unit.id, target.id);
+      if (processed.has(pairKey)) continue;
+      processed.add(pairKey);
+
+      const weightDiff = unit.weight - target.weight;
+      const pushMove = Math.abs(weightDiff) * GAME_CONFIG.PUSH_SPEED * dt;
+
+      // Push movement — stronger pushes in its march direction
+      if (weightDiff > 0) {
+        unit.z -= pushMove * unit.direction;
+        target.z -= pushMove * unit.direction;
+      } else if (weightDiff < 0) {
+        unit.z -= pushMove * target.direction;
+        target.z -= pushMove * target.direction;
+      }
+      // Equal weight: no movement (stuck)
+
+      // Attrition damage
+      if (weightDiff > 0) {
+        target.hp -= weightDiff * GAME_CONFIG.PUSH_DAMAGE * dt;
+      } else if (weightDiff < 0) {
+        unit.hp -= Math.abs(weightDiff) * GAME_CONFIG.PUSH_DAMAGE * dt;
+      } else {
+        unit.hp -= GAME_CONFIG.EQUAL_PUSH_DAMAGE * dt;
+        target.hp -= GAME_CONFIG.EQUAL_PUSH_DAMAGE * dt;
+      }
+
+      // Check HP deaths
+      for (const u of [unit, target]) {
+        if (u.hp <= 0 && u.state !== 'dead') {
+          u.state = 'dead';
+          alive.forEach((a) => {
+            if (a.targetId === u.id) {
+              a.state = 'march';
+              a.targetId = null;
+            }
+          });
         }
+      }
 
-        unit.attackTimer += dt;
-        if (unit.attackTimer >= 1 / unit.attackRate) {
-          unit.attackTimer = 0;
-          target.hp -= unit.atk;
+      // Check if pushed past own base (eliminated)
+      for (const u of [unit, target]) {
+        if (u.state === 'dead') continue;
+        if (u.direction === 1 && u.z > halfLane + 0.5) {
+          u.state = 'dead';
+          u.deadTimer = 10;
+        } else if (u.direction === -1 && u.z < -halfLane - 0.5) {
+          u.state = 'dead';
+          u.deadTimer = 10;
+        }
+      }
 
-          if (target.hp <= 0) {
-            target.state = 'dead';
-            // Release all fighters targeting this unit
-            alive.forEach((u) => {
-              if (u.targetId === target.id) {
-                u.state = 'march';
-                u.targetId = null;
-              }
-            });
-          }
+      // Check if reached enemy base while pushing
+      for (const u of [unit, target]) {
+        if (u.state === 'dead') continue;
+        if (u.direction === 1 && u.z <= -halfLane) {
+          this.onUnitReachedBase(u);
+        } else if (u.direction === -1 && u.z >= halfLane) {
+          this.onUnitReachedBase(u);
         }
       }
     }
@@ -170,10 +241,9 @@ export class GameState {
     for (const other of alive) {
       if (other.state === 'dead') continue;
       if (other.direction === unit.direction) continue;
-      if (other.lane !== unit.lane) continue; // Same lane only
+      if (other.lane !== unit.lane) continue;
 
       const dist = Math.abs(unit.z - other.z);
-      // Check opponent is ahead
       const ahead = unit.direction === 1
         ? other.z < unit.z
         : other.z > unit.z;
@@ -187,14 +257,12 @@ export class GameState {
   }
 
   onUnitReachedBase(unit) {
-    // Deal damage to the opponent's HP pool
     const damage = GAME_CONFIG.BASE_DAMAGE[unit.tier - 1];
     const opponentId = unit.ownerId === this.p1.id ? this.p2.id : this.p1.id;
     this.playerHP[opponentId] = Math.max(0, this.playerHP[opponentId] - damage);
 
-    // Remove the unit
     unit.state = 'dead';
-    unit.deadTimer = 10; // remove immediately
+    unit.deadTimer = 10;
   }
 
   requestSpawn(playerId, tier, lane) {
@@ -224,10 +292,8 @@ export class GameState {
       z: startZ,
       hp: config.hp,
       maxHp: config.hp,
-      atk: config.atk,
+      weight: config.weight,
       speed: config.speed,
-      attackRate: config.attackRate,
-      attackTimer: 0,
       state: 'march',
       targetId: null,
     };

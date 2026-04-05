@@ -18,9 +18,9 @@
 
 ## Sheep Fight clone — next steps
 
-- [ ] Rewrite combat to tug-of-war push — Replace stop-and-attack (HP/atk) with weight-based pushing. Stronger unit pushes weaker backward. Multiple weak can overwhelm one strong. ~110 lines in GameState.js `updateUnits()` + client fight visualization changes. Core gameplay change, test carefully.
-- [ ] Add weight-based unit system (10kg/20kg/50kg/70kg) — Replace tier numbers with weight labels. Requires rebalancing all unit stats. Bundle with combat rewrite.
-- [ ] Add 3D floating power/weight labels on units — TextSprite or CSS2DRenderer label above each unit showing its weight/power. Polish layer.
+- [x] ~~Rewrite combat to tug-of-war push~~ — Done: weight-based pushing in GameState.js, push shake visualization on client
+- [x] ~~Add weight-based unit system (10kg/20kg/50kg/70kg)~~ — Done: server + client configs aligned, units have weight/hp/speed/cost
+- [x] ~~Add 3D floating HP bars on units~~ — Done: subtle canvas sprite bars above each unit, auto-updates per tick
 
 ## Deferred from plan-eng-review (2026-04-05)
 

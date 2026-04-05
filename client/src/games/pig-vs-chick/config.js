@@ -24,10 +24,10 @@ export let GAME_CONFIG = {
   ENERGY_REGEN: 3,
   BASE_DAMAGE: [60, 35, 18, 8],
   UNITS: [
-    { tier: 1, hp: 30, atk: 10, speed: 1.5, cost: 5, attackRate: 1.0, ...DISPLAY_CONFIG.UNITS[0] },
-    { tier: 2, hp: 60, atk: 18, speed: 1.3, cost: 12, attackRate: 0.8, ...DISPLAY_CONFIG.UNITS[1] },
-    { tier: 3, hp: 120, atk: 30, speed: 1.0, cost: 25, attackRate: 0.6, ...DISPLAY_CONFIG.UNITS[2] },
-    { tier: 4, hp: 250, atk: 50, speed: 0.8, cost: 50, attackRate: 0.5, ...DISPLAY_CONFIG.UNITS[3] },
+    { tier: 1, weight: 10, hp: 40, speed: 1.8, cost: 5, ...DISPLAY_CONFIG.UNITS[0] },
+    { tier: 2, weight: 20, hp: 70, speed: 1.4, cost: 12, ...DISPLAY_CONFIG.UNITS[1] },
+    { tier: 3, weight: 50, hp: 130, speed: 1.0, cost: 25, ...DISPLAY_CONFIG.UNITS[2] },
+    { tier: 4, weight: 70, hp: 200, speed: 0.7, cost: 50, ...DISPLAY_CONFIG.UNITS[3] },
   ],
 };
 
