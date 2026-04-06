@@ -2536,6 +2536,303 @@
       .bs-attack-grid { max-width: 180px; }
       .bs-defense-grid { max-width: 110px; }
     }
+
+    /* ====== Vending Machine Tycoon ====== */
+    .vm-layer {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      background: linear-gradient(135deg, #1a0a2e 0%, #16213e 50%, #0f3460 100%);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+    }
+    .vm-countdown {
+      text-align: center;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .vm-countdown-icon { font-size: 3.5rem; margin-bottom: 0.5rem; }
+    .vm-countdown-text {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #ffb7d5;
+      text-shadow: 0 0 15px rgba(255, 183, 213, 0.4);
+    }
+    .vm-countdown-sub {
+      color: #a0a0c0;
+      font-size: 0.95rem;
+      margin-top: 0.3rem;
+    }
+    .vm-wrapper {
+      width: 100%;
+      max-width: 420px;
+      padding: 0.5rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .vm-hud { position: relative; z-index: 30; }
+    .vm-timer-bar {
+      width: 100%;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .vm-timer-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #ff6b9d, #ff9ec7);
+      transition: width 0.3s linear;
+      border-radius: 2px;
+    }
+    .vm-timer-fill.vm-timer-danger {
+      background: linear-gradient(90deg, #ff4444, #ff6666);
+      animation: pulse 0.5s ease-in-out infinite;
+    }
+
+    /* Event banner */
+    .vm-event-banner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 0.4rem 0.75rem;
+      background: rgba(255, 183, 100, 0.15);
+      border: 1px solid rgba(255, 183, 100, 0.3);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: #ffd4a0;
+    }
+    .vm-event-boost {
+      color: #7eff7e;
+      font-weight: 600;
+    }
+
+    /* Score bar */
+    .vm-scores {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .vm-score {
+      flex: 1;
+      text-align: center;
+      padding: 0.4rem;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      transition: all 0.3s;
+    }
+    .vm-score-active {
+      background: rgba(255, 107, 157, 0.15);
+      border-color: rgba(255, 107, 157, 0.4);
+      box-shadow: 0 0 10px rgba(255, 107, 157, 0.2);
+    }
+    .vm-score-label {
+      font-size: 0.7rem;
+      color: #a0a0c0;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .vm-score-yen {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #ffd700;
+    }
+    .vm-score-machines {
+      font-size: 0.75rem;
+      color: #c0c0e0;
+    }
+    .vm-round-info {
+      text-align: center;
+      min-width: 80px;
+    }
+    .vm-round {
+      font-size: 0.7rem;
+      color: #808090;
+    }
+    .vm-turn-indicator {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #ff6b9d;
+    }
+
+    /* Grid */
+    .vm-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--vm-cols, 4), 1fr);
+      gap: 4px;
+      width: 100%;
+    }
+    .vm-cell {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: all 0.2s;
+      font-size: 0.75rem;
+    }
+    .vm-cell-empty {
+      background: rgba(255,255,255,0.06);
+      border: 1px dashed rgba(255,255,255,0.15);
+    }
+    .vm-cell-clickable {
+      cursor: pointer;
+      border-color: rgba(255, 107, 157, 0.4);
+    }
+    .vm-cell-clickable:hover {
+      background: rgba(255, 107, 157, 0.15);
+      transform: scale(1.05);
+    }
+    .vm-cell-clickable:active {
+      transform: scale(0.95);
+    }
+    .vm-cell-mine {
+      background: linear-gradient(135deg, rgba(255, 107, 157, 0.2), rgba(255, 107, 157, 0.1));
+      border: 1px solid rgba(255, 107, 157, 0.4);
+    }
+    .vm-cell-opp {
+      background: linear-gradient(135deg, rgba(100, 149, 237, 0.2), rgba(100, 149, 237, 0.1));
+      border: 1px solid rgba(100, 149, 237, 0.4);
+    }
+    .vm-cell-last {
+      animation: vm-pop 0.5s ease-out;
+    }
+    @keyframes vm-pop {
+      0% { transform: scale(0.8); opacity: 0.5; }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .vm-loc-emoji { font-size: 1.3rem; }
+    .vm-loc-name {
+      font-size: 0.55rem;
+      color: #a0a0b0;
+      margin-top: 1px;
+    }
+    .vm-loc-traffic {
+      font-size: 0.45rem;
+      margin-top: 1px;
+    }
+    .vm-machine {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+    .vm-machine-icon { font-size: 1.3rem; }
+    .vm-machine-drink { font-size: 0.85rem; margin-top: -2px; }
+
+    /* Income feedback */
+    .vm-income-feedback {
+      text-align: center;
+      color: #7eff7e;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 0.3rem;
+      animation: vm-pop 0.5s ease-out;
+    }
+
+    /* Drink picker overlay */
+    .vm-drink-picker {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #1a1a2e;
+      border-top: 2px solid rgba(255, 107, 157, 0.4);
+      border-radius: 16px 16px 0 0;
+      padding: 0.75rem;
+      z-index: 50;
+      animation: vm-slide-up 0.25s ease-out;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    @keyframes vm-slide-up {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .vm-picker-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #ffb7d5;
+      margin-bottom: 0.3rem;
+    }
+    .vm-picker-close {
+      background: none;
+      border: none;
+      color: #a0a0c0;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 0.25rem;
+    }
+    .vm-picker-hint {
+      font-size: 0.75rem;
+      color: #7eff7e;
+      margin-bottom: 0.5rem;
+    }
+    .vm-drink-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .vm-drink-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: #e0e0f0;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: inherit;
+    }
+    .vm-drink-btn:hover:not(.vm-drink-disabled) {
+      background: rgba(255, 107, 157, 0.15);
+      border-color: rgba(255, 107, 157, 0.4);
+    }
+    .vm-drink-btn:active:not(.vm-drink-disabled) {
+      transform: scale(0.97);
+    }
+    .vm-drink-disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .vm-drink-emoji { font-size: 1.5rem; }
+    .vm-drink-info {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .vm-drink-name {
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .vm-drink-cost {
+      font-size: 0.7rem;
+      color: #ffd700;
+    }
+
+    @media (max-width: 360px) {
+      .vm-wrapper { padding: 0.3rem 0.5rem; }
+      .vm-cell { font-size: 0.65rem; }
+      .vm-loc-emoji { font-size: 1rem; }
+      .vm-machine-icon { font-size: 1rem; }
+    }
   </style>
 </head>
 <body>

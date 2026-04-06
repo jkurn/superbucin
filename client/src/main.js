@@ -13,6 +13,7 @@ import { speedMatchGame } from './games/speed-match/index.js';
 import { connectFourGame } from './games/connect-four/index.js';
 import { quizRaceGame } from './games/quiz-race/index.js';
 import { battleshipMiniGame } from './games/battleship-mini/index.js';
+import { vendingMachineGame } from './games/vending-machine/index.js';
 
 GameRegistry.register('pig-vs-chick', pigVsChickGame);
 GameRegistry.register('othello', othelloGame);
@@ -23,6 +24,7 @@ GameRegistry.register('speed-match', speedMatchGame);
 GameRegistry.register('connect-four', connectFourGame);
 GameRegistry.register('quiz-race', quizRaceGame);
 GameRegistry.register('battleship-mini', battleshipMiniGame);
+GameRegistry.register('vending-machine', vendingMachineGame);
 
 const app = {
   sceneManager: null,

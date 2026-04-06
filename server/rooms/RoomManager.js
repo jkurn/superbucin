@@ -417,6 +417,14 @@ export class RoomManager {
         break;
       }
 
+      case 'vending-state': {
+        connected.forEach((p) => {
+          const slice = data.byPlayer[p.id];
+          if (slice) p.socket.emit('vending-state', slice);
+        });
+        break;
+      }
+
       case 'action-error':
         connected.forEach((p) => {
           if (p.id === data.playerId) {

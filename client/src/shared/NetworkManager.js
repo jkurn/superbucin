@@ -121,6 +121,10 @@ export class NetworkManager {
       EventBus.emit('battleship:state', state);
     });
 
+    this.socket.on('vending-state', (state) => {
+      EventBus.emit('vending:state', state);
+    });
+
     this.socket.on('match-end', (data) => {
       this._inGame = false;
       this.ui.showVictory(data);

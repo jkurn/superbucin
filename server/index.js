@@ -16,6 +16,7 @@ import { GameState as SpeedMatchState, GAME_CONFIG as SPEED_MATCH_CONFIG } from 
 import { GameState as ConnectFourState, GAME_CONFIG as CONNECT_FOUR_CONFIG } from './games/connect-four/GameState.js';
 import { GameState as QuizRaceState, GAME_CONFIG as QUIZ_RACE_CONFIG } from './games/quiz-race/GameState.js';
 import { GameState as BattleshipState, GAME_CONFIG as BATTLESHIP_CONFIG } from './games/battleship-mini/GameState.js';
+import { GameState as VendingState, GAME_CONFIG as VENDING_CONFIG } from './games/vending-machine/GameState.js';
 
 GameFactory.register('pig-vs-chick', GameState, GAME_CONFIG);
 GameFactory.register('word-scramble-race', WordScrambleState, WORD_SCRAMBLE_CONFIG);
@@ -26,6 +27,7 @@ GameFactory.register('speed-match', SpeedMatchState, SPEED_MATCH_CONFIG);
 GameFactory.register('connect-four', ConnectFourState, CONNECT_FOUR_CONFIG);
 GameFactory.register('quiz-race', QuizRaceState, QUIZ_RACE_CONFIG);
 GameFactory.register('battleship-mini', BattleshipState, BATTLESHIP_CONFIG);
+GameFactory.register('vending-machine', VendingState, VENDING_CONFIG);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
