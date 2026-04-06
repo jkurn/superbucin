@@ -7,6 +7,7 @@ import {
   getDoodlePacksMeta,
   DEFAULT_DOODLE_PACK_ID,
 } from './doodle-guess/prompts.js';
+import { getClientConfig as getVendingClientConfig } from './vending-machine/config.js';
 
 const games = new Map();
 
@@ -36,6 +37,10 @@ export const GameFactory = {
 
     if (gameType === 'memory-match') {
       return getMemoryMatchClientConfig(roomOptions);
+    }
+
+    if (gameType === 'vending-machine') {
+      return getVendingClientConfig();
     }
 
     if (gameType === 'speed-match') {
