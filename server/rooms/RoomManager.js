@@ -59,7 +59,7 @@ export class RoomManager {
 
     if (!GameFactory.has(gameType)) {
       console.log(`Create failed: unknown game type '${gameType}'`);
-      socket.emit('error', { message: 'Unknown game type!' });
+      socket.emit('room-error', { message: 'Unknown game type!' });
       return;
     }
 
@@ -91,13 +91,13 @@ export class RoomManager {
 
     if (!room) {
       console.log(`Join failed: room ${roomCode} not found (active rooms: ${[...this.rooms.keys()].join(', ') || 'none'})`);
-      socket.emit('error', { message: 'Room not found! Check the code sayang~' });
+      socket.emit('room-error', { message: 'Room not found! Check the code sayang~' });
       return;
     }
 
     if (room.players.length >= 2) {
       console.log(`Join failed: room ${roomCode} is full`);
-      socket.emit('error', { message: 'Room is full!' });
+      socket.emit('room-error', { message: 'Room is full!' });
       return;
     }
 
@@ -508,14 +508,14 @@ export class RoomManager {
     const room = this.rooms.get(roomCode);
     if (!room) {
       console.log(`Rejoin failed: room ${roomCode} expired`);
-      socket.emit('error', { message: 'Room expired! Start a new game sayang~' });
+      socket.emit('room-error', { message: 'Room expired! Start a new game sayang~' });
       return;
     }
 
     const dcPlayer = room.players.find((p) => p.disconnected);
     if (!dcPlayer) {
       console.log(`Rejoin failed: room ${roomCode} has no open slot`);
-      socket.emit('error', { message: 'No open slot to rejoin!' });
+      socket.emit('room-error', { message: 'No open slot to rejoin!' });
       return;
     }
 

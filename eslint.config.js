@@ -26,6 +26,18 @@ export default [
     },
   },
 
+  // Vite / build configs — Node.js globals
+  {
+    files: ['client/vite.config.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+
   // Server code — Node.js globals
   {
     files: ['server/**/*.js'],

@@ -151,7 +151,7 @@ export class NetworkManager {
       this.ui.showError(data.message);
     });
 
-    this.socket.on('error', (data) => {
+    this.socket.on('room-error', (data) => {
       const msg = data.message || 'Something went wrong';
       this.ui.showError(msg);
 
