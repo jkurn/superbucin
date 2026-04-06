@@ -129,6 +129,10 @@ export class NetworkManager {
       EventBus.emit('bonk:state', state);
     });
 
+    this.socket.on('cute-aggression-state', (state) => {
+      EventBus.emit('cute-aggression:state', state);
+    });
+
     this.socket.on('match-end', (data) => {
       this._inGame = false;
       this.ui.showVictory(data);

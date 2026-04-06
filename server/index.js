@@ -18,6 +18,7 @@ import { GameState as QuizRaceState, GAME_CONFIG as QUIZ_RACE_CONFIG } from './g
 import { GameState as BattleshipState, GAME_CONFIG as BATTLESHIP_CONFIG } from './games/battleship-mini/GameState.js';
 import { GameState as VendingState, GAME_CONFIG as VENDING_CONFIG } from './games/vending-machine/GameState.js';
 import { GameState as BonkBrawlState, GAME_CONFIG as BONK_BRAWL_CONFIG } from './games/bonk-brawl/GameState.js';
+import { GameState as CuteAggressionState, GAME_CONFIG as CUTE_AGGRESSION_CONFIG } from './games/cute-aggression/GameState.js';
 
 GameFactory.register('pig-vs-chick', GameState, GAME_CONFIG);
 GameFactory.register('word-scramble-race', WordScrambleState, WORD_SCRAMBLE_CONFIG);
@@ -30,6 +31,7 @@ GameFactory.register('quiz-race', QuizRaceState, QUIZ_RACE_CONFIG);
 GameFactory.register('battleship-mini', BattleshipState, BATTLESHIP_CONFIG);
 GameFactory.register('vending-machine', VendingState, VENDING_CONFIG);
 GameFactory.register('bonk-brawl', BonkBrawlState, BONK_BRAWL_CONFIG);
+GameFactory.register('cute-aggression', CuteAggressionState, CUTE_AGGRESSION_CONFIG);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();

@@ -49,6 +49,12 @@ export const GameFactory = {
       };
     }
 
+    if (gameType === 'cute-aggression') {
+      return {
+        CHARACTERS: config.CHARACTERS,
+      };
+    }
+
     if (gameType === 'speed-match') {
       return {
         QUESTIONS_PER_ROUND: config.QUESTIONS_PER_ROUND,
