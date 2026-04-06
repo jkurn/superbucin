@@ -111,7 +111,7 @@ export const speedMatchGame = {
         btn.addEventListener('click', () => {
           if (selectedAnswer !== null) return;
           selectedAnswer = i;
-          network.socket.emit('speed-match-answer', { answer: i });
+          network.sendGameAction({ type: 'answer', answer: i });
 
           optionsEl.querySelectorAll('.sm-option-btn').forEach((b) => {
             b.classList.remove('sm-option-selected');

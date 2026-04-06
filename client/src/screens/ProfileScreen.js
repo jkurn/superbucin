@@ -71,6 +71,9 @@ const GAME_NAMES = {
   'memory-match': '\ud83e\udde0 Memory Match',
   'speed-match': '\u26a1 Speed Match',
   'othello': '\u26ab Othello',
+  'connect-four': '\ud83d\udfe1 Connect Four',
+  'quiz-race': '\ud83e\udde0\u26a1 Blitz Trivia',
+  'battleship-mini': '\ud83d\udea2 Sink Squad',
 };
 
 async function showStatsSection(userManager) {
@@ -187,6 +190,8 @@ async function showHistorySection(userManager) {
     'pig-vs-chick': '\ud83d\udc37', 'word-scramble-race': '\ud83d\udcdd',
     'doodle-guess': '\ud83c\udfa8', 'memory-match': '\ud83e\udde0',
     'speed-match': '\u26a1', 'othello': '\u26ab',
+    'connect-four': '\ud83d\udfe1', 'quiz-race': '\ud83e\udde0',
+    'battleship-mini': '\ud83d\udea2',
   };
 
   container.innerHTML = `

@@ -213,12 +213,12 @@ See `planning/test-plan-next-three-games-2026-04-05.md` (artifact on disk).
 
 ---
 
-## PREMISE GATE (human confirmation required)
+## PREMISE GATE — APPROVED (2026-04-06)
 
-Please confirm or correct these three premises:
+Premises confirmed:
 
-1. **Audience:** Two players in a private room (couples-first), mobile web, same stack as today.  
-2. **Priority order to build:** Connect Four → Quiz Race → Mini Battleship *(Battleship most complex)* — swap if you want fastest “new mechanic” first.  
-3. **Content:** Quiz v1 is **host-supplied JSON only** (no LLM).
+1. **Audience:** Two players in a private room (couples-first), mobile web, same stack as today.
+2. **Build order:** Connect Four → Quiz Race → Mini Battleship.
+3. **Content:** Quiz v1 is host-supplied JSON only (no LLM).
 
-Reply with **Approve**, or **Override:** (e.g. “Battleship first”, “skip quiz”, “add X instead”).
+**Status:** Ready to build. Start with Connect Four (“Stack for Us”).

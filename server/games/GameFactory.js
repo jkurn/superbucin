@@ -56,6 +56,29 @@ export const GameFactory = {
       };
     }
 
+    if (gameType === 'connect-four') {
+      return {
+        ROWS: config.ROWS,
+        COLS: config.COLS,
+      };
+    }
+
+    if (gameType === 'quiz-race') {
+      return {
+        QUESTIONS_PER_ROUND: config.QUESTIONS_PER_ROUND,
+        TIME_PER_QUESTION_MS: config.TIME_PER_QUESTION_MS,
+      };
+    }
+
+    if (gameType === 'battleship-mini') {
+      return {
+        GRID_SIZE: config.GRID_SIZE,
+        SHIPS: config.SHIPS,
+        TURN_TIME_MS: config.TURN_TIME_MS,
+        PLACEMENT_TIME_MS: config.PLACEMENT_TIME_MS,
+      };
+    }
+
     if (gameType === 'word-scramble-race') {
       return {
         ROUND_DURATION_MS: config.ROUND_DURATION_MS,

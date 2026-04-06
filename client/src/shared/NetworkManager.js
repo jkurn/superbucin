@@ -113,6 +113,14 @@ export class NetworkManager {
       EventBus.emit('memory:state', state);
     });
 
+    this.socket.on('speed-match-state', (state) => {
+      EventBus.emit('speed-match:state', state);
+    });
+
+    this.socket.on('battleship-state', (state) => {
+      EventBus.emit('battleship:state', state);
+    });
+
     this.socket.on('match-end', (data) => {
       this._inGame = false;
       this.ui.showVictory(data);

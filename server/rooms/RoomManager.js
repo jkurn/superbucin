@@ -173,7 +173,9 @@ export class RoomManager {
           ? ['sprout', 'blossom']
           : room.gameType === 'othello'
             ? ['black', 'white']
-            : ['pig', 'chicken'];
+            : room.gameType === 'connect-four'
+              ? ['yellow', 'pink']
+              : ['pig', 'chicken'];
     if (!validSides.includes(side)) {
       socket.emit('side-selected', { message: 'Pick a valid role!' });
       return;
@@ -387,6 +389,30 @@ export class RoomManager {
         connected.forEach((p) => {
           const slice = p.id === p1p.id ? data.p1 : data.p2;
           if (slice) p.socket.emit('memory-state', slice);
+        });
+        break;
+      }
+
+      case 'speed-match-state': {
+        const p1p = room.players[0];
+        connected.forEach((p) => {
+          const isP1 = p.id === p1p.id;
+          p.socket.emit('speed-match-state', {
+            ...data,
+            yourScore: isP1 ? data.scores[0] : data.scores[1],
+            partnerScore: isP1 ? data.scores[1] : data.scores[0],
+            yourAnswer: isP1 ? data.p1Answer : data.p2Answer,
+            partnerAnswer: isP1 ? data.p2Answer : data.p1Answer,
+            partnerAnswered: isP1 ? data.p2Answered : data.p1Answered,
+          });
+        });
+        break;
+      }
+
+      case 'battleship-state': {
+        connected.forEach((p) => {
+          const slice = data.byPlayer[p.id];
+          if (slice) p.socket.emit('battleship-state', slice);
         });
         break;
       }

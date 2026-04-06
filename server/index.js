@@ -12,12 +12,20 @@ import { DoodleGuessGameState, DOODLE_GAME_CONFIG } from './games/doodle-guess/G
 import { MemoryMatchGameState } from './games/memory-match/GameState.js';
 import { MEMORY_MATCH_CONFIG } from './games/memory-match/config.js';
 import { GameState as OthelloState, GAME_CONFIG as OTHELLO_CONFIG } from './games/othello/GameState.js';
+import { GameState as SpeedMatchState, GAME_CONFIG as SPEED_MATCH_CONFIG } from './games/speed-match/GameState.js';
+import { GameState as ConnectFourState, GAME_CONFIG as CONNECT_FOUR_CONFIG } from './games/connect-four/GameState.js';
+import { GameState as QuizRaceState, GAME_CONFIG as QUIZ_RACE_CONFIG } from './games/quiz-race/GameState.js';
+import { GameState as BattleshipState, GAME_CONFIG as BATTLESHIP_CONFIG } from './games/battleship-mini/GameState.js';
 
 GameFactory.register('pig-vs-chick', GameState, GAME_CONFIG);
 GameFactory.register('word-scramble-race', WordScrambleState, WORD_SCRAMBLE_CONFIG);
 GameFactory.register('doodle-guess', DoodleGuessGameState, DOODLE_GAME_CONFIG);
 GameFactory.register('memory-match', MemoryMatchGameState, MEMORY_MATCH_CONFIG);
 GameFactory.register('othello', OthelloState, OTHELLO_CONFIG);
+GameFactory.register('speed-match', SpeedMatchState, SPEED_MATCH_CONFIG);
+GameFactory.register('connect-four', ConnectFourState, CONNECT_FOUR_CONFIG);
+GameFactory.register('quiz-race', QuizRaceState, QUIZ_RACE_CONFIG);
+GameFactory.register('battleship-mini', BattleshipState, BATTLESHIP_CONFIG);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
