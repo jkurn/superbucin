@@ -125,6 +125,10 @@ export class NetworkManager {
       EventBus.emit('vending:state', state);
     });
 
+    this.socket.on('bonk-state', (state) => {
+      EventBus.emit('bonk:state', state);
+    });
+
     this.socket.on('match-end', (data) => {
       this._inGame = false;
       this.ui.showVictory(data);

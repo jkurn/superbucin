@@ -175,7 +175,9 @@ export class RoomManager {
             ? ['black', 'white']
             : room.gameType === 'connect-four'
               ? ['yellow', 'pink']
-              : ['pig', 'chicken'];
+              : room.gameType === 'bonk-brawl'
+                ? ['bunny', 'kitty']
+                : ['pig', 'chicken'];
     if (!validSides.includes(side)) {
       socket.emit('side-selected', { message: 'Pick a valid role!' });
       return;
@@ -421,6 +423,14 @@ export class RoomManager {
         connected.forEach((p) => {
           const slice = data.byPlayer[p.id];
           if (slice) p.socket.emit('vending-state', slice);
+        });
+        break;
+      }
+
+      case 'bonk-state': {
+        connected.forEach((p) => {
+          const slice = data.byPlayer[p.id];
+          if (slice) p.socket.emit('bonk-state', slice);
         });
         break;
       }
