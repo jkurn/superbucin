@@ -12,6 +12,7 @@ export class BonkBrawlScene {
     this.rootEl = null;
     this.lastState = null;
     this._blocking = false;
+    this._charging = false;
     this._shakeTimer = null;
     this._floaters = [];
     this._onState = (s) => this._applyState(s);
@@ -86,6 +87,10 @@ export class BonkBrawlScene {
 
         <div class="bk-controls" id="bk-controls">
           <button class="bk-btn bk-btn-bonk" id="bk-btn-bonk">\uD83D\uDCA5 BONK</button>
+          <button class="bk-btn bk-btn-cubit" id="bk-btn-cubit">
+            \uD83E\uDD0F CUBIT
+            <div class="bk-cubit-charge-bar"><div class="bk-cubit-charge-fill" id="bk-cubit-fill"></div></div>
+          </button>
           <button class="bk-btn bk-btn-shield" id="bk-btn-shield">\uD83D\uDEE1\uFE0F SHIELD</button>
         </div>
       </div>
@@ -116,6 +121,25 @@ export class BonkBrawlScene {
     shieldBtn.addEventListener('pointerup', stopBlock);
     shieldBtn.addEventListener('pointerleave', stopBlock);
     shieldBtn.addEventListener('pointercancel', stopBlock);
+
+    // CUBIT button — hold to charge pinch, release to unleash
+    const cubitBtn = document.getElementById('bk-btn-cubit');
+    cubitBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._charging = true;
+      this.network.sendGameAction({ type: 'cubit-start' });
+    });
+
+    const releaseCubit = (e) => {
+      e.preventDefault();
+      if (this._charging) {
+        this._charging = false;
+        this.network.sendGameAction({ type: 'cubit-release' });
+      }
+    };
+    cubitBtn.addEventListener('pointerup', releaseCubit);
+    cubitBtn.addEventListener('pointerleave', releaseCubit);
+    cubitBtn.addEventListener('pointercancel', releaseCubit);
   }
 
   _applyState(state) {
@@ -187,6 +211,36 @@ export class BonkBrawlScene {
       }
     }
 
+    // Cubit charge bar
+    const cubitFill = document.getElementById('bk-cubit-fill');
+    const cubitBtn = document.getElementById('bk-btn-cubit');
+    if (cubitFill) {
+      const pct = (state.me.chargePct || 0) * 100;
+      cubitFill.style.width = `${pct}%`;
+      if (pct >= 60) {
+        cubitFill.classList.add('bk-cubit-charged');
+      } else {
+        cubitFill.classList.remove('bk-cubit-charged');
+      }
+    }
+    if (cubitBtn) {
+      cubitBtn.classList.toggle('bk-btn-cubit-active', state.me.state === 'charging');
+    }
+
+    // Show charge indicator on opponent too
+    if (oppEl && state.opp.state === 'charging') {
+      const existing = oppEl.querySelector('.bk-charge-glow');
+      if (!existing) {
+        const glow = document.createElement('div');
+        glow.className = 'bk-charge-glow';
+        glow.textContent = '\uD83E\uDD0F';
+        oppEl.appendChild(glow);
+      }
+    } else if (oppEl) {
+      const existing = oppEl.querySelector('.bk-charge-glow');
+      if (existing) existing.remove();
+    }
+
     // Controls enabled/disabled
     const controls = document.getElementById('bk-controls');
     if (controls) {
@@ -253,7 +307,12 @@ export class BonkBrawlScene {
         const float = document.createElement('div');
         float.className = 'bk-float';
 
-        if (evt.isSpecial) {
+        if (evt.isCubit) {
+          const pwr = evt.chargeRatio >= 0.6 ? 'MAX ' : '';
+          float.textContent = evt.iDidIt ? `\uD83E\uDD0F ${pwr}-${evt.damage}` : `\uD83E\uDD0F ${pwr}-${evt.damage}!`;
+          float.classList.add('bk-float-cubit');
+          if (evt.chargeRatio >= 0.6) float.classList.add('bk-float-cubit-max');
+        } else if (evt.isSpecial) {
           float.textContent = evt.iDidIt ? `\u2B50 -${evt.damage}` : `\uD83D\uDCA2 -${evt.damage}!`;
           float.classList.add('bk-float-special');
         } else if (evt.blocked) {

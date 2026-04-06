@@ -3225,6 +3225,99 @@
       background: linear-gradient(135deg, #2255aa, #4488cc);
     }
 
+    /* Cubit button */
+    .bk-btn-cubit {
+      background: linear-gradient(135deg, #9b59b6, #e056a0);
+      color: #fff;
+      border-color: rgba(180, 80, 180, 0.5);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.2rem;
+    }
+    .bk-btn-cubit:active {
+      background: linear-gradient(135deg, #8844aa, #cc4490);
+    }
+    .bk-btn-cubit-active {
+      animation: bk-cubit-pulse 0.4s ease-in-out infinite;
+      border-color: rgba(255, 200, 255, 0.7) !important;
+      box-shadow: 0 0 15px rgba(180, 80, 180, 0.5);
+    }
+    @keyframes bk-cubit-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    .bk-cubit-charge-bar {
+      width: 80%;
+      height: 4px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .bk-cubit-charge-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #e0a0ff, #ff80cc);
+      border-radius: 2px;
+      transition: width 0.1s linear;
+    }
+    .bk-cubit-charged {
+      background: linear-gradient(90deg, #ff60ff, #ffcc00) !important;
+      box-shadow: 0 0 6px rgba(255, 100, 255, 0.6);
+    }
+
+    /* Charging fighter state */
+    .bk-state-charging .bk-fighter-emoji {
+      animation: bk-charge-squeeze 0.6s ease-in-out infinite;
+      filter: drop-shadow(0 0 12px rgba(180, 80, 180, 0.6));
+    }
+    @keyframes bk-charge-squeeze {
+      0%, 100% { transform: scale(1, 1); }
+      50% { transform: scale(0.85, 1.15); }
+    }
+    .bk-state-charging .bk-fighter-weapon {
+      opacity: 0;
+    }
+
+    /* Cubit release attack */
+    .bk-state-cubit .bk-fighter-emoji {
+      animation: bk-cubit-release 0.35s ease-out;
+      filter: drop-shadow(0 0 15px rgba(255, 100, 255, 0.8));
+    }
+    .bk-fighter-left.bk-state-cubit {
+      transform: translateX(40px);
+    }
+    .bk-fighter-right.bk-state-cubit {
+      transform: translateX(-40px);
+    }
+    @keyframes bk-cubit-release {
+      0% { transform: scale(0.8, 1.2); }
+      40% { transform: scale(1.3, 0.8); }
+      100% { transform: scale(1, 1); }
+    }
+
+    /* Charge glow indicator on opponent */
+    .bk-charge-glow {
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.5rem;
+      animation: bk-glow-float 0.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes bk-glow-float {
+      0%, 100% { opacity: 0.5; transform: translateX(-50%) translateY(0); }
+      50% { opacity: 1; transform: translateX(-50%) translateY(-5px); }
+    }
+
+    /* Cubit floating damage */
+    .bk-float-cubit { color: #e060ff; font-size: 1.1rem; }
+    .bk-float-cubit-max { color: #ff60ff; font-size: 1.4rem; text-shadow: 0 0 8px rgba(255,100,255,0.6); }
+
     .bk-hud-placeholder { display: none; }
 
     @media (max-width: 360px) {

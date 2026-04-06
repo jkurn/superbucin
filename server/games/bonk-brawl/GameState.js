@@ -2,8 +2,10 @@
  * Bonk Brawl — Real-time cute fighting game.
  *
  * Two adorable characters face off in a bonk-or-block battle.
- * Two buttons: BONK (attack) and SHIELD (block).
+ * Three buttons: BONK (attack), SHIELD (block), CUBIT (hold-to-charge pinch).
  * Special meter charges from combat — unleash a devastating super bonk!
+ * Cubit: hold to charge a pinch attack — the longer you hold the harder you squeeze,
+ * but you're vulnerable while charging (1.5x damage taken).
  * Best of 3 rounds. First to 0 HP loses the round.
  */
 
@@ -75,12 +77,13 @@ export class GameState {
     for (const p of [this.p1, this.p2]) {
       this.fighters[p.id] = {
         hp: CFG.MAX_HP,
-        state: 'idle', // 'idle' | 'attacking' | 'blocking' | 'hurt' | 'special'
+        state: 'idle', // 'idle' | 'attacking' | 'blocking' | 'hurt' | 'special' | 'charging' | 'cubit'
         stateTimer: 0,
         attackCooldown: 0,
         specialMeter: 0,
         shieldHP: CFG.SHIELD_MAX,
         character: p.side, // 'bunny' or 'kitty'
+        chargeStartedAt: 0, // timestamp when cubit charge began
       };
     }
   }
@@ -111,7 +114,7 @@ export class GameState {
     if (this.phase !== 'fighting') return;
     if (!action || typeof action !== 'object') return;
 
-    const validTypes = ['attack', 'block-start', 'block-end', 'special'];
+    const validTypes = ['attack', 'block-start', 'block-end', 'special', 'cubit-start', 'cubit-release'];
     if (!validTypes.includes(action.type)) return;
 
     this.actionQueue.push({ playerId, type: action.type });
@@ -130,7 +133,7 @@ export class GameState {
         f.stateTimer -= CFG.TICK_MS;
         if (f.stateTimer <= 0) {
           f.stateTimer = 0;
-          if (f.state === 'hurt' || f.state === 'attacking' || f.state === 'special') {
+          if (f.state === 'hurt' || f.state === 'attacking' || f.state === 'special' || f.state === 'cubit') {
             f.state = 'idle';
           }
         }
@@ -148,7 +151,16 @@ export class GameState {
       const f = this.fighters[action.playerId];
       if (!f) continue;
 
-      if (action.type === 'block-start') {
+      if (action.type === 'cubit-start') {
+        if (f.state === 'idle' && f.attackCooldown <= 0) {
+          f.state = 'charging';
+          f.chargeStartedAt = Date.now();
+        }
+      } else if (action.type === 'cubit-release') {
+        if (f.state === 'charging') {
+          this.doCubitAttack(action.playerId);
+        }
+      } else if (action.type === 'block-start') {
         if (f.state === 'idle' && f.shieldHP > 0) {
           f.state = 'blocking';
         }
@@ -161,7 +173,7 @@ export class GameState {
           this.doSpecialAttack(action.playerId);
         }
       } else if (action.type === 'attack') {
-        if (f.state !== 'hurt' && f.state !== 'attacking' && f.state !== 'special' && f.attackCooldown <= 0) {
+        if (f.state !== 'hurt' && f.state !== 'attacking' && f.state !== 'special' && f.state !== 'charging' && f.state !== 'cubit' && f.attackCooldown <= 0) {
           // Auto-upgrade to special if meter is full
           if (f.specialMeter >= CFG.SPECIAL_METER_MAX) {
             this.doSpecialAttack(action.playerId);
@@ -207,6 +219,11 @@ export class GameState {
       }
     } else {
       damage = CFG.ATTACK_DAMAGE;
+      // Charging fighters take bonus damage (vulnerable!)
+      if (defender.state === 'charging') {
+        damage = Math.floor(damage * CFG.CUBIT_VULNERABLE_MULT);
+        defender.chargeStartedAt = 0;
+      }
       defender.state = 'hurt';
       defender.stateTimer = CFG.HURT_STUN_MS;
     }
@@ -253,6 +270,68 @@ export class GameState {
       blocked: false,
       isSpecial: true,
     });
+
+    if (defender.hp <= 0) {
+      this.endRound(playerId);
+    }
+  }
+
+  doCubitAttack(playerId) {
+    const attacker = this.fighters[playerId];
+    const opponentId = playerId === this.p1.id ? this.p2.id : this.p1.id;
+    const defender = this.fighters[opponentId];
+
+    // Calculate charge duration → damage
+    const chargeMs = Math.min(Date.now() - attacker.chargeStartedAt, CFG.CUBIT_MAX_CHARGE_MS);
+    const chargeRatio = chargeMs / CFG.CUBIT_MAX_CHARGE_MS; // 0..1
+    const damage = Math.floor(
+      CFG.CUBIT_MIN_DAMAGE + (CFG.CUBIT_MAX_DAMAGE - CFG.CUBIT_MIN_DAMAGE) * chargeRatio,
+    );
+
+    attacker.state = 'cubit';
+    attacker.stateTimer = CFG.CUBIT_ANIM_MS;
+    attacker.attackCooldown = CFG.CUBIT_COOLDOWN_MS;
+    attacker.chargeStartedAt = 0;
+
+    // Cubit ignores block if charge >= 60%
+    const breaksBlock = chargeRatio >= 0.6;
+
+    if (defender.state === 'blocking' && defender.shieldHP > 0 && !breaksBlock) {
+      const blockedDmg = Math.max(CFG.BLOCKED_DAMAGE, Math.floor(damage * 0.2));
+      defender.hp = Math.max(0, defender.hp - blockedDmg);
+      defender.shieldHP = Math.max(0, defender.shieldHP - CFG.SHIELD_DRAIN_PER_HIT * 2);
+
+      this.hitEvents.push({
+        attackerId: playerId,
+        defenderId: opponentId,
+        damage: blockedDmg,
+        blocked: true,
+        isSpecial: false,
+        isCubit: true,
+        chargeRatio,
+      });
+    } else {
+      defender.hp = Math.max(0, defender.hp - damage);
+      defender.state = 'hurt';
+      defender.stateTimer = CFG.HURT_STUN_MS + Math.floor(chargeRatio * 200); // longer stun at higher charge
+
+      this.hitEvents.push({
+        attackerId: playerId,
+        defenderId: opponentId,
+        damage,
+        blocked: false,
+        isSpecial: false,
+        isCubit: true,
+        chargeRatio,
+      });
+    }
+
+    // Cubit fills special meter based on charge
+    attacker.specialMeter = Math.min(
+      CFG.SPECIAL_METER_MAX,
+      attacker.specialMeter + Math.floor(CFG.SPECIAL_GAIN_ON_HIT * (1 + chargeRatio)),
+    );
+    defender.specialMeter = Math.min(CFG.SPECIAL_METER_MAX, defender.specialMeter + CFG.SPECIAL_GAIN_ON_HURT);
 
     if (defender.hp <= 0) {
       this.endRound(playerId);
@@ -319,6 +398,9 @@ export class GameState {
           shieldMax: CFG.SHIELD_MAX,
           character: pChar,
           side: pf.character,
+          chargePct: pf.state === 'charging' && pf.chargeStartedAt
+            ? Math.min(1, (Date.now() - pf.chargeStartedAt) / CFG.CUBIT_MAX_CHARGE_MS)
+            : 0,
         },
         opp: {
           hp: of.hp ?? CFG.MAX_HP,
@@ -330,6 +412,9 @@ export class GameState {
           shieldMax: CFG.SHIELD_MAX,
           character: oChar,
           side: of.character,
+          chargePct: of.state === 'charging' && of.chargeStartedAt
+            ? Math.min(1, (Date.now() - of.chargeStartedAt) / CFG.CUBIT_MAX_CHARGE_MS)
+            : 0,
         },
         hitEvents: this.hitEvents.map((e) => ({
           ...e,
@@ -373,6 +458,7 @@ export class GameState {
           shieldMax: CFG.SHIELD_MAX,
           character: pChar,
           side: pf.character,
+          chargePct: 0,
         },
         opp: {
           hp: of.hp ?? CFG.MAX_HP,
@@ -384,6 +470,7 @@ export class GameState {
           shieldMax: CFG.SHIELD_MAX,
           character: oChar,
           side: of.character,
+          chargePct: 0,
         },
         hitEvents: [],
       },

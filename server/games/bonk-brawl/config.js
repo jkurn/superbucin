@@ -30,6 +30,14 @@ export const BONK_BRAWL_CONFIG = {
   SPECIAL_GAIN_ON_HIT: 8,
   SPECIAL_GAIN_ON_HURT: 5,
 
+  /** Cubit — hold-to-charge pinch attack */
+  CUBIT_MAX_CHARGE_MS: 2500,
+  CUBIT_MIN_DAMAGE: 5,
+  CUBIT_MAX_DAMAGE: 45,
+  CUBIT_VULNERABLE_MULT: 1.5,
+  CUBIT_COOLDOWN_MS: 1000,
+  CUBIT_ANIM_MS: 400,
+
   /** Shield regen rate per tick when not blocking */
   SHIELD_MAX: 50,
   SHIELD_DRAIN_PER_HIT: 10,
