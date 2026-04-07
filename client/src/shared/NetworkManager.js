@@ -17,6 +17,7 @@ export class NetworkManager {
     this.roomGameType = 'pig-vs-chick';
     this.opponentIdentity = null;
     this.pendingJoinCode = null;
+    this.latestStateByEvent = {};
   }
 
   init(ui, sceneManager, userManager) {
@@ -99,10 +100,12 @@ export class NetworkManager {
     });
 
     this.socket.on('game-state', (state) => {
+      this._captureState('game-state', state);
       EventBus.emit('game:state', state);
     });
 
     this.socket.on('word-scramble-state', (state) => {
+      this._captureState('word-scramble-state', state);
       EventBus.emit('word:state', state);
     });
 
@@ -111,31 +114,38 @@ export class NetworkManager {
     });
 
     this.socket.on('memory-state', (state) => {
+      this._captureState('memory-state', state);
       EventBus.emit('memory:state', state);
     });
 
     this.socket.on('speed-match-state', (state) => {
+      this._captureState('speed-match-state', state);
       EventBus.emit('speed-match:state', state);
     });
 
     this.socket.on('battleship-state', (state) => {
+      this._captureState('battleship-state', state);
       EventBus.emit('battleship:state', state);
     });
 
     this.socket.on('vending-state', (state) => {
+      this._captureState('vending-state', state);
       EventBus.emit('vending:state', state);
     });
 
     this.socket.on('bonk-state', (state) => {
+      this._captureState('bonk-state', state);
       EventBus.emit('bonk:state', state);
     });
 
     this.socket.on('cute-aggression-state', (state) => {
+      this._captureState('cute-aggression-state', state);
       EventBus.emit('cute-aggression:state', state);
     });
 
     this.socket.on('match-end', (data) => {
       this._inGame = false;
+      EventBus.emit('game:match-end', data);
       this.ui.showVictory(data);
       this.userManager.refreshProfile();
     });
@@ -225,5 +235,22 @@ export class NetworkManager {
 
   submitWord(path) {
     this.socket.emit('submit-word', { path });
+  }
+
+  _captureState(eventName, payload) {
+    this.latestStateByEvent[eventName] = payload;
+  }
+
+  getDebugSnapshot() {
+    return {
+      connected: !!this.socket?.id,
+      playerId: this.playerId,
+      roomCode: this.roomCode,
+      roomGameType: this.roomGameType,
+      isHost: this.isHost,
+      inGame: this._inGame,
+      opponentIdentity: this.opponentIdentity,
+      latestStateByEvent: this.latestStateByEvent,
+    };
   }
 }

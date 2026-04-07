@@ -215,9 +215,17 @@ canvas { display: block; width: 100%; height: 100%; }
   padding: 1.25rem 0.75rem;
   text-align: center;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  color: inherit;
   transition: transform 0.15s, border-color 0.3s, box-shadow 0.3s;
 }
 .game-card:active { transform: scale(0.95); }
+.game-card:focus-visible {
+  outline: 2px solid var(--color-blue-500);
+  outline-offset: 2px;
+}
 .game-card.active {
   border-color: #ff6b9d;
   box-shadow: 0 0 20px rgba(255, 107, 157, 0.3);
@@ -268,9 +276,17 @@ canvas { display: block; width: 100%; height: 100%; }
       align-items: center;
       justify-content: center;
       cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      font: inherit;
+      color: inherit;
       transition: transform 0.15s, border-color 0.3s, box-shadow 0.3s;
     }
     .side-option:active { transform: scale(0.95); }
+    .side-option:focus-visible {
+      outline: 2px solid var(--color-blue-500);
+      outline-offset: 2px;
+    }
     .side-option.selected {
       border-color: #ff6b9d;
       box-shadow: 0 0 25px rgba(255, 107, 157, 0.3);

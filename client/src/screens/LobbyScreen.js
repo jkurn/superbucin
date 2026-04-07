@@ -12,19 +12,19 @@ export function render(overlay, deps, options) {
 
   const registered = GameRegistry.list();
   const cardsHTML = registered.map((g, i) => `
-    <div class="game-card${i === 0 ? ' active' : ''}" data-game-type="${g.type}">
+    <button type="button" class="game-card${i === 0 ? ' active' : ''}" data-game-type="${g.type}" aria-label="Select ${g.name}">
       <div class="game-card-icon">${g.icon}</div>
       <div class="game-card-title">${g.name}</div>
       <div class="game-card-badge">${g.badge}</div>
-    </div>
+    </button>
   `).join('');
 
   const padHTML = Array(1).fill(`
-    <div class="game-card disabled">
+    <button type="button" class="game-card disabled" disabled aria-disabled="true">
       <div class="game-card-icon">\ud83d\udd12</div>
       <div class="game-card-title">Coming Soon</div>
       <div class="game-card-badge">???</div>
-    </div>
+    </button>
   `).join('');
 
   const packOptionsHtml = MEMORY_PACK_CHOICES.map(

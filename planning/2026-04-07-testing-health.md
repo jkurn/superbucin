@@ -135,6 +135,41 @@ Copy this block every week and fill values:
 - Success criteria for next week:
 ```
 
+## Week of 2026-04-07
+
+### Test Snapshot
+- `npm test`: 197 pass, 0 fail
+- coverage line/branch/functions: 79.70 / 76.63 / 67.48
+
+### DORA
+- Deployment Frequency: daily pushes to `main` with Render auto-deploy.
+- Lead Time for Changes: short for test/docs work this week (same-day merge/deploy loop).
+- Change Failure Rate: no known regressions from current test/coverage updates.
+- Failed Deployment Recovery Time: not measured this week (no recorded incident).
+- Rework Rate: low for this slice; work landed mostly as first-pass test additions.
+
+### SPACE (quick pulse)
+- Satisfaction and Wellbeing: improved by stronger guardrails and explicit test-health doc.
+- Performance: higher confidence in event privacy and game-rule correctness.
+- Activity: added two GameState suites + doc/rule scaffolding + a11y/debug improvements.
+- Communication and Collaboration: backlog now links to a single testing-health source.
+- Efficiency and Flow: fast local loop (`npm test`, `npm run lint`, coverage snapshot).
+
+### Flow
+- Flow Time: reduced for test changes due focused, small batch updates.
+- Flow Efficiency: high in this slice (most time spent in active coding/testing vs waiting).
+- Flow Load: moderate; remaining TODOs still include larger feature work.
+
+### Quality Signals
+- Defect Density: trending down in tested paths; no failing tests in current suite.
+- Technical Debt Ratio: improved in docs/process; still pending gameplay polish items.
+- Largest uncovered risk area: server `GameState` coverage for `memory-match` and `vending-machine`.
+
+### Improvement Bets
+- Structural bet: add direct server tests for `memory-match` and `vending-machine`.
+- Quality bet: implement lerp smoothing in `pig-vs-chick` with visual regression smoke.
+- Success criteria for next week: raise function coverage and close two remaining quality TODOs.
+
 ## Operational Notes
 
 - Source test strategy: `planning/2026-04-07-robust-testing-strategy.md`

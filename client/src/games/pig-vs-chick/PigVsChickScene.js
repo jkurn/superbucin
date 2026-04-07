@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from './config.js';
 import { createUnitModel } from './CubePetModels.js';
 import { EventBus } from '../../shared/EventBus.js';
+import { emitSpectacle, SPECTACLE_EVENTS } from '../../shared/SpectacleHooks.js';
 
 // ── Floating HP bar (canvas → Sprite) ────────────────────────
 function createHPLabel(weight, maxHp) {
@@ -89,6 +90,10 @@ export class PigVsChickScene {
     for (let i = 0; i < GAME_CONFIG.NUM_LANES; i++) {
       this.laneXPositions.push(-totalWidth / 2 + GAME_CONFIG.LANE_WIDTH / 2 + i * GAME_CONFIG.LANE_WIDTH);
     }
+
+    this._comboWindowMs = 2500;
+    this._killTimestamps = [];
+    this._lastPlayerHP = null;
   }
 
   init() {
@@ -307,16 +312,26 @@ export class PigVsChickScene {
       weight,
       state: data.state || 'march',
       z: startZ,
+      targetX: laneX,
+      targetZ: startZ,
       hpLabel,
     };
 
     this.units.set(id, unit);
+    emitSpectacle(SPECTACLE_EVENTS.ENTRANCE, { lane, side, tier });
   }
 
-  update() {
+  update(dt = 0.016) {
     if (!this.gameActive) return;
 
+    const lerpFactor = Math.min(1, dt * 12);
+
     for (const [, unit] of this.units) {
+      if (!unit._pushing) {
+        unit.model.position.x += (unit.targetX - unit.model.position.x) * lerpFactor;
+      }
+      unit.model.position.z += (unit.targetZ - unit.model.position.z) * lerpFactor;
+
       if (unit.state !== 'dead') {
         // Gentle bob when marching, faster shake when pushing
         if (unit.state === 'push') {
@@ -375,6 +390,14 @@ export class PigVsChickScene {
         }
         this.disposeModel(unit.model);
         this.units.delete(id);
+
+        emitSpectacle(SPECTACLE_EVENTS.KILL, { lane: unit.lane, side: unit.side, tier: unit.tier });
+        const now = Date.now();
+        this._killTimestamps.push(now);
+        this._killTimestamps = this._killTimestamps.filter((t) => now - t <= this._comboWindowMs);
+        if (this._killTimestamps.length >= 2) {
+          emitSpectacle(SPECTACLE_EVENTS.COMBO, { kills: this._killTimestamps.length });
+        }
       }
     }
 
@@ -389,11 +412,15 @@ export class PigVsChickScene {
 
       if (unit) {
         const laneX = this.laneXPositions[su.lane] || 0;
-        unit.model.position.x = laneX;
-        unit.model.position.z = su.z;
+        unit.targetX = laneX;
+        unit.targetZ = su.z;
         unit.z = su.z;
         unit.hp = su.hp;
         unit.state = su.state;
+        if (!unit._nearMissEmitted && su.hp > 0 && su.hp <= Math.max(1, Math.floor(unit.maxHp * 0.2))) {
+          unit._nearMissEmitted = true;
+          emitSpectacle(SPECTACLE_EVENTS.NEAR_MISS, { lane: su.lane, side: su.side, id: su.id });
+        }
 
         // Update floating HP bar
         if (unit.hpLabel) {
@@ -402,26 +429,34 @@ export class PigVsChickScene {
 
         // Push shake effect
         if (su.state === 'push' && !unit._pushing) {
+          emitSpectacle(SPECTACLE_EVENTS.HIT, { lane: su.lane, side: su.side, id: su.id });
           unit._pushing = true;
           unit._pushShake = setInterval(() => {
             if (unit.state !== 'push') {
               clearInterval(unit._pushShake);
               unit._pushing = false;
-              unit.model.position.x = laneX;
+              unit.model.position.x = unit.targetX;
               return;
             }
-            unit.model.position.x = laneX + (Math.random() - 0.5) * 0.06;
+            unit.model.position.x = unit.targetX + (Math.random() - 0.5) * 0.06;
           }, 80);
         }
         if (su.state !== 'push' && unit._pushing) {
           clearInterval(unit._pushShake);
           unit._pushing = false;
-          unit.model.position.x = laneX;
+          unit.model.position.x = unit.targetX;
         }
       }
     }
 
     if (state.playerHP) {
+      if (this._lastPlayerHP && state.playerHP.mine < this._lastPlayerHP.mine) {
+        emitSpectacle(SPECTACLE_EVENTS.BASE_HIT, {
+          amount: this._lastPlayerHP.mine - state.playerHP.mine,
+          side: this.mySide,
+        });
+      }
+      this._lastPlayerHP = { ...state.playerHP };
       this.ui.updateHP(state.playerHP, this.gameData);
     }
     if (state.energy !== undefined) {

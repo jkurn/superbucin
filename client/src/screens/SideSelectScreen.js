@@ -34,10 +34,10 @@ export function render(overlay, deps, roomCode) {
   const optionsHtml = options
     .map(
       (o) => `
-          <div class="side-option" data-side="${o.side}">
+          <button type="button" class="side-option" data-side="${o.side}" aria-label="Choose ${o.label}">
             <div class="emoji">${o.emoji}</div>
             <div class="label">${o.label}</div>
-          </div>`,
+          </button>`,
     )
     .join('');
 

@@ -5,6 +5,7 @@ import { UIManager } from './shared/UIManager.js';
 import { UserManager } from './shared/UserManager.js';
 import { Router } from './shared/Router.js';
 import { GameRegistry } from './shared/GameRegistry.js';
+import { WebAudioManager } from './shared/WebAudioManager.js';
 import { pigVsChickGame } from './games/pig-vs-chick/index.js';
 import { othelloGame } from './games/othello/index.js';
 import { wordScrambleRaceGame } from './games/word-scramble-race/index.js';
@@ -36,10 +37,13 @@ const app = {
   network: null,
   ui: null,
   userManager: null,
+  audio: null,
 
   async init() {
     this.userManager = new UserManager();
     await this.userManager.init();
+    this.audio = new WebAudioManager();
+    this.audio.init();
 
     this.network = new NetworkManager();
     this.ui = new UIManager();
@@ -68,6 +72,21 @@ const app = {
     });
 
     this.sceneManager.startLoop();
+
+    // Debug helper for QA/Playwright and quick console inspection.
+    window.getGameState = () => this.getDebugState();
+  },
+
+  getDebugState() {
+    return {
+      timestamp: new Date().toISOString(),
+      route: window.location.pathname,
+      network: this.network?.getDebugSnapshot?.() || null,
+      ui: {
+        hasGameScene: !!this.ui?.gameScene,
+        selectedSide: this.ui?.selectedSide || null,
+      },
+    };
   },
 };
 

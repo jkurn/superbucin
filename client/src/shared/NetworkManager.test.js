@@ -202,4 +202,22 @@ describe('NetworkManager contracts', () => {
     assert.equal(navigated, true);
     assert.deepEqual(ui.calls.map((c) => c.method), ['showError', 'showLobby']);
   });
+
+  it('getDebugSnapshot captures latest game state payloads', () => {
+    const fakeSocket = new FakeSocket();
+    const nm = new NetworkManager(() => fakeSocket);
+    const ui = makeUI();
+
+    nm.init(ui, {}, { getIdentity: () => ({}), refreshProfile: () => {} });
+    fakeSocket.trigger('memory-state', { turn: 1, payload: { p1: { score: 2 } } });
+    fakeSocket.trigger('battleship-state', { phase: 'battle' });
+
+    const snapshot = nm.getDebugSnapshot();
+    assert.equal(snapshot.roomGameType, 'pig-vs-chick');
+    assert.deepEqual(snapshot.latestStateByEvent['memory-state'], {
+      turn: 1,
+      payload: { p1: { score: 2 } },
+    });
+    assert.deepEqual(snapshot.latestStateByEvent['battleship-state'], { phase: 'battle' });
+  });
 });
