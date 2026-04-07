@@ -58,3 +58,9 @@ Suggested build order in plan: Connect Four → Quiz Race → Battleship (comple
 - [ ] Network resilience: disconnect/reconnect, timeout windows, rejoin consistency.
 - [ ] Notification integrity: correct recipient + no duplicate/conflicting notifications.
 - [ ] Persistence side effects: `match-end` path records points/achievements correctly and degrades safely on DB failure.
+
+## Engineering scorecard (run weekly)
+
+- [ ] Run weekly engineering scorecard (10 categories: maintainability, DRY/reuse, SOLID boundaries, tests, reliability, delivery hygiene, change size, observability, docs freshness, focus/flow).
+- [ ] Track and log baseline metrics weekly: commit size distribution, hotspot churn, test ratio, coverage trend, change failure rate, deploy health.
+- [ ] Set weekly improvement bet (one structural bet + one quality bet) and review outcome in next retro.
