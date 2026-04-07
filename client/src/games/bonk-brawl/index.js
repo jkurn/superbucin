@@ -7,7 +7,7 @@ import { applyServerConfig } from './config.js';
 export const bonkBrawlGame = {
   type: 'bonk-brawl',
   lobby: {
-    name: 'Bonk Brawl',
+    name: 'Cute Aggression',
     icon: '\uD83D\uDC30\uD83D\uDCA5\uD83D\uDC31',
     badge: 'Fighter',
     sides: [
@@ -16,7 +16,7 @@ export const bonkBrawlGame = {
     ],
   },
   sideSelect: {
-    title: 'BONK BRAWL',
+    title: 'CUTE AGGRESSION',
     pickTitle: 'Pick your fighter!',
     options: [
       { side: 'bunny', label: 'Usagi', emoji: '\uD83D\uDC30' },
