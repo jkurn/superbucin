@@ -1,24 +1,50 @@
 import { EventBus } from '../../shared/EventBus.js';
 
 /**
- * Cute Aggression — SUPER BUCIN MAXIMUM GEMAS Edition!
- * DOM-based: two cute blob creatures with arms, legs, expressive faces.
- * GEMAS (squeeze) + GIGIT (bite combo) + CUBIT (charge pinch) + PELUK (hug shield)
- * Special: CIUM (kiss super attack) with heart explosion.
- * Combo counter, rage mode, falling hearts, screen shake, emoji explosions.
+ * Virus vs Virus — Super Bucin Edition!
+ * DOM-based scene. No Three.js canvas — scene hides canvas and takes full screen.
+ *
+ * Match UI: score bar (top) → game area (dynamic) → controls (bottom)
+ *
+ * Four mini-game renderers:
+ *   mash    — two growing virus circles, one big TAP button
+ *   reflex  — central signal emoji, tap after it fires
+ *   pong    — pointer-drag paddle on a court with a bouncing ball
+ *   sorting — falling virus dots, toggle gate button
  */
+
+const MINI_NAMES = {
+  mash: '\uD83E\uDDA0 Virus Inflater',    // 🦠
+  reflex: '\u26A1 Quick Draw',             // ⚡
+  pong: '\uD83C\uDFD3 Deflector',          // 🏓
+  sorting: '\uD83D\uDEAA Gatekeeper',      // 🚪
+};
+
+const MINI_DESC = {
+  mash: 'Tap cepet-cepetan biar virusmu menyeberang!',
+  reflex: 'Tap saat sinyal muncul! Duluan = kalah~',
+  pong: 'Geser paddle buat blok virus musuh!',
+  sorting: 'Toggle gate: tangkap warnamu, blok musuh!',
+};
+
 export class CuteAggressionScene {
   constructor(sceneManager, network, _ui, gameData) {
     this.sceneManager = sceneManager;
     this.network = network;
     this.gameData = gameData;
+
     this.rootEl = null;
     this.lastState = null;
-    this._blocking = false;
-    this._charging = false;
-    this._shakeTimer = null;
     this._heartInterval = null;
-    this._comboTimeout = null;
+
+    // Pong input state
+    this._pongActive = false;
+    this._paddleThrottleAt = 0;
+
+    // Track which mini-game is currently rendered to avoid full rebuilds on every tick
+    this._renderedMiniGame = null;
+    this._renderedPhase = null;
+
     this._onState = (s) => this._applyState(s);
   }
 
@@ -30,8 +56,8 @@ export class CuteAggressionScene {
     this.rootEl.className = 'ca-layer';
     document.getElementById('ui-overlay').appendChild(this.rootEl);
 
-    this._buildLayout();
-    this._startHeartRain();
+    this._buildShell();
+    this._startParticles();
 
     EventBus.on('cute-aggression:state', this._onState);
     if (this.gameData.cuteAggressionState) {
@@ -39,510 +65,468 @@ export class CuteAggressionScene {
     }
   }
 
-  _startHeartRain() {
-    const bg = this.rootEl.querySelector('.ca-heart-bg');
-    if (!bg) return;
+  // ── Shell (persistent layout) ─────────────────────────────────────────────
 
-    const particles = [
-      '\u2764\uFE0F', '\uD83D\uDC95', '\uD83D\uDC96', '\uD83D\uDC97', '\uD83D\uDC93',
-      '\u2728', '\uD83C\uDF1F', '\uD83D\uDC8B', '\uD83E\uDD0F', '\uD83E\uDD17',
-      '\uD83D\uDE18', '\uD83E\uDD70', '\uD83D\uDC9E', '\uD83D\uDC9D',
-    ];
-
-    this._heartInterval = setInterval(() => {
-      const heart = document.createElement('div');
-      heart.className = 'ca-falling-heart';
-      heart.textContent = particles[Math.floor(Math.random() * particles.length)];
-      heart.style.left = `${Math.random() * 100}%`;
-      heart.style.animationDuration = `${2.5 + Math.random() * 4}s`;
-      heart.style.fontSize = `${0.5 + Math.random() * 1}rem`;
-      heart.style.opacity = `${0.2 + Math.random() * 0.4}`;
-      bg.appendChild(heart);
-      setTimeout(() => heart.remove(), 7000);
-    }, 200);
-  }
-
-  _buildLayout() {
+  _buildShell() {
     this.rootEl.innerHTML = `
       <div class="ca-heart-bg"></div>
       <div class="ca-arena" id="ca-arena">
-        <div class="ca-round-info" id="ca-round-info"></div>
-
-        <div class="ca-hp-section">
-          <div class="ca-hp-row ca-hp-mine">
-            <div class="ca-hp-icon" id="ca-my-icon"></div>
-            <div class="ca-hp-bar-wrap">
-              <div class="ca-hp-bar ca-hp-bar-me" id="ca-my-hp"></div>
-              <div class="ca-hp-rage-overlay" id="ca-my-rage"></div>
-            </div>
-            <span class="ca-hp-text" id="ca-my-hp-text"></span>
-          </div>
-          <div class="ca-hp-row ca-hp-opp">
-            <div class="ca-hp-icon" id="ca-opp-icon"></div>
-            <div class="ca-hp-bar-wrap">
-              <div class="ca-hp-bar ca-hp-bar-opp" id="ca-opp-hp"></div>
-              <div class="ca-hp-rage-overlay" id="ca-opp-rage"></div>
-            </div>
-            <span class="ca-hp-text" id="ca-opp-hp-text"></span>
-          </div>
+        <div class="ca-score-bar" id="ca-score-bar">
+          <div class="ca-score-side" id="ca-score-me"></div>
+          <div class="ca-score-mid" id="ca-score-mid">VS</div>
+          <div class="ca-score-side ca-score-side-opp" id="ca-score-opp"></div>
         </div>
-
-        <div class="ca-combo-display" id="ca-combo-display"></div>
-
-        <div class="ca-stage" id="ca-stage">
-          <div class="ca-blob ca-blob-left" id="ca-blob-me">
-            <div class="ca-blob-arm ca-arm-left" id="ca-me-arm-l"></div>
-            <div class="ca-blob-arm ca-arm-right" id="ca-me-arm-r"></div>
-            <div class="ca-blob-body" id="ca-me-body">
-              <div class="ca-blob-blush ca-blush-left"></div>
-              <div class="ca-blob-blush ca-blush-right"></div>
-              <div class="ca-blob-eye ca-eye-left">
-                <div class="ca-pupil"></div>
-              </div>
-              <div class="ca-blob-eye ca-eye-right">
-                <div class="ca-pupil"></div>
-              </div>
-              <div class="ca-blob-mouth" id="ca-me-mouth"></div>
-              <div class="ca-blob-fang ca-fang-left"></div>
-              <div class="ca-blob-fang ca-fang-right"></div>
-            </div>
-            <div class="ca-blob-feet">
-              <div class="ca-foot ca-foot-left"></div>
-              <div class="ca-foot ca-foot-right"></div>
-            </div>
-            <div class="ca-blob-label" id="ca-me-label"></div>
-          </div>
-
-          <div class="ca-vs-section">
-            <div class="ca-vs-heart">\uD83D\uDC98</div>
-            <div class="ca-vs-text">VS</div>
-          </div>
-
-          <div class="ca-blob ca-blob-right" id="ca-blob-opp">
-            <div class="ca-blob-arm ca-arm-left" id="ca-opp-arm-l"></div>
-            <div class="ca-blob-arm ca-arm-right" id="ca-opp-arm-r"></div>
-            <div class="ca-blob-body" id="ca-opp-body">
-              <div class="ca-blob-blush ca-blush-left"></div>
-              <div class="ca-blob-blush ca-blush-right"></div>
-              <div class="ca-blob-eye ca-eye-left">
-                <div class="ca-pupil"></div>
-              </div>
-              <div class="ca-blob-eye ca-eye-right">
-                <div class="ca-pupil"></div>
-              </div>
-              <div class="ca-blob-mouth" id="ca-opp-mouth"></div>
-              <div class="ca-blob-fang ca-fang-left"></div>
-              <div class="ca-blob-fang ca-fang-right"></div>
-            </div>
-            <div class="ca-blob-feet">
-              <div class="ca-foot ca-foot-left"></div>
-              <div class="ca-foot ca-foot-right"></div>
-            </div>
-            <div class="ca-blob-label" id="ca-opp-label"></div>
-          </div>
-
-          <div class="ca-floaters" id="ca-floaters"></div>
-        </div>
-
-        <div class="ca-center-msg" id="ca-center-msg"></div>
-
-        <div class="ca-meters">
-          <div class="ca-meter-row">
-            <span class="ca-meter-label">\uD83D\uDC96 Gemas</span>
-            <div class="ca-meter-bar-wrap">
-              <div class="ca-meter-bar ca-special-bar" id="ca-special-bar"></div>
-            </div>
-          </div>
-          <div class="ca-meter-row">
-            <span class="ca-meter-label">\uD83E\uDD17 Peluk</span>
-            <div class="ca-meter-bar-wrap">
-              <div class="ca-meter-bar ca-shield-bar" id="ca-shield-bar"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="ca-controls" id="ca-controls">
-          <div class="ca-controls-row">
-            <button class="ca-btn ca-btn-gemas" id="ca-btn-gemas">\uD83D\uDE21 GEMAS</button>
-            <button class="ca-btn ca-btn-gigit" id="ca-btn-gigit">\uD83E\uDE77 GIGIT</button>
-          </div>
-          <div class="ca-controls-row">
-            <button class="ca-btn ca-btn-cubit" id="ca-btn-cubit">
-              \uD83E\uDD0F CUBIT
-              <div class="ca-cubit-charge-bar"><div class="ca-cubit-charge-fill" id="ca-cubit-fill"></div></div>
-            </button>
-            <button class="ca-btn ca-btn-peluk" id="ca-btn-peluk">\uD83E\uDD17 PELUK</button>
-          </div>
-        </div>
+        <div class="ca-game-area" id="ca-game-area"></div>
+        <div class="ca-ctrl-area" id="ca-ctrl-area"></div>
+        <div class="ca-overlay" id="ca-overlay"></div>
       </div>
     `;
-
-    // GEMAS (squeeze attack)
-    const gemasBtn = document.getElementById('ca-btn-gemas');
-    gemasBtn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      this.network.sendGameAction({ type: 'attack' });
-    });
-
-    // GIGIT (bite — fast combo attack)
-    const gigitBtn = document.getElementById('ca-btn-gigit');
-    gigitBtn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      this.network.sendGameAction({ type: 'gigit' });
-    });
-
-    // PELUK (hug shield — hold)
-    const pelukBtn = document.getElementById('ca-btn-peluk');
-    pelukBtn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      this._blocking = true;
-      this.network.sendGameAction({ type: 'block-start' });
-    });
-
-    const stopBlock = (e) => {
-      e.preventDefault();
-      if (this._blocking) {
-        this._blocking = false;
-        this.network.sendGameAction({ type: 'block-end' });
-      }
-    };
-    pelukBtn.addEventListener('pointerup', stopBlock);
-    pelukBtn.addEventListener('pointerleave', stopBlock);
-    pelukBtn.addEventListener('pointercancel', stopBlock);
-
-    // CUBIT (pinch charge — hold to charge, release to unleash)
-    const cubitBtn = document.getElementById('ca-btn-cubit');
-    cubitBtn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      this._charging = true;
-      this.network.sendGameAction({ type: 'cubit-start' });
-    });
-
-    const releaseCubit = (e) => {
-      e.preventDefault();
-      if (this._charging) {
-        this._charging = false;
-        this.network.sendGameAction({ type: 'cubit-release' });
-      }
-    };
-    cubitBtn.addEventListener('pointerup', releaseCubit);
-    cubitBtn.addEventListener('pointerleave', releaseCubit);
-    cubitBtn.addEventListener('pointercancel', releaseCubit);
   }
+
+  _startParticles() {
+    const bg = this.rootEl.querySelector('.ca-heart-bg');
+    if (!bg) return;
+    const pool = [
+      '\u2764\uFE0F', '\uD83D\uDC95', '\uD83D\uDC96', '\u2728', '\uD83C\uDF1F',
+      '\uD83E\uDDA0', '\uD83E\uDDEC', '\uD83D\uDC8B', '\uD83E\uDD70', '\uD83E\uDE78',
+    ];
+    this._heartInterval = setInterval(() => {
+      const el = document.createElement('div');
+      el.className = 'ca-falling-heart';
+      el.textContent = pool[Math.floor(Math.random() * pool.length)];
+      el.style.left = `${Math.random() * 100}%`;
+      el.style.animationDuration = `${3 + Math.random() * 5}s`;
+      el.style.fontSize = `${0.55 + Math.random() * 0.9}rem`;
+      el.style.opacity = `${0.12 + Math.random() * 0.25}`;
+      bg.appendChild(el);
+      setTimeout(() => el.remove(), 9000);
+    }, 280);
+  }
+
+  // ── State handler ─────────────────────────────────────────────────────────
 
   _applyState(state) {
     this.lastState = state;
     if (!this.rootEl) return;
 
-    // Round info
-    const roundInfo = document.getElementById('ca-round-info');
-    if (roundInfo) {
-      const myWins = '\uD83D\uDC96'.repeat(state.myRoundWins) + '\uD83D\uDDA4'.repeat(state.roundsToWin - state.myRoundWins);
-      const oppWins = '\uD83D\uDC96'.repeat(state.oppRoundWins) + '\uD83D\uDDA4'.repeat(state.roundsToWin - state.oppRoundWins);
-      roundInfo.innerHTML = `<span>${myWins}</span><span class="ca-round-label">Round ${state.round}</span><span>${oppWins}</span>`;
+    this._updateScoreBar(state);
+
+    if (state.phase === 'countdown') {
+      if (this._renderedPhase !== 'countdown' || this._renderedMiniGame !== state.currentMiniGame) {
+        this._renderedPhase = 'countdown';
+        this._renderedMiniGame = state.currentMiniGame;
+        this._renderCountdown(state);
+      }
+      // Clear result overlay if still showing
+      const ov = document.getElementById('ca-overlay');
+      if (ov) ov.innerHTML = '';
+
+    } else if (state.phase === 'playing') {
+      if (this._renderedPhase !== 'playing' || this._renderedMiniGame !== state.currentMiniGame) {
+        this._renderedPhase = 'playing';
+        this._renderedMiniGame = state.currentMiniGame;
+        this._clearGameAreas();
+        this._renderMiniGameSkeleton(state);
+      }
+      this._updateMiniGame(state);
+      // Clear result overlay
+      const ov = document.getElementById('ca-overlay');
+      if (ov && ov.firstChild) ov.innerHTML = '';
+
+    } else if (state.phase === 'mini-result') {
+      if (this._renderedPhase !== 'mini-result') {
+        this._renderedPhase = 'mini-result';
+        this._renderMiniResult(state);
+      }
     }
+  }
 
-    // HP bars
-    this._updateHP('ca-my-hp', 'ca-my-hp-text', state.me);
-    this._updateHP('ca-opp-hp', 'ca-opp-hp-text', state.opp);
+  // ── Score bar ─────────────────────────────────────────────────────────────
 
-    // Rage overlays
-    const myRage = document.getElementById('ca-my-rage');
-    const oppRage = document.getElementById('ca-opp-rage');
-    if (myRage) myRage.classList.toggle('ca-rage-active', state.me.rage);
-    if (oppRage) oppRage.classList.toggle('ca-rage-active', state.opp.rage);
+  _updateScoreBar(state) {
+    const meEl = document.getElementById('ca-score-me');
+    const oppEl = document.getElementById('ca-score-opp');
+    const midEl = document.getElementById('ca-score-mid');
+    if (!meEl) return;
 
-    // HP icons
-    const myIcon = document.getElementById('ca-my-icon');
-    const oppIcon = document.getElementById('ca-opp-icon');
-    if (myIcon) myIcon.textContent = state.me.rage ? '\uD83D\uDD25' : state.me.character.emoji;
-    if (oppIcon) oppIcon.textContent = state.opp.rage ? '\uD83D\uDD25' : state.opp.character.emoji;
+    const { me, opp, matchScore, winScore, currentMiniGame } = state;
 
-    // Blob bodies — color
-    const meBody = document.getElementById('ca-me-body');
-    const oppBody = document.getElementById('ca-opp-body');
-    if (meBody) meBody.style.background = `radial-gradient(circle at 35% 35%, ${state.me.character.colorLight}, ${state.me.character.color} 60%, ${state.me.character.colorDark})`;
-    if (oppBody) oppBody.style.background = `radial-gradient(circle at 35% 35%, ${state.opp.character.colorLight}, ${state.opp.character.color} 60%, ${state.opp.character.colorDark})`;
+    meEl.innerHTML = `
+      <span class="ca-sc-emoji">${me.character.emoji}</span>
+      <span class="ca-sc-pips">${'\u2764\uFE0F'.repeat(matchScore.me)}${'<span class="ca-pip-empty">\u2B24</span>'.repeat(Math.max(0, winScore - matchScore.me))}</span>
+    `;
+    oppEl.innerHTML = `
+      <span class="ca-sc-pips">${'\u2764\uFE0F'.repeat(matchScore.opp)}${'<span class="ca-pip-empty">\u2B24</span>'.repeat(Math.max(0, winScore - matchScore.opp))}</span>
+      <span class="ca-sc-emoji">${opp.character.emoji}</span>
+    `;
+    if (midEl) {
+      midEl.textContent = currentMiniGame ? MINI_NAMES[currentMiniGame] || 'VS' : 'VS';
+    }
+  }
 
-    // Feet color
-    this.rootEl.querySelectorAll('#ca-blob-me .ca-foot').forEach((f) => { f.style.background = state.me.character.colorDark; });
-    this.rootEl.querySelectorAll('#ca-blob-opp .ca-foot').forEach((f) => { f.style.background = state.opp.character.colorDark; });
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
-    // Arm color
-    this.rootEl.querySelectorAll('#ca-blob-me .ca-blob-arm').forEach((a) => { a.style.background = state.me.character.color; });
-    this.rootEl.querySelectorAll('#ca-blob-opp .ca-blob-arm').forEach((a) => { a.style.background = state.opp.character.color; });
+  _clearGameAreas() {
+    const g = document.getElementById('ca-game-area');
+    const c = document.getElementById('ca-ctrl-area');
+    const o = document.getElementById('ca-overlay');
+    if (g) g.innerHTML = '';
+    if (c) c.innerHTML = '';
+    if (o) o.innerHTML = '';
+    this._pongActive = false;
+  }
 
-    // Labels
-    const meLabel = document.getElementById('ca-me-label');
-    const oppLabel = document.getElementById('ca-opp-label');
-    if (meLabel) meLabel.textContent = state.me.character.name;
-    if (oppLabel) oppLabel.textContent = state.opp.character.name;
+  // ── Countdown ─────────────────────────────────────────────────────────────
 
-    // Blob states (CSS classes)
-    const meEl = document.getElementById('ca-blob-me');
-    const oppEl = document.getElementById('ca-blob-opp');
-    if (meEl) {
-      meEl.className = `ca-blob ca-blob-left ca-state-${state.me.state}${state.me.rage ? ' ca-rage' : ''}`;
+  _renderCountdown(state) {
+    const gameArea = document.getElementById('ca-game-area');
+    const ctrlArea = document.getElementById('ca-ctrl-area');
+    if (!gameArea) return;
+
+    const name = MINI_NAMES[state.currentMiniGame] || 'Virus vs Virus';
+    const desc = MINI_DESC[state.currentMiniGame] || '';
+
+    gameArea.innerHTML = `
+      <div class="ca-cdwn-stage">
+        <div class="ca-cdwn-chars">
+          <div class="ca-cdwn-virus" style="background:${state.me.character.color}">
+            ${state.me.character.emoji}
+          </div>
+          <div class="ca-cdwn-vs-pill">VS</div>
+          <div class="ca-cdwn-virus" style="background:${state.opp.character.color}">
+            ${state.opp.character.emoji}
+          </div>
+        </div>
+        <div class="ca-cdwn-name">${name}</div>
+        <div class="ca-cdwn-desc">${desc}</div>
+        <div class="ca-cdwn-num" id="ca-cdwn-num">3</div>
+      </div>
+    `;
+    ctrlArea.innerHTML = '';
+
+    // Animate 3 → 2 → 1 → GO! (client-side display only; server controls actual timing)
+    let n = 3;
+    const numEl = document.getElementById('ca-cdwn-num');
+    if (!numEl) return;
+    numEl.classList.add('ca-num-pop');
+
+    const tick = () => {
+      if (!this.rootEl || this.lastState?.phase !== 'countdown') return;
+      n--;
+      if (n > 0) {
+        numEl.textContent = n;
+        numEl.classList.remove('ca-num-pop', 'ca-num-go');
+        void numEl.offsetWidth;
+        numEl.classList.add('ca-num-pop');
+        setTimeout(tick, 1000);
+      } else {
+        numEl.textContent = 'GO!!';
+        numEl.classList.remove('ca-num-pop', 'ca-num-go');
+        void numEl.offsetWidth;
+        numEl.classList.add('ca-num-pop', 'ca-num-go');
+      }
+    };
+    setTimeout(tick, 1000);
+  }
+
+  // ── Mini-game skeleton builders (DOM structure, set up once) ──────────────
+
+  _renderMiniGameSkeleton(state) {
+    switch (state.currentMiniGame) {
+      case 'mash': this._buildMashSkeleton(state); break;
+      case 'reflex': this._buildReflexSkeleton(state); break;
+      case 'pong': this._buildPongSkeleton(state); break;
+      case 'sorting': this._buildSortingSkeleton(state); break;
+    }
+  }
+
+  _buildMashSkeleton(state) {
+    const gameArea = document.getElementById('ca-game-area');
+    const ctrlArea = document.getElementById('ca-ctrl-area');
+
+    gameArea.innerHTML = `
+      <div class="ca-mash-arena">
+        <div class="ca-mash-half ca-mash-opp">
+          <div class="ca-mash-virus" id="ca-mash-opp"
+               style="background:${state.opp.character.color};width:50px;height:50px">
+            ${state.opp.character.emoji}
+          </div>
+          <div class="ca-mash-lbl">${state.opp.character.name}</div>
+        </div>
+        <div class="ca-mash-divider">
+          <div class="ca-mash-timer-track"><div class="ca-mash-timer-fill" id="ca-mash-timer" style="width:100%"></div></div>
+          <div class="ca-mash-center-line"></div>
+        </div>
+        <div class="ca-mash-half ca-mash-me">
+          <div class="ca-mash-virus" id="ca-mash-me"
+               style="background:${state.me.character.color};width:50px;height:50px">
+            ${state.me.character.emoji}
+          </div>
+          <div class="ca-mash-lbl">Virusmu!</div>
+        </div>
+      </div>
+    `;
+
+    ctrlArea.innerHTML = `
+      <button class="ca-tap-btn" id="ca-mash-btn" style="--btn-clr:${state.me.character.color}">
+        \uD83E\uDDA0 TAP TAP TAP!!
+      </button>
+    `;
+
+    document.getElementById('ca-mash-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.network.sendGameAction({ type: 'mash' });
+      const v = document.getElementById('ca-mash-me');
+      if (v) { v.classList.remove('ca-mash-pulse'); void v.offsetWidth; v.classList.add('ca-mash-pulse'); }
+    });
+  }
+
+  _buildReflexSkeleton(state) {
+    const gameArea = document.getElementById('ca-game-area');
+    const ctrlArea = document.getElementById('ca-ctrl-area');
+
+    gameArea.innerHTML = `
+      <div class="ca-reflex-arena">
+        <div class="ca-reflex-row">
+          <div class="ca-reflex-char" style="color:${state.me.character.color}">${state.me.character.emoji}</div>
+          <div class="ca-reflex-signal" id="ca-reflex-signal">\uD83D\uDC40</div>
+          <div class="ca-reflex-char" style="color:${state.opp.character.color}">${state.opp.character.emoji}</div>
+        </div>
+        <div class="ca-reflex-status" id="ca-reflex-status">Tunggu sinyal sayang~</div>
+      </div>
+    `;
+
+    ctrlArea.innerHTML = `
+      <button class="ca-tap-btn ca-tap-btn-wait" id="ca-reflex-btn">
+        \uD83D\uDC40 SIAP-SIAP...
+      </button>
+    `;
+
+    document.getElementById('ca-reflex-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.network.sendGameAction({ type: 'tap' });
+    });
+  }
+
+  _buildPongSkeleton(state) {
+    const gameArea = document.getElementById('ca-game-area');
+    const ctrlArea = document.getElementById('ca-ctrl-area');
+
+    gameArea.innerHTML = `
+      <div class="ca-pong-court" id="ca-pong-court">
+        <div class="ca-pong-lbl ca-pong-lbl-opp">${state.opp.character.emoji} ${state.opp.character.name}</div>
+        <div class="ca-pong-paddle ca-pong-opp" id="ca-pong-opp"
+             style="background:${state.opp.character.color}"></div>
+        <div class="ca-pong-center"></div>
+        <div class="ca-pong-ball" id="ca-pong-ball">\uD83E\uDDA0</div>
+        <div class="ca-pong-paddle ca-pong-me" id="ca-pong-me"
+             style="background:${state.me.character.color}"></div>
+        <div class="ca-pong-lbl ca-pong-lbl-me">\uD83E\uDDA0 Virusmu</div>
+      </div>
+    `;
+    ctrlArea.innerHTML = `<div class="ca-pong-hint">\u2190 Geser di lapangan untuk gerakin paddle \u2192</div>`;
+
+    const court = document.getElementById('ca-pong-court');
+    if (!court) return;
+
+    const move = (clientX) => {
+      const rect = court.getBoundingClientRect();
+      const nx = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const now = Date.now();
+      if (now - this._paddleThrottleAt > 35) {
+        this._paddleThrottleAt = now;
+        this.network.sendGameAction({ type: 'paddle', x: nx });
+      }
+    };
+
+    court.addEventListener('pointerdown', (e) => { e.preventDefault(); this._pongActive = true; move(e.clientX); });
+    court.addEventListener('pointermove', (e) => { if (!this._pongActive) return; e.preventDefault(); move(e.clientX); });
+    court.addEventListener('pointerup', () => { this._pongActive = false; });
+    court.addEventListener('pointerleave', () => { this._pongActive = false; });
+    court.addEventListener('pointercancel', () => { this._pongActive = false; });
+  }
+
+  _buildSortingSkeleton(state) {
+    const gameArea = document.getElementById('ca-game-area');
+    const ctrlArea = document.getElementById('ca-ctrl-area');
+
+    gameArea.innerHTML = `
+      <div class="ca-sort-arena">
+        <div class="ca-sort-scores">
+          <div class="ca-sort-score" id="ca-sort-me-score">${state.me.character.emoji} 0</div>
+          <span class="ca-sort-score-sep">vs</span>
+          <div class="ca-sort-score" id="ca-sort-opp-score">0 ${state.opp.character.emoji}</div>
+        </div>
+        <div class="ca-sort-field" id="ca-sort-field">
+          <div class="ca-sort-viruses" id="ca-sort-viruses"></div>
+          <div class="ca-sort-gate" id="ca-sort-gate">
+            <div class="ca-gate-status" id="ca-gate-status">\uD83D\uDD34 TUTUP</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    ctrlArea.innerHTML = `
+      <button class="ca-tap-btn ca-tap-btn-gate" id="ca-gate-btn"
+              style="--btn-clr:${state.me.character.color}">
+        \uD83D\uDEAA BUKA / TUTUP GATE
+      </button>
+    `;
+
+    document.getElementById('ca-gate-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.network.sendGameAction({ type: 'gate' });
+    });
+  }
+
+  // ── Mini-game updaters (called every state tick) ───────────────────────────
+
+  _updateMiniGame(state) {
+    switch (state.currentMiniGame) {
+      case 'mash': this._updateMash(state); break;
+      case 'reflex': this._updateReflex(state); break;
+      case 'pong': this._updatePong(state); break;
+      case 'sorting': this._updateSorting(state); break;
+    }
+  }
+
+  _updateMash(state) {
+    const mini = state.mini || {};
+    const myEl = document.getElementById('ca-mash-me');
+    const oppEl = document.getElementById('ca-mash-opp');
+    const timerEl = document.getElementById('ca-mash-timer');
+
+    if (myEl) {
+      const sz = 40 + (mini.myScale ?? 0.1) * 110;
+      myEl.style.width = myEl.style.height = `${sz}px`;
     }
     if (oppEl) {
-      oppEl.className = `ca-blob ca-blob-right ca-state-${state.opp.state}${state.opp.rage ? ' ca-rage' : ''}`;
+      const sz = 40 + (mini.oppScale ?? 0.1) * 110;
+      oppEl.style.width = oppEl.style.height = `${sz}px`;
     }
-
-    // Mouth expression based on state
-    this._updateMouth('ca-me-mouth', state.me.state, state.me.rage);
-    this._updateMouth('ca-opp-mouth', state.opp.state, state.opp.rage);
-
-    // Combo display
-    const comboDisplay = document.getElementById('ca-combo-display');
-    if (comboDisplay) {
-      if (state.me.combo >= 2) {
-        comboDisplay.textContent = `${state.me.combo}x COMBO! \uD83E\uDE77\uD83D\uDD25`;
-        comboDisplay.className = `ca-combo-display ca-combo-show${state.me.combo >= 5 ? ' ca-combo-fire' : ''}`;
-      } else {
-        comboDisplay.className = 'ca-combo-display';
-      }
-    }
-
-    // Meters
-    const specialBar = document.getElementById('ca-special-bar');
-    const shieldBar = document.getElementById('ca-shield-bar');
-    if (specialBar) {
-      const pct = (state.me.specialMeter / state.me.specialMax) * 100;
-      specialBar.style.width = `${pct}%`;
-      specialBar.classList.toggle('ca-special-ready', pct >= 100);
-    }
-    if (shieldBar) {
-      const pct = (state.me.shieldHP / state.me.shieldMax) * 100;
-      shieldBar.style.width = `${pct}%`;
-    }
-
-    // GEMAS button upgrades to CIUM when special ready
-    const gemasBtn = document.getElementById('ca-btn-gemas');
-    if (gemasBtn) {
-      if (state.me.specialMeter >= state.me.specialMax) {
-        gemasBtn.textContent = '\uD83D\uDC8B CIUMM!!';
-        gemasBtn.classList.add('ca-btn-super');
-      } else {
-        gemasBtn.textContent = '\uD83D\uDE21 GEMAS';
-        gemasBtn.classList.remove('ca-btn-super');
-      }
-    }
-
-    // GIGIT button also upgrades when special ready
-    const gigitBtn = document.getElementById('ca-btn-gigit');
-    if (gigitBtn) {
-      if (state.me.specialMeter >= state.me.specialMax) {
-        gigitBtn.textContent = '\uD83D\uDC8B CIUMM!!';
-        gigitBtn.classList.add('ca-btn-super');
-      } else {
-        gigitBtn.textContent = '\uD83E\uDE77 GIGIT';
-        gigitBtn.classList.remove('ca-btn-super');
-      }
-    }
-
-    // Cubit charge bar
-    const cubitFill = document.getElementById('ca-cubit-fill');
-    const cubitBtn = document.getElementById('ca-btn-cubit');
-    if (cubitFill) {
-      const pct = (state.me.chargePct || 0) * 100;
-      cubitFill.style.width = `${pct}%`;
-      cubitFill.classList.toggle('ca-cubit-charged', pct >= 60);
-    }
-    if (cubitBtn) {
-      cubitBtn.classList.toggle('ca-btn-cubit-active', state.me.state === 'charging');
-    }
-
-    // Charge indicator on opponent
-    if (oppEl && state.opp.state === 'charging') {
-      if (!oppEl.querySelector('.ca-charge-glow')) {
-        const glow = document.createElement('div');
-        glow.className = 'ca-charge-glow';
-        glow.textContent = '\uD83E\uDD0F';
-        oppEl.appendChild(glow);
-      }
-    } else if (oppEl) {
-      const existing = oppEl.querySelector('.ca-charge-glow');
-      if (existing) existing.remove();
-    }
-
-    // Controls
-    const controls = document.getElementById('ca-controls');
-    if (controls) {
-      controls.classList.toggle('ca-controls-disabled', state.phase !== 'fighting');
-    }
-
-    // Center message
-    const centerMsg = document.getElementById('ca-center-msg');
-    if (centerMsg) {
-      if (state.phase === 'countdown') {
-        centerMsg.innerHTML = 'SIAP-SIAP SAYANG~<br><span class="ca-subtitle">jangan nangis ya\u2026</span>';
-        centerMsg.className = 'ca-center-msg ca-msg-countdown';
-      } else if (state.phase === 'round-end') {
-        const iWon = state.me.hp > 0 && state.opp.hp <= 0;
-        if (iWon) {
-          centerMsg.innerHTML = 'GEMESSS!! \uD83D\uDC96\uD83D\uDC96\uD83D\uDC96<br><span class="ca-subtitle">habis di-gemasin~</span>';
-        } else {
-          centerMsg.innerHTML = 'Yahhh kena~ \uD83D\uDE35\u200D\uD83D\uDCAB<br><span class="ca-subtitle">terlalu gemas\u2026</span>';
-        }
-        centerMsg.className = `ca-center-msg ca-msg-ko ${iWon ? 'ca-msg-win' : 'ca-msg-lose'}`;
-      } else if (state.phase === 'fighting') {
-        centerMsg.innerHTML = 'GEMAS!! \uD83D\uDE24\uD83E\uDE77\uD83E\uDD0F';
-        centerMsg.className = 'ca-center-msg ca-msg-fight';
-        setTimeout(() => {
-          if (centerMsg.textContent.startsWith('GEMAS')) {
-            centerMsg.textContent = '';
-            centerMsg.className = 'ca-center-msg';
-          }
-        }, 900);
-      } else {
-        centerMsg.textContent = '';
-        centerMsg.className = 'ca-center-msg';
-      }
-    }
-
-    // Hit effects
-    this._processHitEvents(state.hitEvents);
-  }
-
-  _updateMouth(id, state, rage) {
-    const mouth = document.getElementById(id);
-    if (!mouth) return;
-    // Reset
-    mouth.className = 'ca-blob-mouth';
-    if (state === 'gigit' || state === 'attacking') {
-      mouth.classList.add('ca-mouth-open');
-    } else if (state === 'special') {
-      mouth.classList.add('ca-mouth-kiss');
-    } else if (state === 'hurt') {
-      mouth.classList.add('ca-mouth-ouch');
-    } else if (state === 'blocking') {
-      mouth.classList.add('ca-mouth-hug');
-    } else if (state === 'charging') {
-      mouth.classList.add('ca-mouth-focus');
-    } else if (rage) {
-      mouth.classList.add('ca-mouth-rage');
+    if (timerEl) {
+      const pct = mini.timeLeft !== null && mini.timeLeft !== undefined
+        ? (mini.timeLeft / (state.mini?.winScale !== null && state.mini?.winScale !== undefined ? 25000 : 25000)) * 100
+        : 100;
+      timerEl.style.width = `${Math.min(100, Math.max(0, pct))}%`;
     }
   }
 
-  _updateHP(barId, textId, fighter) {
-    const bar = document.getElementById(barId);
-    const text = document.getElementById(textId);
-    if (bar) {
-      const pct = (fighter.hp / fighter.maxHp) * 100;
-      bar.style.width = `${pct}%`;
-      bar.classList.toggle('ca-hp-critical', pct < 25);
+  _updateReflex(state) {
+    const mini = state.mini || {};
+    const signalEl = document.getElementById('ca-reflex-signal');
+    const statusEl = document.getElementById('ca-reflex-status');
+    const btn = document.getElementById('ca-reflex-btn');
+
+    const rp = mini.reflexPhase || 'waiting';
+
+    if (rp === 'waiting') {
+      if (signalEl) { signalEl.textContent = '\uD83D\uDC40'; signalEl.className = 'ca-reflex-signal'; }
+      if (statusEl) statusEl.textContent = 'Tunggu dulu... jangan duluan ya sayang~';
+      if (btn) { btn.textContent = '\uD83D\uDC40 SIAP-SIAP...'; btn.className = 'ca-tap-btn ca-tap-btn-wait'; }
+    } else if (rp === 'signal') {
+      if (signalEl) { signalEl.textContent = '\uD83E\uDDA0'; signalEl.className = 'ca-reflex-signal ca-signal-go'; }
+      if (statusEl) statusEl.textContent = 'TAP SEKARANG!! \uD83D\uDD25';
+      if (btn) {
+        btn.textContent = '\uD83E\uDDA0 TAP!!';
+        btn.className = 'ca-tap-btn ca-tap-btn-go';
+        btn.style.setProperty('--btn-clr', state.me.character.color);
+      }
+    } else if (rp === 'false-start') {
+      if (signalEl) signalEl.textContent = '\u26D4';
+      const me = mini.falseTapper === 'me';
+      if (statusEl) statusEl.textContent = me ? 'Duluan dong! \uD83D\uDE31' : 'Lawan duluan! \uD83D\uDE0F';
+    } else if (rp === 'done') {
+      if (signalEl) signalEl.textContent = '\u2705';
+      if (statusEl) statusEl.textContent = 'Cepet banget! \uD83D\uDD25';
     }
-    if (text) {
-      text.textContent = `${fighter.hp}`;
+  }
+
+  _updatePong(state) {
+    const mini = state.mini || {};
+    if (!mini.ball) return;
+
+    const ballEl = document.getElementById('ca-pong-ball');
+    const myPadEl = document.getElementById('ca-pong-me');
+    const oppPadEl = document.getElementById('ca-pong-opp');
+
+    if (ballEl) {
+      ballEl.style.left = `${mini.ball.x * 100}%`;
+      ballEl.style.top = `${mini.ball.y * 100}%`;
+    }
+
+    const pw = 30; // paddle width in %
+    if (myPadEl && mini.myPaddleX !== null && mini.myPaddleX !== undefined) {
+      myPadEl.style.left = `${Math.max(0, Math.min(100 - pw, mini.myPaddleX * 100 - pw / 2))}%`;
+    }
+    if (oppPadEl && mini.oppPaddleX !== null && mini.oppPaddleX !== undefined) {
+      oppPadEl.style.left = `${Math.max(0, Math.min(100 - pw, mini.oppPaddleX * 100 - pw / 2))}%`;
     }
   }
 
-  _processHitEvents(events) {
-    if (!events || events.length === 0) return;
+  _updateSorting(state) {
+    const mini = state.mini || {};
 
-    const arena = document.getElementById('ca-arena');
-    const floaters = document.getElementById('ca-floaters');
+    const meScore = document.getElementById('ca-sort-me-score');
+    const oppScore = document.getElementById('ca-sort-opp-score');
+    const gateStatus = document.getElementById('ca-gate-status');
+    const gateEl = document.getElementById('ca-sort-gate');
 
-    for (const evt of events) {
-      // Screen shake — bigger for specials
-      if (arena && (evt.iGotHit || evt.isSpecial)) {
-        arena.classList.remove('ca-shake', 'ca-shake-big');
-        // Force reflow for re-triggering animation
-        void arena.offsetWidth;
-        arena.classList.add(evt.isSpecial ? 'ca-shake-big' : 'ca-shake');
-        clearTimeout(this._shakeTimer);
-        this._shakeTimer = setTimeout(() => {
-          arena.classList.remove('ca-shake', 'ca-shake-big');
-        }, evt.isSpecial ? 400 : 200);
+    if (meScore) meScore.textContent = `${state.me.character.emoji} ${mini.myScore ?? 0} / ${mini.winCatches || 10}`;
+    if (oppScore) oppScore.textContent = `${mini.oppScore ?? 0} / ${mini.winCatches || 10} ${state.opp.character.emoji}`;
+
+    const open = mini.gateOpen || false;
+    if (gateStatus) gateStatus.textContent = open ? '\uD83D\uDFE2 BUKA' : '\uD83D\uDD34 TUTUP';
+    if (gateEl) gateEl.classList.toggle('ca-gate-open', open);
+
+    // Sync virus dots
+    const container = document.getElementById('ca-sort-viruses');
+    if (!container || !mini.viruses) return;
+
+    const activeIds = new Set(mini.viruses.map((v) => v.id));
+    container.querySelectorAll('[data-vid]').forEach((el) => {
+      if (!activeIds.has(Number(el.dataset.vid))) el.remove();
+    });
+
+    for (const v of mini.viruses) {
+      let el = container.querySelector(`[data-vid="${v.id}"]`);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = `ca-sort-virus ${v.color === 'merah' ? 'ca-virus-red' : 'ca-virus-blue'}`;
+        el.dataset.vid = v.id;
+        el.textContent = v.color === 'merah' ? '\uD83D\uDD34' : '\uD83D\uDD35';
+        container.appendChild(el);
       }
-
-      // Floating damage/effect text
-      if (floaters) {
-        const float = document.createElement('div');
-        float.className = 'ca-float';
-
-        if (evt.isGigit) {
-          const comboText = evt.combo >= 2 ? ` ${evt.combo}x` : '';
-          float.textContent = evt.iDidIt
-            ? `\uD83E\uDE77 GIGIT${comboText} -${evt.damage}`
-            : `\uD83E\uDE77 -${evt.damage}!`;
-          float.classList.add('ca-float-gigit');
-          if (evt.combo >= 5) float.classList.add('ca-float-combo-fire');
-        } else if (evt.isCubit) {
-          const pwr = evt.chargeRatio >= 0.6 ? 'MAX ' : '';
-          float.textContent = evt.iDidIt
-            ? `\uD83E\uDD0F ${pwr}CUBIT -${evt.damage}`
-            : `\uD83E\uDD0F ${pwr}-${evt.damage}!`;
-          float.classList.add('ca-float-cubit');
-          if (evt.chargeRatio >= 0.6) float.classList.add('ca-float-cubit-max');
-        } else if (evt.isSpecial) {
-          float.textContent = evt.iDidIt
-            ? `\uD83D\uDC8B\uD83D\uDC8B CIUM!! -${evt.damage}`
-            : `\uD83D\uDE35 DICIUM!! -${evt.damage}`;
-          float.classList.add('ca-float-special');
-        } else if (evt.blocked) {
-          float.textContent = evt.iDidIt ? '\uD83E\uDD17 Dipeluk~' : `\uD83E\uDD17 -${evt.damage}`;
-          float.classList.add('ca-float-blocked');
-        } else {
-          float.textContent = evt.iDidIt
-            ? `\uD83D\uDE21 GEMAS -${evt.damage}`
-            : `\uD83D\uDE16 -${evt.damage}`;
-          float.classList.add(evt.iDidIt ? 'ca-float-hit' : 'ca-float-hurt');
-        }
-
-        float.style.left = evt.iDidIt ? '60%' : '40%';
-        float.style.top = `${20 + Math.random() * 25}%`;
-        floaters.appendChild(float);
-        setTimeout(() => float.remove(), 1200);
-      }
-
-      // GIGIT bite marks
-      if (evt.isGigit && !evt.blocked && floaters) {
-        const bite = document.createElement('div');
-        bite.className = 'ca-bite-mark';
-        bite.textContent = '\uD83E\uDE77';
-        bite.style.left = evt.iDidIt ? '60%' : '40%';
-        bite.style.top = `${35 + Math.random() * 20}%`;
-        floaters.appendChild(bite);
-        setTimeout(() => bite.remove(), 800);
-      }
-
-      // Heart/kiss explosions on special attacks
-      if (evt.isSpecial && floaters) {
-        const emojis = ['\uD83D\uDC95', '\uD83D\uDC96', '\uD83D\uDC97', '\uD83D\uDC8B', '\u2764\uFE0F', '\uD83D\uDE18', '\uD83E\uDD70', '\uD83D\uDC9E', '\uD83D\uDC93', '\u2728'];
-        for (let i = 0; i < 15; i++) {
-          const h = document.createElement('div');
-          h.className = 'ca-burst-heart';
-          h.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-          h.style.left = `${20 + Math.random() * 60}%`;
-          h.style.top = `${10 + Math.random() * 50}%`;
-          h.style.animationDelay = `${i * 40}ms`;
-          h.style.fontSize = `${1 + Math.random() * 1.2}rem`;
-          floaters.appendChild(h);
-          setTimeout(() => h.remove(), 1500);
-        }
-      }
-
-      // Cubit max charge sparkles
-      if (evt.isCubit && evt.chargeRatio >= 0.6 && floaters) {
-        for (let i = 0; i < 6; i++) {
-          const s = document.createElement('div');
-          s.className = 'ca-burst-heart';
-          s.textContent = ['\uD83E\uDD0F', '\u2728', '\uD83D\uDCAB'][Math.floor(Math.random() * 3)];
-          s.style.left = `${35 + Math.random() * 30}%`;
-          s.style.top = `${25 + Math.random() * 30}%`;
-          s.style.animationDelay = `${i * 60}ms`;
-          floaters.appendChild(s);
-          setTimeout(() => s.remove(), 1000);
-        }
-      }
+      el.style.top = `${v.progress * 82}%`;
+      el.style.left = `${8 + (v.id % 8) * 11}%`;
     }
   }
+
+  // ── Mini result overlay ───────────────────────────────────────────────────
+
+  _renderMiniResult(state) {
+    const overlay = document.getElementById('ca-overlay');
+    if (!overlay || !state.lastMiniResult) return;
+
+    const iWon = state.lastMiniResult.iWon;
+
+    overlay.innerHTML = iWon
+      ? `<div class="ca-result ca-result-win">
+           <div class="ca-result-big">\uD83C\uDF89 MENANG!! \uD83E\uDDA0</div>
+           <div class="ca-result-sub">+1 poin buat ${state.me.character.emoji}</div>
+           <div class="ca-result-score">${state.matchScore.me} \u2014 ${state.matchScore.opp}</div>
+         </div>`
+      : `<div class="ca-result ca-result-lose">
+           <div class="ca-result-big">Yahhh~ \uD83D\uDE2D</div>
+           <div class="ca-result-sub">+1 poin buat ${state.opp.character.emoji}</div>
+           <div class="ca-result-score">${state.matchScore.me} \u2014 ${state.matchScore.opp}</div>
+         </div>`;
+  }
+
+  // ── Teardown ──────────────────────────────────────────────────────────────
 
   destroy() {
     EventBus.off('cute-aggression:state', this._onState);
-    clearTimeout(this._shakeTimer);
-    clearTimeout(this._comboTimeout);
     clearInterval(this._heartInterval);
     this.rootEl?.remove();
     this.rootEl = null;

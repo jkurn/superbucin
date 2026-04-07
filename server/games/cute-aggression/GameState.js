@@ -1,24 +1,21 @@
 /**
- * Cute Aggression — Super Bucin Edition! MAXIMUM GEMAS!!
+ * Virus vs Virus — Server-authoritative match container.
  *
- * Two adorable blob creatures face off in cute-aggressive combat.
- * Inspired by Virus vs Virus — red blob vs blue blob.
+ * Match flow:
+ *   countdown → playing → mini-result → (repeat) → finished
  *
- * Four buttons:
- *   GEMAS  — squeeze attack (medium damage, medium cooldown)
- *   GIGIT  — bite attack (fast, low damage, builds combo + special faster)
- *   CUBIT  — hold-to-charge pinch (high damage potential, vulnerable while charging)
- *   PELUK  — hug shield (hold to block, absorbs damage)
- *
- * Special: CIUM (kiss super) — auto-fires when meter is full + you attack.
- * Combo system: consecutive GIGIT hits increase damage multiplier.
- * Rage mode: when HP drops below 30%, damage output increases 30%.
- * Best of 3 rounds. First to 0 HP loses the round.
+ * Four mini-games (randomly selected each round):
+ *   mash    — Virus Inflater: tap to grow virus, first to cross centre wins
+ *   reflex  — Quick Draw: tap after signal fires, false-start = opponent wins
+ *   pong    — Deflector: server-side ball physics, drag paddle to block
+ *   sorting — Gatekeeper: toggle gate to catch own-colour viruses, block enemy
  */
 
 import { CUTE_AGGRESSION_CONFIG as CFG } from './config.js';
 
 export const GAME_CONFIG = CFG;
+
+const MINI_POOL = ['mash', 'reflex', 'pong', 'sorting'];
 
 export class GameState {
   constructor(player1, player2, emitCallback, _roomOptions = {}) {
@@ -28,481 +25,501 @@ export class GameState {
 
     this.active = false;
     this.paused = false;
+    /** @type {'countdown'|'playing'|'mini-result'|'finished'} */
     this.phase = 'countdown';
 
-    this.round = 0;
-    this.roundWins = {};
-    this.fighters = {};
-    this.actionQueue = [];
+    this.matchScore = {};
+    /** @type {'mash'|'reflex'|'pong'|'sorting'|null} */
+    this.currentMiniGame = null;
+    this.miniGameState = {};
+    this.lastMiniResult = null;
+    this.roundNum = 0;
 
-    this.tickInterval = null;
     this.phaseTimer = null;
-
-    this.hitEvents = [];
+    this.tickInterval = null;
+    this.spawnInterval = null;
   }
+
+  // ── Lifecycle ────────────────────────────────────────────────────────────
 
   start() {
     this.active = true;
     this.paused = false;
-    this.round = 0;
-    this.roundWins = { [this.p1.id]: 0, [this.p2.id]: 0 };
-
-    this.phase = 'countdown';
-    this.clearTimers();
-    this.startCountdown();
+    this.matchScore = { [this.p1.id]: 0, [this.p2.id]: 0 };
+    this.lastMiniResult = null;
+    this.roundNum = 0;
+    this._startNextMiniGame();
   }
 
   stop() {
     this.active = false;
-    this.clearTimers();
+    this._clearTimers();
   }
 
   pause() {
     if (!this.active) return;
     this.paused = true;
-    this.clearTimers();
+    this._clearTimers();
   }
 
   resume() {
     if (!this.active) return;
     this.paused = false;
-    if (this.phase === 'fighting') {
-      this.startTickLoop();
-      this.broadcastState();
-    } else if (this.phase === 'countdown') {
-      this.startCountdown();
+    if (this.phase === 'countdown') {
+      this._startCountdown();
+    } else if (this.phase === 'playing') {
+      this._resumeMiniGame();
+    }
+    this._broadcastState();
+  }
+
+  migratePlayer(oldId, newId, playerObj) {
+    if (this.p1.id === oldId) this.p1 = playerObj;
+    else if (this.p2.id === oldId) this.p2 = playerObj;
+
+    if (this.matchScore[oldId] !== undefined) {
+      this.matchScore[newId] = this.matchScore[oldId];
+      delete this.matchScore[oldId];
+    }
+
+    const ms = this.miniGameState;
+    if (ms) {
+      for (const key of ['scales', 'paddles', 'scores', 'gates']) {
+        if (ms[key]?.[oldId] !== undefined) {
+          ms[key][newId] = ms[key][oldId];
+          delete ms[key][oldId];
+        }
+      }
     }
   }
 
-  clearTimers() {
-    if (this.tickInterval) { clearInterval(this.tickInterval); this.tickInterval = null; }
+  getReconnectPayload(socketId) {
+    const player = socketId === this.p1.id ? this.p1 : this.p2;
+    const opponent = socketId === this.p1.id ? this.p2 : this.p1;
+    const pChar = CFG.CHARACTERS[player.side] || CFG.CHARACTERS.merah;
+    const oChar = CFG.CHARACTERS[opponent.side] || CFG.CHARACTERS.biru;
+
+    return {
+      cuteAggressionState: {
+        gameType: 'cute-aggression',
+        phase: this.phase,
+        roundNum: this.roundNum,
+        currentMiniGame: this.currentMiniGame,
+        matchScore: {
+          me: this.matchScore[player.id] || 0,
+          opp: this.matchScore[opponent.id] || 0,
+        },
+        winScore: CFG.WIN_SCORE,
+        lastMiniResult: this.lastMiniResult
+          ? { iWon: this.lastMiniResult.winnerId === player.id, miniGame: this.lastMiniResult.miniGame }
+          : null,
+        me: { character: pChar, side: player.side },
+        opp: { character: oChar, side: opponent.side },
+        mini: this._buildMiniSlice(player, opponent),
+      },
+    };
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  _clearTimers() {
     if (this.phaseTimer) { clearTimeout(this.phaseTimer); this.phaseTimer = null; }
+    if (this.tickInterval) { clearInterval(this.tickInterval); this.tickInterval = null; }
+    if (this.spawnInterval) { clearInterval(this.spawnInterval); this.spawnInterval = null; }
   }
 
-  initFighters() {
-    for (const p of [this.p1, this.p2]) {
-      this.fighters[p.id] = {
-        hp: CFG.MAX_HP,
-        state: 'idle',
-        stateTimer: 0,
-        attackCooldown: 0,
-        specialMeter: 0,
-        shieldHP: CFG.SHIELD_MAX,
-        character: p.side,
-        chargeStartedAt: 0,
-        combo: 0,
-        lastGigitAt: 0,
-      };
-    }
+  _opponentOf(playerId) {
+    return playerId === this.p1.id ? this.p2.id : this.p1.id;
   }
 
-  startCountdown() {
-    this.round++;
-    this.initFighters();
-    this.hitEvents = [];
-    this.actionQueue = [];
+  // ── Match flow ────────────────────────────────────────────────────────────
+
+  _startNextMiniGame() {
+    this.roundNum++;
+    this.currentMiniGame = MINI_POOL[Math.floor(Math.random() * MINI_POOL.length)];
+    this.miniGameState = {};
+    this._startCountdown();
+  }
+
+  _startCountdown() {
+    this._clearTimers();
     this.phase = 'countdown';
-    this.broadcastState();
+    this._broadcastState();
 
     this.phaseTimer = setTimeout(() => {
       this.phaseTimer = null;
-      this.phase = 'fighting';
-      this.startTickLoop();
-      this.broadcastState();
+      this._launchMiniGame();
     }, CFG.COUNTDOWN_MS);
   }
 
-  startTickLoop() {
-    if (this.tickInterval) clearInterval(this.tickInterval);
-    this.tickInterval = setInterval(() => this.tick(), CFG.TICK_MS);
-  }
+  _launchMiniGame() {
+    this.phase = 'playing';
+    this.miniGameState = {};
 
-  handleAction(playerId, action) {
-    if (!this.active || this.paused) return;
-    if (this.phase !== 'fighting') return;
-    if (!action || typeof action !== 'object') return;
-
-    const validTypes = ['attack', 'gigit', 'block-start', 'block-end', 'special', 'cubit-start', 'cubit-release'];
-    if (!validTypes.includes(action.type)) return;
-
-    this.actionQueue.push({ playerId, type: action.type });
-  }
-
-  _isActing(f) {
-    return f.state === 'hurt' || f.state === 'attacking' || f.state === 'special'
-      || f.state === 'charging' || f.state === 'cubit' || f.state === 'gigit';
-  }
-
-  _getRageMult(f) {
-    return f.hp <= CFG.RAGE_HP_THRESHOLD ? CFG.RAGE_DAMAGE_MULT : 1;
-  }
-
-  tick() {
-    if (!this.active || this.paused || this.phase !== 'fighting') return;
-
-    this.hitEvents = [];
-
-    // Update state timers
-    for (const p of [this.p1, this.p2]) {
-      const f = this.fighters[p.id];
-      if (f.stateTimer > 0) {
-        f.stateTimer -= CFG.TICK_MS;
-        if (f.stateTimer <= 0) {
-          f.stateTimer = 0;
-          if (f.state === 'hurt' || f.state === 'attacking' || f.state === 'special' || f.state === 'cubit' || f.state === 'gigit') {
-            f.state = 'idle';
-          }
-        }
-      }
-      if (f.attackCooldown > 0) {
-        f.attackCooldown = Math.max(0, f.attackCooldown - CFG.TICK_MS);
-      }
-      // Decay combo if window expired
-      if (f.combo > 0 && Date.now() - f.lastGigitAt > CFG.GIGIT_COMBO_WINDOW_MS) {
-        f.combo = 0;
-      }
+    switch (this.currentMiniGame) {
+      case 'mash': this._initMash(); break;
+      case 'reflex': this._initReflex(); break;
+      case 'pong': this._initPong(); break;
+      case 'sorting': this._initSorting(); break;
     }
 
-    // Process action queue
-    const queue = [...this.actionQueue];
-    this.actionQueue = [];
-
-    for (const action of queue) {
-      const f = this.fighters[action.playerId];
-      if (!f) continue;
-
-      if (action.type === 'cubit-start') {
-        if (f.state === 'idle' && f.attackCooldown <= 0) {
-          f.state = 'charging';
-          f.chargeStartedAt = Date.now();
-        }
-      } else if (action.type === 'cubit-release') {
-        if (f.state === 'charging') {
-          this.doCubitAttack(action.playerId);
-        }
-      } else if (action.type === 'block-start') {
-        if (f.state === 'idle' && f.shieldHP > 0) {
-          f.state = 'blocking';
-        }
-      } else if (action.type === 'block-end') {
-        if (f.state === 'blocking') {
-          f.state = 'idle';
-        }
-      } else if (action.type === 'gigit') {
-        if (!this._isActing(f) && f.attackCooldown <= 0) {
-          if (f.specialMeter >= CFG.SPECIAL_METER_MAX) {
-            this.doSpecialAttack(action.playerId);
-          } else {
-            this.doGigitAttack(action.playerId);
-          }
-        }
-      } else if (action.type === 'attack') {
-        if (!this._isActing(f) && f.attackCooldown <= 0) {
-          if (f.specialMeter >= CFG.SPECIAL_METER_MAX) {
-            this.doSpecialAttack(action.playerId);
-          } else {
-            this.doAttack(action.playerId);
-          }
-        }
-      }
-    }
-
-    // Shield regen when not blocking
-    for (const p of [this.p1, this.p2]) {
-      const f = this.fighters[p.id];
-      if (f.state !== 'blocking' && f.shieldHP < CFG.SHIELD_MAX) {
-        f.shieldHP = Math.min(CFG.SHIELD_MAX, f.shieldHP + CFG.SHIELD_REGEN_PER_TICK);
-      }
-    }
-
-    this.broadcastState();
+    this._broadcastState();
   }
 
-  doAttack(playerId) {
-    const attacker = this.fighters[playerId];
-    const opponentId = playerId === this.p1.id ? this.p2.id : this.p1.id;
-    const defender = this.fighters[opponentId];
-
-    attacker.state = 'attacking';
-    attacker.stateTimer = CFG.ATTACK_ANIM_MS;
-    attacker.attackCooldown = CFG.ATTACK_COOLDOWN_MS;
-    attacker.combo = 0; // GEMAS resets gigit combo
-
-    let damage;
-    let blocked = false;
-
-    if (defender.state === 'blocking' && defender.shieldHP > 0) {
-      damage = CFG.BLOCKED_DAMAGE;
-      defender.shieldHP = Math.max(0, defender.shieldHP - CFG.SHIELD_DRAIN_PER_HIT);
-      blocked = true;
-
-      if (defender.shieldHP <= 0) {
-        defender.state = 'hurt';
-        defender.stateTimer = CFG.HURT_STUN_MS;
-      }
-    } else {
-      damage = Math.floor(CFG.ATTACK_DAMAGE * this._getRageMult(attacker));
-      if (defender.state === 'charging') {
-        damage = Math.floor(damage * CFG.CUBIT_VULNERABLE_MULT);
-        defender.chargeStartedAt = 0;
-      }
-      defender.state = 'hurt';
-      defender.stateTimer = CFG.HURT_STUN_MS;
-    }
-
-    defender.hp = Math.max(0, defender.hp - damage);
-    attacker.specialMeter = Math.min(CFG.SPECIAL_METER_MAX, attacker.specialMeter + CFG.SPECIAL_GAIN_ON_HIT);
-    defender.specialMeter = Math.min(CFG.SPECIAL_METER_MAX, defender.specialMeter + CFG.SPECIAL_GAIN_ON_HURT);
-
-    this.hitEvents.push({
-      attackerId: playerId,
-      defenderId: opponentId,
-      damage,
-      blocked,
-      isSpecial: false,
-      isGigit: false,
-      combo: 0,
-    });
-
-    if (defender.hp <= 0) this.endRound(playerId);
-  }
-
-  doGigitAttack(playerId) {
-    const attacker = this.fighters[playerId];
-    const opponentId = playerId === this.p1.id ? this.p2.id : this.p1.id;
-    const defender = this.fighters[opponentId];
-
-    // Build combo
-    if (Date.now() - attacker.lastGigitAt <= CFG.GIGIT_COMBO_WINDOW_MS) {
-      attacker.combo = Math.min(CFG.MAX_COMBO, attacker.combo + 1);
-    } else {
-      attacker.combo = 1;
-    }
-    attacker.lastGigitAt = Date.now();
-
-    attacker.state = 'gigit';
-    attacker.stateTimer = CFG.GIGIT_ANIM_MS;
-    attacker.attackCooldown = CFG.GIGIT_COOLDOWN_MS;
-
-    const comboMult = 1 + attacker.combo * CFG.COMBO_MULT;
-    let damage;
-    let blocked = false;
-
-    if (defender.state === 'blocking' && defender.shieldHP > 0) {
-      damage = CFG.BLOCKED_DAMAGE;
-      defender.shieldHP = Math.max(0, defender.shieldHP - Math.floor(CFG.SHIELD_DRAIN_PER_HIT * 0.5));
-      blocked = true;
-
-      if (defender.shieldHP <= 0) {
-        defender.state = 'hurt';
-        defender.stateTimer = CFG.HURT_STUN_MS;
-      }
-    } else {
-      damage = Math.floor(CFG.GIGIT_DAMAGE * comboMult * this._getRageMult(attacker));
-      if (defender.state === 'charging') {
-        damage = Math.floor(damage * CFG.CUBIT_VULNERABLE_MULT);
-        defender.chargeStartedAt = 0;
-      }
-      defender.state = 'hurt';
-      defender.stateTimer = Math.floor(CFG.HURT_STUN_MS * 0.6); // shorter stun from bites
-    }
-
-    defender.hp = Math.max(0, defender.hp - damage);
-    attacker.specialMeter = Math.min(CFG.SPECIAL_METER_MAX, attacker.specialMeter + CFG.GIGIT_SPECIAL_GAIN);
-    defender.specialMeter = Math.min(CFG.SPECIAL_METER_MAX, defender.specialMeter + Math.floor(CFG.SPECIAL_GAIN_ON_HURT * 0.5));
-
-    this.hitEvents.push({
-      attackerId: playerId,
-      defenderId: opponentId,
-      damage,
-      blocked,
-      isSpecial: false,
-      isGigit: true,
-      combo: attacker.combo,
-    });
-
-    if (defender.hp <= 0) this.endRound(playerId);
-  }
-
-  doSpecialAttack(playerId) {
-    const attacker = this.fighters[playerId];
-    const opponentId = playerId === this.p1.id ? this.p2.id : this.p1.id;
-    const defender = this.fighters[opponentId];
-
-    attacker.state = 'special';
-    attacker.stateTimer = CFG.SPECIAL_ANIM_MS;
-    attacker.attackCooldown = CFG.SPECIAL_COOLDOWN_MS;
-    attacker.specialMeter = 0;
-    attacker.combo = 0;
-
-    const damage = Math.floor(CFG.SPECIAL_DAMAGE * this._getRageMult(attacker));
-    defender.state = 'hurt';
-    defender.stateTimer = CFG.HURT_STUN_MS * 2;
-
-    defender.hp = Math.max(0, defender.hp - damage);
-    defender.specialMeter = Math.min(CFG.SPECIAL_METER_MAX, defender.specialMeter + CFG.SPECIAL_GAIN_ON_HURT);
-
-    this.hitEvents.push({
-      attackerId: playerId,
-      defenderId: opponentId,
-      damage,
-      blocked: false,
-      isSpecial: true,
-      isGigit: false,
-      combo: 0,
-    });
-
-    if (defender.hp <= 0) this.endRound(playerId);
-  }
-
-  doCubitAttack(playerId) {
-    const attacker = this.fighters[playerId];
-    const opponentId = playerId === this.p1.id ? this.p2.id : this.p1.id;
-    const defender = this.fighters[opponentId];
-
-    const chargeMs = Math.min(Date.now() - attacker.chargeStartedAt, CFG.CUBIT_MAX_CHARGE_MS);
-    const chargeRatio = chargeMs / CFG.CUBIT_MAX_CHARGE_MS;
-    const baseDmg = CFG.CUBIT_MIN_DAMAGE + (CFG.CUBIT_MAX_DAMAGE - CFG.CUBIT_MIN_DAMAGE) * chargeRatio;
-    const damage = Math.floor(baseDmg * this._getRageMult(attacker));
-
-    attacker.state = 'cubit';
-    attacker.stateTimer = CFG.CUBIT_ANIM_MS;
-    attacker.attackCooldown = CFG.CUBIT_COOLDOWN_MS;
-    attacker.chargeStartedAt = 0;
-    attacker.combo = 0;
-
-    const breaksBlock = chargeRatio >= 0.6;
-
-    if (defender.state === 'blocking' && defender.shieldHP > 0 && !breaksBlock) {
-      const blockedDmg = Math.max(CFG.BLOCKED_DAMAGE, Math.floor(damage * 0.2));
-      defender.hp = Math.max(0, defender.hp - blockedDmg);
-      defender.shieldHP = Math.max(0, defender.shieldHP - CFG.SHIELD_DRAIN_PER_HIT * 2);
-
-      this.hitEvents.push({
-        attackerId: playerId,
-        defenderId: opponentId,
-        damage: blockedDmg,
-        blocked: true,
-        isSpecial: false,
-        isGigit: false,
-        isCubit: true,
-        chargeRatio,
-        combo: 0,
-      });
-    } else {
-      defender.hp = Math.max(0, defender.hp - damage);
-      defender.state = 'hurt';
-      defender.stateTimer = CFG.HURT_STUN_MS + Math.floor(chargeRatio * 200);
-
-      this.hitEvents.push({
-        attackerId: playerId,
-        defenderId: opponentId,
-        damage,
-        blocked: false,
-        isSpecial: false,
-        isGigit: false,
-        isCubit: true,
-        chargeRatio,
-        combo: 0,
-      });
-    }
-
-    attacker.specialMeter = Math.min(
-      CFG.SPECIAL_METER_MAX,
-      attacker.specialMeter + Math.floor(CFG.SPECIAL_GAIN_ON_HIT * (1 + chargeRatio)),
-    );
-    defender.specialMeter = Math.min(CFG.SPECIAL_METER_MAX, defender.specialMeter + CFG.SPECIAL_GAIN_ON_HURT);
-
-    if (defender.hp <= 0) this.endRound(playerId);
-  }
-
-  endRound(winnerId) {
-    this.clearTimers();
-    this.phase = 'round-end';
-    this.roundWins[winnerId]++;
-
-    this.broadcastState();
-
-    if (this.roundWins[winnerId] >= CFG.ROUNDS_TO_WIN) {
-      this.phaseTimer = setTimeout(() => {
-        this.finishMatch(winnerId);
-      }, CFG.ROUND_PAUSE_MS);
-    } else {
-      this.phaseTimer = setTimeout(() => {
-        this.phaseTimer = null;
-        this.startCountdown();
-      }, CFG.ROUND_PAUSE_MS);
+  _resumeMiniGame() {
+    if (this.miniGameState.winner) return;
+    if (this.currentMiniGame === 'pong') {
+      this.tickInterval = setInterval(() => this._tickPong(), CFG.PONG_TICK_MS);
+    } else if (this.currentMiniGame === 'sorting') {
+      this.spawnInterval = setInterval(() => this._spawnVirus(), CFG.SORTING_SPAWN_INTERVAL_MS);
+      this.tickInterval = setInterval(() => this._tickSorting(), CFG.SORTING_TICK_MS);
     }
   }
 
-  finishMatch(winnerId) {
+  _endMiniGame(winnerId) {
+    this._clearTimers();
+    this.phase = 'mini-result';
+
+    if (winnerId) {
+      this.matchScore[winnerId] = (this.matchScore[winnerId] || 0) + 1;
+    }
+
+    this.lastMiniResult = { winnerId, miniGame: this.currentMiniGame };
+    this._broadcastState();
+
+    const matchWon = winnerId && this.matchScore[winnerId] >= CFG.WIN_SCORE;
+
+    this.phaseTimer = setTimeout(() => {
+      this.phaseTimer = null;
+      if (matchWon) {
+        this._finishMatch(winnerId);
+      } else {
+        this._startNextMiniGame();
+      }
+    }, CFG.MINI_RESULT_MS);
+  }
+
+  _finishMatch(winnerId) {
     this.active = false;
     this.phase = 'finished';
-    this.clearTimers();
-
-    const s1 = this.roundWins[this.p1.id];
-    const s2 = this.roundWins[this.p2.id];
+    this._clearTimers();
 
     this.emit('match-end', {
       winnerId,
       tie: false,
-      scores: [s1, s2],
+      scores: [this.matchScore[this.p1.id] || 0, this.matchScore[this.p2.id] || 0],
     });
   }
 
-  broadcastState() {
-    const buildSlice = (player, opponent) => {
-      const pf = this.fighters[player.id] || {};
-      const of2 = this.fighters[opponent.id] || {};
-      const pChar = CFG.CHARACTERS[pf.character] || CFG.CHARACTERS.merah;
-      const oChar = CFG.CHARACTERS[of2.character] || CFG.CHARACTERS.biru;
+  // ── handleAction (router) ─────────────────────────────────────────────────
 
-      return {
-        gameType: 'cute-aggression',
-        phase: this.phase,
-        round: this.round,
-        myRoundWins: this.roundWins[player.id] || 0,
-        oppRoundWins: this.roundWins[opponent.id] || 0,
-        roundsToWin: CFG.ROUNDS_TO_WIN,
-        me: {
-          hp: pf.hp ?? CFG.MAX_HP,
-          maxHp: CFG.MAX_HP,
-          state: pf.state || 'idle',
-          specialMeter: pf.specialMeter || 0,
-          specialMax: CFG.SPECIAL_METER_MAX,
-          shieldHP: pf.shieldHP ?? CFG.SHIELD_MAX,
-          shieldMax: CFG.SHIELD_MAX,
-          character: pChar,
-          side: pf.character,
-          combo: pf.combo || 0,
-          rage: (pf.hp ?? CFG.MAX_HP) <= CFG.RAGE_HP_THRESHOLD,
-          chargePct: pf.state === 'charging' && pf.chargeStartedAt
-            ? Math.min(1, (Date.now() - pf.chargeStartedAt) / CFG.CUBIT_MAX_CHARGE_MS)
-            : 0,
-        },
-        opp: {
-          hp: of2.hp ?? CFG.MAX_HP,
-          maxHp: CFG.MAX_HP,
-          state: of2.state || 'idle',
-          specialMeter: of2.specialMeter || 0,
-          specialMax: CFG.SPECIAL_METER_MAX,
-          shieldHP: of2.shieldHP ?? CFG.SHIELD_MAX,
-          shieldMax: CFG.SHIELD_MAX,
-          character: oChar,
-          side: of2.character,
-          combo: of2.combo || 0,
-          rage: (of2.hp ?? CFG.MAX_HP) <= CFG.RAGE_HP_THRESHOLD,
-          chargePct: of2.state === 'charging' && of2.chargeStartedAt
-            ? Math.min(1, (Date.now() - of2.chargeStartedAt) / CFG.CUBIT_MAX_CHARGE_MS)
-            : 0,
-        },
-        hitEvents: this.hitEvents.map((e) => ({
-          ...e,
-          iDidIt: e.attackerId === player.id,
-          iGotHit: e.defenderId === player.id,
-        })),
-      };
+  handleAction(playerId, action) {
+    if (!this.active || this.paused || this.phase !== 'playing') return;
+    if (!action || typeof action !== 'object') return;
+
+    switch (this.currentMiniGame) {
+      case 'mash':
+        if (action.type === 'mash') this._handleMash(playerId);
+        break;
+      case 'reflex':
+        if (action.type === 'tap') this._handleReflex(playerId);
+        break;
+      case 'pong':
+        if (action.type === 'paddle') this._handlePaddle(playerId, action);
+        break;
+      case 'sorting':
+        if (action.type === 'gate') this._handleGate(playerId);
+        break;
+    }
+  }
+
+  // ── Mini-game: Mash ───────────────────────────────────────────────────────
+
+  _initMash() {
+    this.miniGameState = {
+      scales: { [this.p1.id]: 0.10, [this.p2.id]: 0.10 },
+      startedAt: Date.now(),
+      winner: null,
     };
+
+    this.phaseTimer = setTimeout(() => {
+      this.phaseTimer = null;
+      if (this.phase !== 'playing' || this.miniGameState.winner) return;
+      const s1 = this.miniGameState.scales[this.p1.id] || 0;
+      const s2 = this.miniGameState.scales[this.p2.id] || 0;
+      this._endMiniGame(s1 >= s2 ? this.p1.id : this.p2.id);
+    }, CFG.MASH_TIME_LIMIT_MS);
+  }
+
+  _handleMash(playerId) {
+    const ms = this.miniGameState;
+    if (!ms.scales || ms.winner) return;
+
+    ms.scales[playerId] = Math.min(1.1, (ms.scales[playerId] || 0.1) + CFG.MASH_SCALE_PER_TAP);
+
+    if (ms.scales[playerId] >= CFG.MASH_WIN_SCALE) {
+      ms.winner = playerId;
+      this._clearTimers();
+      this._endMiniGame(playerId);
+    } else {
+      this._broadcastState();
+    }
+  }
+
+  // ── Mini-game: Reflex ─────────────────────────────────────────────────────
+
+  _initReflex() {
+    const waitMs = CFG.REFLEX_MIN_WAIT_MS
+      + Math.random() * (CFG.REFLEX_MAX_WAIT_MS - CFG.REFLEX_MIN_WAIT_MS);
+
+    this.miniGameState = {
+      reflexPhase: 'waiting',
+      triggered: false,
+      triggeredAt: null,
+      falseTapper: null,
+      winner: null,
+    };
+
+    this.phaseTimer = setTimeout(() => {
+      this.phaseTimer = null;
+      if (this.phase !== 'playing' || this.miniGameState.winner) return;
+
+      this.miniGameState.triggered = true;
+      this.miniGameState.triggeredAt = Date.now();
+      this.miniGameState.reflexPhase = 'signal';
+      this._broadcastState();
+
+      // Response window — if nobody taps, random winner
+      this.phaseTimer = setTimeout(() => {
+        this.phaseTimer = null;
+        if (this.phase !== 'playing' || this.miniGameState.winner) return;
+        const winner = Math.random() < 0.5 ? this.p1.id : this.p2.id;
+        this.miniGameState.winner = winner;
+        this._endMiniGame(winner);
+      }, CFG.REFLEX_RESPONSE_WINDOW_MS);
+    }, waitMs);
+  }
+
+  _handleReflex(playerId) {
+    const ms = this.miniGameState;
+    if (!ms || ms.winner) return;
+
+    const opponentId = this._opponentOf(playerId);
+
+    if (!ms.triggered) {
+      // False start — opponent wins
+      ms.falseTapper = playerId;
+      ms.winner = opponentId;
+      ms.reflexPhase = 'false-start';
+      this._clearTimers();
+      this._endMiniGame(opponentId);
+    } else {
+      // First valid tap wins
+      ms.winner = playerId;
+      ms.reflexPhase = 'done';
+      this._clearTimers();
+      this._endMiniGame(playerId);
+    }
+  }
+
+  // ── Mini-game: Pong ───────────────────────────────────────────────────────
+
+  _initPong() {
+    // Random initial angle 30–75 degrees to avoid too-horizontal or too-vertical ball
+    const angle = (Math.PI / 6) + Math.random() * (5 * Math.PI / 12);
+    const dirX = Math.random() < 0.5 ? 1 : -1;
+    const dirY = Math.random() < 0.5 ? 1 : -1;
+    const spd = CFG.PONG_BALL_SPEED;
+
+    this.miniGameState = {
+      ball: {
+        x: 0.5,
+        y: 0.5,
+        vx: Math.cos(angle) * spd * dirX,
+        vy: Math.sin(angle) * spd * dirY,
+        speed: spd,
+      },
+      paddles: { [this.p1.id]: 0.5, [this.p2.id]: 0.5 },
+      winner: null,
+    };
+
+    this.tickInterval = setInterval(() => this._tickPong(), CFG.PONG_TICK_MS);
+  }
+
+  _tickPong() {
+    if (!this.active || this.paused || this.phase !== 'playing') return;
+    const ms = this.miniGameState;
+    if (!ms?.ball || ms.winner) return;
+
+    const ball = ms.ball;
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+
+    // Side-wall bounces
+    if (ball.x <= 0.02) { ball.x = 0.02; ball.vx = Math.abs(ball.vx); }
+    if (ball.x >= 0.98) { ball.x = 0.98; ball.vx = -Math.abs(ball.vx); }
+
+    const half = CFG.PONG_PADDLE_WIDTH / 2;
+    const P1_Y = 0.88; // p1's paddle row (bottom of court)
+    const P2_Y = 0.12; // p2's paddle row (top of court)
+
+    // p1 paddle — ball moving downward
+    if (ball.vy > 0 && ball.y >= P1_Y - 0.06 && ball.y <= P1_Y + 0.04) {
+      const px = ms.paddles[this.p1.id];
+      if (ball.x >= px - half && ball.x <= px + half) {
+        this._bounceBall(ball, px, half, -1); // -1 = send upward
+        ball.y = P1_Y - 0.07;
+      }
+    }
+
+    // p2 paddle — ball moving upward
+    if (ball.vy < 0 && ball.y <= P2_Y + 0.06 && ball.y >= P2_Y - 0.04) {
+      const px = ms.paddles[this.p2.id];
+      if (ball.x >= px - half && ball.x <= px + half) {
+        this._bounceBall(ball, px, half, 1); // 1 = send downward
+        ball.y = P2_Y + 0.07;
+      }
+    }
+
+    // Out of bounds — goal scored
+    if (ball.y > 1.05 && !ms.winner) {
+      ms.winner = this.p2.id;
+      this._endMiniGame(this.p2.id);
+      return;
+    }
+    if (ball.y < -0.05 && !ms.winner) {
+      ms.winner = this.p1.id;
+      this._endMiniGame(this.p1.id);
+      return;
+    }
+
+    this._broadcastState();
+  }
+
+  _bounceBall(ball, paddleX, halfWidth, vyDir) {
+    ball.speed = Math.min(ball.speed * 1.05, CFG.PONG_MAX_SPEED);
+    const off = (ball.x - paddleX) / halfWidth; // −1..1
+    const angle = (Math.PI / 4) + Math.abs(off) * (Math.PI / 8); // 45–68°
+    ball.vx = Math.cos(angle) * ball.speed * Math.sign(off || 0.01);
+    ball.vy = Math.sin(angle) * ball.speed * vyDir;
+  }
+
+  _handlePaddle(playerId, action) {
+    if (!this.miniGameState.paddles) return;
+    if (typeof action.x !== 'number') return;
+    this.miniGameState.paddles[playerId] = Math.max(0, Math.min(1, action.x));
+  }
+
+  // ── Mini-game: Sorting ────────────────────────────────────────────────────
+
+  _initSorting() {
+    this.miniGameState = {
+      scores: { [this.p1.id]: 0, [this.p2.id]: 0 },
+      gates: { [this.p1.id]: false, [this.p2.id]: false },
+      viruses: [],
+      nextId: 0,
+      startedAt: Date.now(),
+      winner: null,
+    };
+
+    this.spawnInterval = setInterval(() => this._spawnVirus(), CFG.SORTING_SPAWN_INTERVAL_MS);
+    this.tickInterval = setInterval(() => this._tickSorting(), CFG.SORTING_TICK_MS);
+
+    this.phaseTimer = setTimeout(() => {
+      this.phaseTimer = null;
+      if (this.phase !== 'playing' || this.miniGameState.winner) return;
+      const s1 = this.miniGameState.scores[this.p1.id] || 0;
+      const s2 = this.miniGameState.scores[this.p2.id] || 0;
+      this._endMiniGame(s1 >= s2 ? this.p1.id : this.p2.id);
+    }, CFG.SORTING_TIME_LIMIT_MS);
+  }
+
+  _spawnVirus() {
+    if (!this.active || this.phase !== 'playing') return;
+    const ms = this.miniGameState;
+    if (!ms.viruses) return;
+
+    const color = Math.random() < 0.5 ? 'merah' : 'biru';
+    ms.viruses.push({
+      id: ms.nextId++,
+      color,
+      spawnedAt: Date.now(),
+      arrivesAt: Date.now() + CFG.SORTING_TRAVEL_MS,
+    });
+    this._broadcastState();
+  }
+
+  _tickSorting() {
+    if (!this.active || this.paused || this.phase !== 'playing') return;
+    const ms = this.miniGameState;
+    if (!ms.viruses || ms.winner) return;
+
+    const now = Date.now();
+    const arrived = ms.viruses.filter((v) => v.arrivesAt <= now);
+    if (arrived.length === 0) return;
+
+    ms.viruses = ms.viruses.filter((v) => v.arrivesAt > now);
+
+    for (const virus of arrived) {
+      for (const player of [this.p1, this.p2]) {
+        if (ms.gates[player.id]) {
+          if (virus.color === player.side) {
+            ms.scores[player.id]++;
+            if (ms.scores[player.id] >= CFG.SORTING_WIN_CATCHES && !ms.winner) {
+              ms.winner = player.id;
+            }
+          } else {
+            ms.scores[player.id] = Math.max(0, ms.scores[player.id] - 1);
+          }
+        }
+      }
+    }
+
+    if (ms.winner) {
+      this._clearTimers();
+      this._endMiniGame(ms.winner);
+      return;
+    }
+
+    this._broadcastState();
+  }
+
+  _handleGate(playerId) {
+    const ms = this.miniGameState;
+    if (!ms.gates) return;
+    ms.gates[playerId] = !ms.gates[playerId];
+    this._broadcastState();
+  }
+
+  // ── State broadcasting ────────────────────────────────────────────────────
+
+  _broadcastState() {
+    const buildSlice = (player, opponent) => ({
+      gameType: 'cute-aggression',
+      phase: this.phase,
+      roundNum: this.roundNum,
+      currentMiniGame: this.currentMiniGame,
+      matchScore: {
+        me: this.matchScore[player.id] || 0,
+        opp: this.matchScore[opponent.id] || 0,
+      },
+      winScore: CFG.WIN_SCORE,
+      lastMiniResult: this.lastMiniResult
+        ? {
+          iWon: this.lastMiniResult.winnerId === player.id,
+          miniGame: this.lastMiniResult.miniGame,
+        }
+        : null,
+      me: {
+        character: CFG.CHARACTERS[player.side] || CFG.CHARACTERS.merah,
+        side: player.side,
+      },
+      opp: {
+        character: CFG.CHARACTERS[opponent.side] || CFG.CHARACTERS.biru,
+        side: opponent.side,
+      },
+      mini: this._buildMiniSlice(player, opponent),
+    });
 
     this.emit('cute-aggression-state', {
       byPlayer: {
@@ -512,52 +529,64 @@ export class GameState {
     });
   }
 
-  getReconnectPayload(socketId) {
-    const player = socketId === this.p1.id ? this.p1 : this.p2;
-    const opponent = socketId === this.p1.id ? this.p2 : this.p1;
-    const pf = this.fighters[player.id] || {};
-    const of2 = this.fighters[opponent.id] || {};
-    const pChar = CFG.CHARACTERS[pf.character] || CFG.CHARACTERS.merah;
-    const oChar = CFG.CHARACTERS[of2.character] || CFG.CHARACTERS.biru;
+  _buildMiniSlice(player, opponent) {
+    const ms = this.miniGameState;
+    if (!ms) return {};
+    const now = Date.now();
 
-    return {
-      cuteAggressionState: {
-        gameType: 'cute-aggression',
-        phase: this.phase,
-        round: this.round,
-        myRoundWins: this.roundWins[player.id] || 0,
-        oppRoundWins: this.roundWins[opponent.id] || 0,
-        roundsToWin: CFG.ROUNDS_TO_WIN,
-        me: {
-          hp: pf.hp ?? CFG.MAX_HP,
-          maxHp: CFG.MAX_HP,
-          state: pf.state || 'idle',
-          specialMeter: pf.specialMeter || 0,
-          specialMax: CFG.SPECIAL_METER_MAX,
-          shieldHP: pf.shieldHP ?? CFG.SHIELD_MAX,
-          shieldMax: CFG.SHIELD_MAX,
-          character: pChar,
-          side: pf.character,
-          combo: pf.combo || 0,
-          rage: false,
-          chargePct: 0,
-        },
-        opp: {
-          hp: of2.hp ?? CFG.MAX_HP,
-          maxHp: CFG.MAX_HP,
-          state: of2.state || 'idle',
-          specialMeter: of2.specialMeter || 0,
-          specialMax: CFG.SPECIAL_METER_MAX,
-          shieldHP: of2.shieldHP ?? CFG.SHIELD_MAX,
-          shieldMax: CFG.SHIELD_MAX,
-          character: oChar,
-          side: of2.character,
-          combo: of2.combo || 0,
-          rage: false,
-          chargePct: 0,
-        },
-        hitEvents: [],
-      },
-    };
+    switch (this.currentMiniGame) {
+      case 'mash':
+        return {
+          myScale: ms.scales?.[player.id] ?? 0.1,
+          oppScale: ms.scales?.[opponent.id] ?? 0.1,
+          timeLeft: ms.startedAt
+            ? Math.max(0, CFG.MASH_TIME_LIMIT_MS - (now - ms.startedAt))
+            : 0,
+          winScale: CFG.MASH_WIN_SCALE,
+        };
+
+      case 'reflex':
+        return {
+          reflexPhase: ms.reflexPhase || 'waiting',
+          triggered: ms.triggered || false,
+          falseTapper: ms.falseTapper === player.id
+            ? 'me'
+            : ms.falseTapper === opponent.id ? 'opp' : null,
+        };
+
+      case 'pong': {
+        if (!ms.ball) return {};
+        const myPad = ms.paddles?.[player.id] ?? 0.5;
+        const opPad = ms.paddles?.[opponent.id] ?? 0.5;
+        // p1 = "bottom" in absolute coords; p2 gets flipped so they also see themselves at bottom
+        if (player.id === this.p1.id) {
+          return { ball: { x: ms.ball.x, y: ms.ball.y }, myPaddleX: myPad, oppPaddleX: opPad };
+        }
+        return {
+          ball: { x: 1 - ms.ball.x, y: 1 - ms.ball.y },
+          myPaddleX: 1 - myPad,
+          oppPaddleX: 1 - opPad,
+        };
+      }
+
+      case 'sorting':
+        return {
+          myScore: ms.scores?.[player.id] ?? 0,
+          oppScore: ms.scores?.[opponent.id] ?? 0,
+          gateOpen: ms.gates?.[player.id] ?? false,
+          viruses: (ms.viruses || []).map((v) => ({
+            id: v.id,
+            color: v.color,
+            progress: Math.min(1, (now - v.spawnedAt) / CFG.SORTING_TRAVEL_MS),
+          })),
+          winCatches: CFG.SORTING_WIN_CATCHES,
+          timeLeft: ms.startedAt
+            ? Math.max(0, CFG.SORTING_TIME_LIMIT_MS - (now - ms.startedAt))
+            : 0,
+        };
+
+      default:
+        return {};
+    }
   }
 }

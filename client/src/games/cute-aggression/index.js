@@ -7,54 +7,52 @@ import { applyServerConfig } from './config.js';
 export const cuteAggressionGame = {
   type: 'cute-aggression',
   lobby: {
-    name: 'Cute Aggression',
-    icon: '\uD83D\uDE21\uD83E\uDE77\uD83E\uDD0F',
-    badge: 'GEMAS!',
+    name: 'Virus vs Virus',
+    icon: '\uD83E\uDDA0\u2694\uFE0F\uD83E\uDDEC',  // 🦠⚔️🧬
+    badge: 'GEMAS!!',
     sides: [
-      { side: 'merah', label: 'Si Merah', emoji: '\u2764\uFE0F' },
-      { side: 'biru', label: 'Si Biru', emoji: '\uD83D\uDC99' },
+      { side: 'merah', label: 'Virus Merah', emoji: '\uD83D\uDD34' },
+      { side: 'biru',  label: 'Virus Biru',  emoji: '\uD83D\uDD35' },
     ],
   },
   sideSelect: {
-    title: 'CUTE AGGRESSION',
-    pickTitle: 'Pilih blob kamu sayang~',
+    title: 'VIRUS VS VIRUS',
+    pickTitle: 'Pilih virus kamu sayang~ \uD83E\uDDA0',
     options: [
-      { side: 'merah', label: 'Si Merah', emoji: '\uD83D\uDD34' },
-      { side: 'biru', label: 'Si Biru', emoji: '\uD83D\uDD35' },
+      { side: 'merah', label: 'Virus Merah', emoji: '\uD83D\uDD34' },
+      { side: 'biru',  label: 'Virus Biru',  emoji: '\uD83D\uDD35' },
     ],
   },
   victoryMessages: {
     win: [
-      'GEMAS BANGET NGGAK KUAT!! \uD83D\uDE24\uD83D\uDC96',
-      'CUBIT GIGIT CIUM semuanya!! \uD83E\uDD0F\uD83E\uDE77\uD83D\uDC8B',
-      'Nggak kuat gemesnya~ K.O.!! \uD83C\uDFC6\uD83D\uDC95',
-      'Terlalu bucin sampe menang!! \uD83E\uDD70\uD83D\uDD25',
-      'Kamu bikin lawan meleleh!! \uD83E\uDEE0\uD83D\uDCAB',
-      'COMBO GIGIT SAMPE PINGSAN!! \uD83E\uDE77\uD83E\uDE77\uD83E\uDE77',
-      'Dicubit sampe sayang~ champion!! \uD83E\uDD0F\uD83C\uDFC6',
+      'VIRUS KAMU MENANG!! \uD83E\uDDA0\uD83C\uDFC6',
+      'INFEKSI TOTAL!! Lawan KO \uD83E\uDDA0\uD83D\uDD25',
+      'Tap cepet, reflex kenceng, paddle pro!! \uD83C\uDF89',
+      'Gatekeeper terbaik!! 10 catch!! \uD83D\uDEAA\uD83C\uDFC6',
+      'Virusmu terlalu ganas!! \uD83E\uDDA0\uD83E\uDDE0\uD83D\uDCAB',
+      'Quick Draw champion!! \u26A1\uD83C\uDFC6',
     ],
     lose: [
-      'Yahhh di-gemasin sampe K.O.~ \uD83D\uDE35\u200D\uD83D\uDCAB',
-      'Kena GIGIT CUBIT CIUM semuanya \uD83D\uDE2D',
-      'Terlalu gemas buat menang~ \uD83D\uDC94\uD83D\uDC95',
+      'Yahhh virus kamu kalah~ \uD83E\uDDA0\uD83D\uDE2D',
+      'Paddle-nya kurang cepet nih sayang \uD83C\uDFD3',
+      'False start!! Duluan dong\u2026 \uD83D\uDE31',
+      'Virusnya kekecilan~ tap lebih cepet! \uD83E\uDDA0',
       'GG sayang! Rematch?? \uD83E\uDD7A\uD83D\uDC96',
-      'Di-combo gigit sampe lemes~ \uD83E\uDE77\uD83D\uDE35',
-      'Kena cium super sampe meleleh \uD83D\uDC8B\uD83E\uDEE0',
+      'Gatenya salah buka sayang~ \uD83D\uDEAA',
     ],
     draw: [
-      'DOUBLE K.O. GEMAS!? \uD83E\uDD2F\uD83D\uDC96\uD83D\uDC96',
-      'Dua-duanya terlalu bucin!! \uD83E\uDD70\uD83E\uDD70',
+      'DRAW?! Dua virus sama kuatnya!! \uD83E\uDDA0\uD83E\uDDA0',
+      'Sama-sama ganas!! Rematch!! \uD83D\uDD25\uD83D\uDD25',
     ],
   },
   Scene: CuteAggressionScene,
   applyConfig: applyServerConfig,
 
   createHUD(overlay, _data, _network) {
+    // Scene is fully self-contained — no extra HUD needed.
     const el = document.createElement('div');
     el.className = 'ca-hud-placeholder';
     overlay.appendChild(el);
-    return {
-      destroy() { el.remove(); },
-    };
+    return { destroy() { el.remove(); } };
   },
 };
