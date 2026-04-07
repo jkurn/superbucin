@@ -8,67 +8,20 @@ Live at **[superbucin.pricylia.com](https://superbucin.pricylia.com)**
 
 ## Games
 
-### Pig vs Chick
-A 5-lane real-time battle game inspired by Hago's Sheep Fight.
+Current server-registered games:
 
-- Pick your side: **Pig** or **Chicken**
-- Spawn units across 5 lanes using your energy bar
-- Units march toward the enemy base and clash via tug-of-war combat (weight-based pushing)
-- Deal damage when a unit reaches the opponent's base
-- First to drain the opponent's HP to 0 wins
-
-**4 unit tiers per side:**
-| Pig | Chicken | Cost | Weight |
-|-----|---------|------|--------|
-| Piglet | Chick | 5 | 10 kg |
-| Pig | Hen | 12 | 20 kg |
-| Boar | Chicken | 25 | 50 kg |
-| Big Boar | Rooster | 50 | 70 kg |
-
----
-
-### Othello
-Classic 8×8 Othello/Reversi.
-
-- One player is **Black**, the other **White**
-- Flip your opponent's discs by sandwiching them
-- Most discs at the end wins
-
----
-
-### Memory Match
-Flip card pairs from memory before your opponent does.
-
-- Multiple themed packs (Photo pack and more)
-- Configurable grid size and speed mode
-- Score by collecting the most matched pairs
-
----
-
-### Speed Match
-A rapid-fire quiz race.
-
-- 10 questions per round + 2 bonus questions
-- 15 seconds per question — first correct answer scores 10 pts (bonus: 20 pts)
-- Most points after all rounds wins
-
----
-
-### Word Scramble Race
-Hunt for words in a letter grid.
-
-- 5-round format, 75 seconds per round
-- Trace connected letters on a randomized 5×5 grid to form English words
-- Longer words score more points; same word can only be claimed once per round
-
----
-
-### Doodle Guess
-One draws, the other guesses — Draw Something style.
-
-- 6 rounds, 30 seconds to draw each prompt
-- Guess faster for more points (up to 100 pts, minimum 8 pts if correct)
-- Themed prompt packs: **Love & us**, and more
+- **Pig vs Chick** — 5-lane real-time battle (energy economy + tug-of-war pushes)
+- **Othello** — classic 8x8 Reversi
+- **Memory Match** — themed packs, grid/speed options
+- **Speed Match** — rapid quiz rounds with timed scoring
+- **Word Scramble Race** — trace words on a randomized grid
+- **Doodle Guess** — drawer vs guesser rounds
+- **Connect Four** — server-authoritative 7x6 drops
+- **Quiz Race** — first-correct round scoring
+- **Mini Battleship** — hidden-board ship placement + shots
+- **Vending Machine** — versus vending strategy mini-game
+- **Bonk Brawl** — cute real-time brawl mode
+- **Cute Aggression** — virus-vs-virus mini-game set
 
 ---
 
@@ -88,19 +41,35 @@ Local Kenney packs and 2D/3D inventory (gitignored source folders): **[ASSETS.md
 ## Run Locally
 
 ```bash
-# Install all deps
+# Install all dependencies
 npm install
 cd server && npm install && cd ..
 cd client && npm install && cd ..
 
-# Start server (port 3000)
-npm run dev:server
-
-# Start client (port 5173)
-npm run dev:client
+# Start server + client together
+npm run dev
 ```
 
-Open `http://localhost:5173`, create a room on one tab, join from another.
+Open `http://localhost:5173`, create a room on one tab, then join from another.
+
+### Useful scripts
+
+```bash
+# Start only backend
+npm run dev:server
+
+# Start only frontend
+npm run dev:client
+
+# Lint JS in client/src and server
+npm run lint
+
+# Run all tests
+npm test
+
+# Run all tests with coverage table
+npm run test:coverage
+```
 
 ### Environment variables
 
@@ -111,4 +80,44 @@ SUPABASE_URL=
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_JWT_SECRET=
+```
+
+---
+
+## Testing strategy (current)
+
+The project now uses a layered testing approach:
+
+- **GameState unit tests** (`server/games/*/GameState.test.js`)
+- **RoomManager contract tests** (`server/rooms/RoomManager.test.js`) for event routing, payload privacy, reconnect behavior
+- **UserService persistence tests** (`server/services/UserService.test.js`)
+- **NetworkManager client contract tests** (`client/src/shared/NetworkManager.test.js`)
+
+Reference plan: `planning/2026-04-07-robust-testing-strategy.md`
+
+---
+
+## Git LFS (required for sticker assets)
+
+`pricy-sticker/*.webp` is tracked via Git LFS.
+
+### One-time setup
+
+```bash
+# macOS (Homebrew)
+brew install git-lfs
+
+# Initialize LFS hooks
+git lfs install
+```
+
+### Clone / pull behavior
+
+- On clone/pull, Git fetches lightweight pointer files via normal Git.
+- Git LFS then downloads the real `.webp` binaries.
+
+If assets look like pointer text files, run:
+
+```bash
+git lfs pull
 ```
