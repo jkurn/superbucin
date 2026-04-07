@@ -94,6 +94,7 @@ The project now uses a layered testing approach:
 - **NetworkManager client contract tests** (`client/src/shared/NetworkManager.test.js`)
 
 Reference plan: `planning/2026-04-07-robust-testing-strategy.md`
+Weekly status and metrics: `planning/2026-04-07-testing-health.md`
 
 ---
 

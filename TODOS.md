@@ -47,8 +47,10 @@ Suggested build order in plan: Connect Four → Quiz Race → Battleship (comple
 
 ## Deferred from plan-eng-review (testing strategy, 2026-04-07)
 
-- [ ] Socket event contract tests — enforce event name/payload/recipient rules for `RoomManager.handleGameEvent` (especially per-player privacy events like `memory-state`, `battleship-state`, `vending-state`, `bonk-state`, `cute-aggression-state`).
-- [ ] NetworkManager client contract tests — mock socket + UI/EventBus to verify server event mapping (`room-error`, reconnect banners, `achievement-unlocked`, `match-end`) and routing behavior.
+- [x] ~~Socket event contract tests~~ — Done: `RoomManager.test.js` enforces event name/payload/recipient routing for privacy-sensitive game events (`memory-state`, `battleship-state`, `vending-state`, `bonk-state`, `cute-aggression-state`).
+- [x] ~~NetworkManager client contract tests~~ — Done: `NetworkManager.test.js` covers server event mapping (`room-error`, reconnect/error notifications, `achievement-unlocked`, `match-end`) and routing behavior.
+- [x] ~~Battleship mini rules/privacy unit suite~~ — Done: `server/games/battleship-mini/GameState.test.js` covers placement validation, turn ownership, hidden-state slices, and match-end behavior.
+- [x] ~~Quiz race rules/authority unit suite~~ — Done: `server/games/quiz-race/GameState.test.js` covers answer validation, scoring (+ speed bonus), phase visibility (`correct` hidden until reveal), finish behavior, and reconnect identity migration.
 
 ### Criteria gate for every game (must pass before "robust")
 
@@ -60,6 +62,8 @@ Suggested build order in plan: Connect Four → Quiz Race → Battleship (comple
 - [ ] Persistence side effects: `match-end` path records points/achievements correctly and degrades safely on DB failure.
 
 ## Engineering scorecard (run weekly)
+
+Reference doc: `planning/2026-04-07-testing-health.md`
 
 - [ ] Run weekly engineering scorecard (10 categories: maintainability, DRY/reuse, SOLID boundaries, tests, reliability, delivery hygiene, change size, observability, docs freshness, focus/flow).
 - [ ] Track and log baseline metrics weekly: commit size distribution, hotspot churn, test ratio, coverage trend, change failure rate, deploy health.
