@@ -1,5 +1,4 @@
-import { VICTORY_POOL_WINNER, QUOTES } from '../shared/StickerPack.js';
-import { recordMatchResult } from './LobbyScreen.js';
+import { VICTORY_POOL_WINNER, QUOTES, recordMatchResult } from '../shared/StickerPack.js';
 
 export function render(overlay, deps, data) {
   const { network, userManager, showScreen } = deps;

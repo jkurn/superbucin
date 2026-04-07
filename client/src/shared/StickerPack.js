@@ -62,3 +62,13 @@ export const QUOTES = {
   overthinking:  'males overthinking\njadi overloving you aja gimana? 💞',
   tanganBerat:   'Tangan kamu berat? Sini aku pegangin. 🤝',
 };
+
+/** Updates the loss streak counter in localStorage. Called from VictoryScreen. */
+export function recordMatchResult(isWinner) {
+  if (isWinner) {
+    localStorage.removeItem('superbucin_loss_streak');
+  } else {
+    const prev = Number(localStorage.getItem('superbucin_loss_streak') || 0);
+    localStorage.setItem('superbucin_loss_streak', String(prev + 1));
+  }
+}

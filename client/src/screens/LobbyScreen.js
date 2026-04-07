@@ -35,20 +35,19 @@ export function render(overlay, deps, options) {
 
   overlay.innerHTML = `
     ${renderUserBar(userManager)}
-    <!-- Floating sticker layer — pointer-events:none, never blocks taps -->
-    <div class="lobby-sticker-layer" aria-hidden="true">
-      <img class="sticker sticker-float"
-           style="width:72px;top:12%;left:3%;animation-delay:0s;"
-           src="${STICKERS.mochiHeart}" alt="" />
-      <img class="sticker sticker-float-slow"
-           style="width:80px;bottom:22%;right:2%;animation-delay:-1.8s;"
-           src="${STICKERS.coupleBlob}" alt="" />
-      <img class="sticker sticker-drift"
-           style="width:90px;top:5%;animation-delay:-3s;"
-           src="${STICKERS.pricyRocket}" alt="" />
-      ${lossStreak >= 5 ? `<img class="easter-sign visible" src="${STICKERS.sayangilahPricy}" alt="" />` : ''}
-    </div>
-    <div class="lobby-ui" style="padding-top:3.5rem;position:relative;z-index:1;">
+    <div class="lobby-ui" style="padding-top:3.5rem;">
+      <div class="lobby-sticker-layer" aria-hidden="true">
+        <img class="sticker sticker-float"
+             style="width:72px;top:12%;left:3%;animation-delay:0s;"
+             src="${STICKERS.mochiHeart}" alt="" />
+        <img class="sticker sticker-float-slow"
+             style="width:80px;bottom:22%;right:2%;animation-delay:-1.8s;"
+             src="${STICKERS.coupleBlob}" alt="" />
+        <img class="sticker sticker-drift"
+             style="width:90px;top:5%;animation-delay:-3s;"
+             src="${STICKERS.pricyRocket}" alt="" />
+        ${lossStreak >= 5 ? `<img class="easter-sign visible" src="${STICKERS.sayangilahPricy}" alt="" />` : ''}
+      </div>
       <div class="lobby-title">SUPERBUCIN</div>
       <div class="lobby-quote">${QUOTES.kangenKamu}</div>
       <div class="game-grid">
@@ -185,12 +184,3 @@ function _getBucinMoments() {
   return { isEleven11, lossStreak };
 }
 
-/** Called from VictoryScreen — updates the loss streak counter. */
-export function recordMatchResult(isWinner) {
-  if (isWinner) {
-    localStorage.removeItem('superbucin_loss_streak');
-  } else {
-    const prev = Number(localStorage.getItem('superbucin_loss_streak') || 0);
-    localStorage.setItem('superbucin_loss_streak', String(prev + 1));
-  }
-}
