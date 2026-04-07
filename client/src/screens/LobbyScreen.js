@@ -35,19 +35,19 @@ export function render(overlay, deps, options) {
 
   overlay.innerHTML = `
     ${renderUserBar(userManager)}
+    <div class="lobby-sticker-layer" style="pointer-events:none" aria-hidden="true">
+      <img class="sticker sticker-float"
+           style="width:72px;top:12%;left:3%;animation-delay:0s;"
+           src="${STICKERS.mochiHeart}" alt="" />
+      <img class="sticker sticker-float-slow"
+           style="width:80px;bottom:22%;right:2%;animation-delay:-1.8s;"
+           src="${STICKERS.coupleBlob}" alt="" />
+      <img class="sticker sticker-drift"
+           style="width:90px;top:5%;animation-delay:-3s;"
+           src="${STICKERS.pricyRocket}" alt="" />
+      ${lossStreak >= 5 ? `<img class="easter-sign visible" src="${STICKERS.sayangilahPricy}" alt="" />` : ''}
+    </div>
     <div class="lobby-ui" style="padding-top:3.5rem;">
-      <div class="lobby-sticker-layer" aria-hidden="true">
-        <img class="sticker sticker-float"
-             style="width:72px;top:12%;left:3%;animation-delay:0s;"
-             src="${STICKERS.mochiHeart}" alt="" />
-        <img class="sticker sticker-float-slow"
-             style="width:80px;bottom:22%;right:2%;animation-delay:-1.8s;"
-             src="${STICKERS.coupleBlob}" alt="" />
-        <img class="sticker sticker-drift"
-             style="width:90px;top:5%;animation-delay:-3s;"
-             src="${STICKERS.pricyRocket}" alt="" />
-        ${lossStreak >= 5 ? `<img class="easter-sign visible" src="${STICKERS.sayangilahPricy}" alt="" />` : ''}
-      </div>
       <div class="lobby-title">SUPERBUCIN</div>
       <div class="lobby-quote">${QUOTES.kangenKamu}</div>
       <div class="game-grid">
