@@ -3366,7 +3366,7 @@
       to { top: 110%; opacity: 0; }
     }
 
-    /* ── Arena shell ── */
+    /* -- Arena shell -- */
     .ca-arena {
       position: relative;
       z-index: 1;
@@ -3380,7 +3380,7 @@
       gap: 0.4rem;
     }
 
-    /* ── Score bar ── */
+    /* -- Score bar -- */
     .ca-score-bar {
       display: flex;
       align-items: center;
@@ -3401,9 +3401,7 @@
       flex: 1;
     }
 
-    .ca-score-side-opp {
-      flex-direction: row-reverse;
-    }
+    .ca-score-side-opp { flex-direction: row-reverse; }
 
     .ca-sc-emoji { font-size: 1.3rem; }
 
@@ -3429,7 +3427,7 @@
       line-height: 1.2;
     }
 
-    /* ── Game area (dynamic content) ── */
+    /* -- Game area -- */
     .ca-game-area {
       flex: 1;
       display: flex;
@@ -3439,7 +3437,6 @@
       position: relative;
     }
 
-    /* ── Controls area ── */
     .ca-ctrl-area {
       flex-shrink: 0;
       display: flex;
@@ -3448,10 +3445,10 @@
       min-height: 80px;
     }
 
-    /* ── Result overlay ── */
+    /* -- Result overlay -- */
     .ca-overlay {
       position: absolute;
-      inset: 48px 0 80px 0;  /* below score bar, above controls */
+      inset: 48px 0 80px 0;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -3482,26 +3479,11 @@
       box-shadow: 0 4px 20px rgba(180,0,150,0.2);
     }
 
-    .ca-result-big {
-      font-size: 1.6rem;
-      font-weight: 900;
-      color: #552244;
-    }
+    .ca-result-big { font-size: 1.6rem; font-weight: 900; color: #552244; }
+    .ca-result-sub { font-size: 0.9rem; color: #663355; margin-top: 0.2rem; }
+    .ca-result-score { font-size: 1.4rem; font-weight: 900; color: #880044; margin-top: 0.3rem; }
 
-    .ca-result-sub {
-      font-size: 0.9rem;
-      color: #663355;
-      margin-top: 0.2rem;
-    }
-
-    .ca-result-score {
-      font-size: 1.4rem;
-      font-weight: 900;
-      color: #880044;
-      margin-top: 0.3rem;
-    }
-
-    /* ── Shared tap button ── */
+    /* -- Shared tap button -- */
     .ca-tap-btn {
       width: 90%;
       max-width: 340px;
@@ -3521,30 +3503,7 @@
 
     .ca-tap-btn:active { transform: scale(0.93); }
 
-    .ca-tap-btn-wait {
-      background: #8899bb !important;
-    }
-
-    .ca-tap-btn-go {
-      animation: ca-btn-glow 0.4s ease-in-out infinite alternate;
-    }
-
-    @keyframes ca-btn-glow {
-      from { box-shadow: 0 4px 18px rgba(0,0,0,0.2); }
-      to   { box-shadow: 0 4px 28px rgba(255,68,100,0.6); transform: scale(1.03); }
-    }
-
-    /* ── Countdown stage ── */
-    .ca-cdwn-stage {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 0.6rem;
-      padding: 1rem;
-    }
-
+    /* -- Countdown characters (shared) -- */
     .ca-cdwn-chars {
       display: flex;
       align-items: center;
@@ -3592,17 +3551,6 @@
       line-height: 1.4;
     }
 
-    .ca-cdwn-num {
-      font-size: 3.5rem;
-      font-weight: 900;
-      color: #ff4466;
-      text-shadow: 0 2px 12px rgba(255,68,102,0.4);
-      min-height: 4rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
     .ca-num-pop {
       animation: ca-num-pop-anim 0.35s ease-out;
     }
@@ -3613,86 +3561,12 @@
     }
 
     .ca-num-go {
-      color: #22aa55;
+      color: #22aa55 !important;
       text-shadow: 0 2px 12px rgba(34,170,85,0.4);
     }
 
-    /* ── Mash mini-game ── */
-    .ca-mash-arena {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-around;
-      padding: 0.5rem;
-    }
-
-    .ca-mash-half {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.25rem;
-    }
-
-    .ca-mash-virus {
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.6rem;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-      transition: width 0.05s ease-out, height 0.05s ease-out;
-      min-width: 40px;
-      min-height: 40px;
-    }
-
-    .ca-mash-pulse {
-      animation: ca-mash-tap 0.15s ease-out;
-    }
-
-    @keyframes ca-mash-tap {
-      0% { transform: scale(1.35); }
-      100% { transform: scale(1); }
-    }
-
-    .ca-mash-lbl {
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: #664455;
-    }
-
-    .ca-mash-divider {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.25rem;
-    }
-
-    .ca-mash-timer-track {
-      width: 80%;
-      height: 8px;
-      background: rgba(0,0,0,0.12);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    .ca-mash-timer-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #ff4466, #ff88aa);
-      border-radius: 4px;
-      transition: width 0.5s linear;
-    }
-
-    .ca-mash-center-line {
-      width: 85%;
-      height: 3px;
-      background: repeating-linear-gradient(90deg, #ff4466 0, #ff4466 8px, transparent 8px, transparent 16px);
-      border-radius: 2px;
-    }
-
-    /* ── Reflex mini-game ── */
-    .ca-reflex-arena {
+    /* -- Roulette -- */
+    .ca-roulette-stage {
       flex: 1;
       display: flex;
       flex-direction: column;
@@ -3702,187 +3576,399 @@
       padding: 1rem;
     }
 
-    .ca-reflex-row {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
+    .ca-roulette-label {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #884466;
     }
 
-    .ca-reflex-char {
-      font-size: 2.2rem;
+    .ca-roulette-spinner {
+      font-size: 1.4rem;
+      font-weight: 900;
+      color: #552244;
+      background: rgba(255,255,255,0.6);
+      border-radius: 16px;
+      padding: 0.8rem 1.5rem;
+      min-width: 200px;
+      text-align: center;
+      transition: transform 0.1s;
     }
 
-    .ca-reflex-signal {
-      font-size: 3.5rem;
-      line-height: 1;
-      transition: transform 0.2s;
+    .ca-roulette-tick {
+      animation: ca-roulette-flash 0.12s ease-out;
     }
 
-    .ca-signal-go {
-      animation: ca-signal-burst 0.3s ease-out;
-    }
-
-    @keyframes ca-signal-burst {
-      0% { transform: scale(2); opacity: 0.5; }
+    @keyframes ca-roulette-flash {
+      0% { transform: scale(1.1); opacity: 0.7; }
       100% { transform: scale(1); opacity: 1; }
     }
 
-    .ca-reflex-status {
+    .ca-roulette-landed {
+      background: rgba(255,230,150,0.85);
+      box-shadow: 0 4px 20px rgba(255,200,0,0.3);
+      transform: scale(1.08);
+    }
+
+    /* -- Ready phase (hold handshake) -- */
+    .ca-ready-stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.8rem;
+      padding: 1rem;
+    }
+
+    .ca-ready-players {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    .ca-ready-player {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .ca-ready-emoji { font-size: 2rem; }
+
+    .ca-ready-dot {
+      font-size: 0.8rem;
+      transition: color 0.2s;
+      color: #cc4444;
+    }
+
+    .ca-ready-status {
       font-size: 1rem;
       font-weight: 700;
       color: #552244;
       text-align: center;
     }
 
-    /* ── Pong mini-game ── */
-    .ca-pong-court {
-      flex: 1;
-      position: relative;
-      background: linear-gradient(180deg, rgba(68,136,255,0.08) 0%, rgba(255,255,255,0.15) 50%, rgba(255,68,102,0.08) 100%);
-      border-radius: 12px;
-      border: 2px solid rgba(180,100,180,0.3);
-      overflow: hidden;
-      cursor: none;
-      touch-action: none;
-      min-height: 200px;
+    .ca-ready-countdown {
+      font-size: 3.5rem;
+      font-weight: 900;
+      color: #ff4466;
+      text-shadow: 0 2px 12px rgba(255,68,102,0.4);
+      min-height: 4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    .ca-pong-lbl {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
+    .ca-ready-hold {
+      width: 90%;
+      max-width: 340px;
+      padding: 1.5rem;
+      border: none;
+      border-radius: 24px;
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: white;
+      background: linear-gradient(135deg, #ff4466, #cc2255);
+      box-shadow: 0 6px 24px rgba(255,68,102,0.35);
+      text-align: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+      user-select: none;
+      transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+
+    .ca-ready-active {
+      transform: scale(0.95);
+      background: linear-gradient(135deg, #22cc44, #119933);
+      box-shadow: 0 6px 24px rgba(34,204,68,0.4);
+    }
+
+    /* -- Mash (Tug-of-War) -- */
+    .ca-mash-arena {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 12px;
+      position: relative;
+    }
+
+    .ca-mash-side {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.25rem;
+      transition: flex 0.15s ease-out;
+      min-height: 0;
+    }
+
+    .ca-mash-opp {
+      background: linear-gradient(to bottom, rgba(68,136,255,0.12), rgba(68,136,255,0.03));
+    }
+
+    .ca-mash-me {
+      background: linear-gradient(to top, rgba(255,68,102,0.12), rgba(255,68,102,0.03));
+    }
+
+    .ca-mash-virus {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      transition: font-size 0.15s ease-out;
+    }
+
+    .ca-mash-pulse {
+      animation: ca-mash-tap 0.12s ease-out;
+    }
+
+    @keyframes ca-mash-tap {
+      0% { transform: scale(1.4); }
+      100% { transform: scale(1); }
+    }
+
+    .ca-mash-lbl {
       font-size: 0.7rem;
       font-weight: 700;
-      color: #664466;
-      z-index: 2;
-      pointer-events: none;
+      color: #664455;
     }
 
-    .ca-pong-lbl-opp { top: 4px; }
-    .ca-pong-lbl-me  { bottom: 4px; }
+    .ca-mash-divider {
+      flex-shrink: 0;
+      height: 4px;
+      display: flex;
+      align-items: center;
+    }
 
-    .ca-pong-center {
+    .ca-mash-line {
+      width: 100%;
+      height: 4px;
+      background: repeating-linear-gradient(90deg, #ff4466 0, #ff4466 8px, #4488ff 8px, #4488ff 16px);
+      border-radius: 2px;
+    }
+
+    .ca-mash-timer-track {
       position: absolute;
+      bottom: 0;
       left: 5%;
       right: 5%;
-      top: 50%;
-      height: 2px;
-      background: repeating-linear-gradient(90deg,
-        rgba(180,100,180,0.4) 0, rgba(180,100,180,0.4) 8px,
-        transparent 8px, transparent 16px);
+      height: 6px;
+      background: rgba(0,0,0,0.1);
+      border-radius: 3px;
+      overflow: hidden;
     }
 
-    .ca-pong-ball {
-      position: absolute;
-      font-size: 1.3rem;
-      line-height: 1;
-      transform: translate(-50%, -50%);
-      z-index: 3;
-      pointer-events: none;
-      transition: left 0.05s linear, top 0.05s linear;
+    .ca-mash-timer-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff4466, #ff88aa);
+      border-radius: 3px;
+      transition: width 0.5s linear;
     }
 
-    .ca-pong-paddle {
-      position: absolute;
-      width: 30%;
-      height: 14px;
-      border-radius: 7px;
-      z-index: 2;
-      pointer-events: none;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      transition: left 0.04s linear;
+    /* -- Color Match -- */
+    .ca-color-arena {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.8rem;
+      padding: 0.5rem;
     }
 
-    .ca-pong-opp { top: 14%; }
-    .ca-pong-me  { bottom: 14%; }
+    .ca-color-header {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      font-size: 1rem;
+      font-weight: 800;
+    }
 
-    .ca-pong-hint {
+    .ca-color-side-lbl { font-size: 0.9rem; }
+    .ca-color-vs { color: #884466; font-size: 0.8rem; }
+
+    .ca-color-info {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.15rem;
+      font-size: 0.8rem;
+      color: #664455;
+    }
+
+    .ca-color-warn {
+      color: #cc4444;
+      font-weight: 700;
       font-size: 0.75rem;
+    }
+
+    .ca-color-track {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .ca-color-dot {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background-color 0.15s, box-shadow 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      border: 3px solid rgba(255,255,255,0.6);
+    }
+
+    .ca-dot-merah {
+      background-color: #ff4466;
+      box-shadow: 0 3px 14px rgba(255,68,102,0.45);
+    }
+
+    .ca-dot-biru {
+      background-color: #4488ff;
+      box-shadow: 0 3px 14px rgba(68,136,255,0.45);
+    }
+
+    .ca-dot-tap {
+      animation: ca-dot-tap-anim 0.2s ease-out;
+    }
+
+    @keyframes ca-dot-tap-anim {
+      0% { transform: scale(1.35); }
+      100% { transform: scale(1); }
+    }
+
+    .ca-color-timer-track {
+      width: 80%;
+      height: 6px;
+      background: rgba(0,0,0,0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .ca-color-timer-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff4466, #4488ff);
+      border-radius: 3px;
+      transition: width 0.5s linear;
+    }
+
+    .ca-color-hint {
+      font-size: 0.8rem;
       color: #774466;
       text-align: center;
       padding: 0.5rem;
     }
 
-    /* ── Sorting mini-game ── */
-    .ca-sort-arena {
+    /* -- Memory (Virus Counting) -- */
+    .ca-mem-arena {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 0.4rem;
-      padding: 0.4rem;
-    }
-
-    .ca-sort-scores {
-      display: flex;
       align-items: center;
       justify-content: center;
-      gap: 1rem;
+      padding: 1rem;
     }
 
-    .ca-sort-score {
-      font-size: 1rem;
-      font-weight: 800;
-      color: #552244;
+    .ca-mem-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.8rem;
     }
 
-    .ca-sort-score-sep {
-      font-size: 0.75rem;
-      color: #aa8899;
+    .ca-mem-progress {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #884466;
     }
 
-    .ca-sort-field {
-      flex: 1;
-      position: relative;
-      background: rgba(255,255,255,0.25);
-      border-radius: 12px;
-      overflow: hidden;
-      min-height: 140px;
-      border: 2px solid rgba(180,100,160,0.25);
-    }
-
-    .ca-sort-viruses {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
-
-    .ca-sort-virus {
-      position: absolute;
-      font-size: 1.4rem;
+    .ca-mem-current {
+      font-size: 4rem;
       line-height: 1;
-      transition: top 0.15s linear;
-    }
-
-    .ca-sort-gate {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 40px;
-      background: rgba(200,150,200,0.35);
+      min-height: 5rem;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-top: 2px dashed rgba(180,80,160,0.4);
-      transition: background 0.2s;
     }
 
-    .ca-sort-gate.ca-gate-open {
-      background: rgba(100,220,120,0.35);
-      border-color: rgba(50,180,80,0.5);
+    .ca-mem-virus-show {
+      animation: ca-mem-pop 0.4s ease-out;
     }
 
-    .ca-gate-status {
-      font-size: 0.9rem;
-      font-weight: 800;
-      color: #443355;
+    @keyframes ca-mem-pop {
+      0% { transform: scale(0.3) rotate(-10deg); opacity: 0.4; }
+      60% { transform: scale(1.2) rotate(5deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0); opacity: 1; }
     }
 
-    .ca-tap-btn-gate {
+    .ca-mem-status {
       font-size: 1rem;
+      font-weight: 700;
+      color: #552244;
+      text-align: center;
     }
 
-    /* ── Screen shake ── */
+    .ca-mem-prompt {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+    }
+
+    .ca-mem-question {
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: #552244;
+      text-align: center;
+    }
+
+    .ca-mem-options {
+      display: flex;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .ca-mem-opt {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      border: 3px solid rgba(180,100,180,0.4);
+      background: rgba(255,255,255,0.6);
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: #552244;
+      cursor: pointer;
+      transition: transform 0.1s, background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .ca-mem-opt:active { transform: scale(0.9); background: rgba(255,200,220,0.6); }
+    .ca-mem-opt:disabled { opacity: 0.4; cursor: default; }
+
+    .ca-mem-feedback {
+      font-size: 1rem;
+      font-weight: 800;
+      text-align: center;
+      min-height: 1.5rem;
+    }
+
+    .ca-mem-wrong { color: #cc2244; }
+    .ca-mem-correct { color: #22aa55; }
+
+    /* -- Screen shake -- */
     .ca-shake {
       animation: ca-shake-anim 0.2s ease-in-out;
     }
@@ -3898,8 +3984,11 @@
     @media (max-width: 360px) {
       .ca-cdwn-virus { width: 52px; height: 52px; font-size: 1.6rem; }
       .ca-tap-btn { font-size: 1rem; padding: 0.85rem 1rem; }
-      .ca-cdwn-num { font-size: 2.8rem; }
+      .ca-ready-hold { font-size: 1rem; padding: 1rem; }
+      .ca-color-dot { width: 48px; height: 48px; }
+      .ca-mem-opt { width: 56px; height: 56px; font-size: 1.3rem; }
     }
+
   </style>
 </head>
 <body>
