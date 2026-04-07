@@ -8,8 +8,8 @@ export const cuteAggressionGame = {
   type: 'cute-aggression',
   lobby: {
     name: 'Cute Aggression',
-    icon: '\uD83D\uDE21\uD83D\uDC96\uD83E\uDD0F',
-    badge: 'Gemas!',
+    icon: '\uD83D\uDE21\uD83E\uDE77\uD83E\uDD0F',
+    badge: 'GEMAS!',
     sides: [
       { side: 'merah', label: 'Si Merah', emoji: '\u2764\uFE0F' },
       { side: 'biru', label: 'Si Biru', emoji: '\uD83D\uDC99' },
@@ -17,7 +17,7 @@ export const cuteAggressionGame = {
   },
   sideSelect: {
     title: 'CUTE AGGRESSION',
-    pickTitle: 'Pilih blob kamu!',
+    pickTitle: 'Pilih blob kamu sayang~',
     options: [
       { side: 'merah', label: 'Si Merah', emoji: '\uD83D\uDD34' },
       { side: 'biru', label: 'Si Biru', emoji: '\uD83D\uDD35' },
@@ -25,20 +25,25 @@ export const cuteAggressionGame = {
   },
   victoryMessages: {
     win: [
-      'GEMAS BANGET!! \uD83D\uDE24\uD83D\uDC96',
-      'Nggak kuat gemesnya~ kamu menang!!',
-      'CUBIT CUBIT CUBIT!! \uD83E\uDD0F\uD83C\uDFC6',
-      'Sayang terlalu gemas~ K.O.!! \uD83D\uDC8B',
-      'Kamu bikin lawan meleleh!! \uD83E\uDEE0\uD83D\uDC95',
+      'GEMAS BANGET NGGAK KUAT!! \uD83D\uDE24\uD83D\uDC96',
+      'CUBIT GIGIT CIUM semuanya!! \uD83E\uDD0F\uD83E\uDE77\uD83D\uDC8B',
+      'Nggak kuat gemesnya~ K.O.!! \uD83C\uDFC6\uD83D\uDC95',
+      'Terlalu bucin sampe menang!! \uD83E\uDD70\uD83D\uDD25',
+      'Kamu bikin lawan meleleh!! \uD83E\uDEE0\uD83D\uDCAB',
+      'COMBO GIGIT SAMPE PINGSAN!! \uD83E\uDE77\uD83E\uDE77\uD83E\uDE77',
+      'Dicubit sampe sayang~ champion!! \uD83E\uDD0F\uD83C\uDFC6',
     ],
     lose: [
-      'Yahhh di-gemasin~ \uD83D\uDE35',
-      'Kena cubit sampe K.O. \uD83D\uDE2D',
-      'Terlalu gemas buat menang~ \uD83D\uDC94',
-      'GG sayang! Rematch?? \uD83E\uDD7A',
+      'Yahhh di-gemasin sampe K.O.~ \uD83D\uDE35\u200D\uD83D\uDCAB',
+      'Kena GIGIT CUBIT CIUM semuanya \uD83D\uDE2D',
+      'Terlalu gemas buat menang~ \uD83D\uDC94\uD83D\uDC95',
+      'GG sayang! Rematch?? \uD83E\uDD7A\uD83D\uDC96',
+      'Di-combo gigit sampe lemes~ \uD83E\uDE77\uD83D\uDE35',
+      'Kena cium super sampe meleleh \uD83D\uDC8B\uD83E\uDEE0',
     ],
     draw: [
-      'Double K.O. gemas!? \uD83E\uDD2F\uD83D\uDC96',
+      'DOUBLE K.O. GEMAS!? \uD83E\uDD2F\uD83D\uDC96\uD83D\uDC96',
+      'Dua-duanya terlalu bucin!! \uD83E\uDD70\uD83E\uDD70',
     ],
   },
   Scene: CuteAggressionScene,

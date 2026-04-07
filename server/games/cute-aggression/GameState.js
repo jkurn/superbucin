@@ -1,10 +1,18 @@
 /**
- * Cute Aggression — Super Bucin Edition!
+ * Cute Aggression — Super Bucin Edition! MAXIMUM GEMAS!!
  *
  * Two adorable blob creatures face off in cute-aggressive combat.
  * Inspired by Virus vs Virus — red blob vs blue blob.
- * Three buttons: GEMAS (squeeze attack), PELUK (hug shield), CUBIT (charge pinch).
- * Special meter charges from combat — unleash a devastating CIUM (kiss) attack!
+ *
+ * Four buttons:
+ *   GEMAS  — squeeze attack (medium damage, medium cooldown)
+ *   GIGIT  — bite attack (fast, low damage, builds combo + special faster)
+ *   CUBIT  — hold-to-charge pinch (high damage potential, vulnerable while charging)
+ *   PELUK  — hug shield (hold to block, absorbs damage)
+ *
+ * Special: CIUM (kiss super) — auto-fires when meter is full + you attack.
+ * Combo system: consecutive GIGIT hits increase damage multiplier.
+ * Rage mode: when HP drops below 30%, damage output increases 30%.
  * Best of 3 rounds. First to 0 HP loses the round.
  */
 
@@ -82,6 +90,8 @@ export class GameState {
         shieldHP: CFG.SHIELD_MAX,
         character: p.side,
         chargeStartedAt: 0,
+        combo: 0,
+        lastGigitAt: 0,
       };
     }
   }
@@ -112,10 +122,19 @@ export class GameState {
     if (this.phase !== 'fighting') return;
     if (!action || typeof action !== 'object') return;
 
-    const validTypes = ['attack', 'block-start', 'block-end', 'special', 'cubit-start', 'cubit-release'];
+    const validTypes = ['attack', 'gigit', 'block-start', 'block-end', 'special', 'cubit-start', 'cubit-release'];
     if (!validTypes.includes(action.type)) return;
 
     this.actionQueue.push({ playerId, type: action.type });
+  }
+
+  _isActing(f) {
+    return f.state === 'hurt' || f.state === 'attacking' || f.state === 'special'
+      || f.state === 'charging' || f.state === 'cubit' || f.state === 'gigit';
+  }
+
+  _getRageMult(f) {
+    return f.hp <= CFG.RAGE_HP_THRESHOLD ? CFG.RAGE_DAMAGE_MULT : 1;
   }
 
   tick() {
@@ -130,13 +149,17 @@ export class GameState {
         f.stateTimer -= CFG.TICK_MS;
         if (f.stateTimer <= 0) {
           f.stateTimer = 0;
-          if (f.state === 'hurt' || f.state === 'attacking' || f.state === 'special' || f.state === 'cubit') {
+          if (f.state === 'hurt' || f.state === 'attacking' || f.state === 'special' || f.state === 'cubit' || f.state === 'gigit') {
             f.state = 'idle';
           }
         }
       }
       if (f.attackCooldown > 0) {
         f.attackCooldown = Math.max(0, f.attackCooldown - CFG.TICK_MS);
+      }
+      // Decay combo if window expired
+      if (f.combo > 0 && Date.now() - f.lastGigitAt > CFG.GIGIT_COMBO_WINDOW_MS) {
+        f.combo = 0;
       }
     }
 
@@ -165,12 +188,16 @@ export class GameState {
         if (f.state === 'blocking') {
           f.state = 'idle';
         }
-      } else if (action.type === 'special') {
-        if (f.specialMeter >= CFG.SPECIAL_METER_MAX && f.state !== 'hurt' && f.attackCooldown <= 0) {
-          this.doSpecialAttack(action.playerId);
+      } else if (action.type === 'gigit') {
+        if (!this._isActing(f) && f.attackCooldown <= 0) {
+          if (f.specialMeter >= CFG.SPECIAL_METER_MAX) {
+            this.doSpecialAttack(action.playerId);
+          } else {
+            this.doGigitAttack(action.playerId);
+          }
         }
       } else if (action.type === 'attack') {
-        if (f.state !== 'hurt' && f.state !== 'attacking' && f.state !== 'special' && f.state !== 'charging' && f.state !== 'cubit' && f.attackCooldown <= 0) {
+        if (!this._isActing(f) && f.attackCooldown <= 0) {
           if (f.specialMeter >= CFG.SPECIAL_METER_MAX) {
             this.doSpecialAttack(action.playerId);
           } else {
@@ -199,6 +226,7 @@ export class GameState {
     attacker.state = 'attacking';
     attacker.stateTimer = CFG.ATTACK_ANIM_MS;
     attacker.attackCooldown = CFG.ATTACK_COOLDOWN_MS;
+    attacker.combo = 0; // GEMAS resets gigit combo
 
     let damage;
     let blocked = false;
@@ -213,7 +241,7 @@ export class GameState {
         defender.stateTimer = CFG.HURT_STUN_MS;
       }
     } else {
-      damage = CFG.ATTACK_DAMAGE;
+      damage = Math.floor(CFG.ATTACK_DAMAGE * this._getRageMult(attacker));
       if (defender.state === 'charging') {
         damage = Math.floor(damage * CFG.CUBIT_VULNERABLE_MULT);
         defender.chargeStartedAt = 0;
@@ -232,11 +260,68 @@ export class GameState {
       damage,
       blocked,
       isSpecial: false,
+      isGigit: false,
+      combo: 0,
     });
 
-    if (defender.hp <= 0) {
-      this.endRound(playerId);
+    if (defender.hp <= 0) this.endRound(playerId);
+  }
+
+  doGigitAttack(playerId) {
+    const attacker = this.fighters[playerId];
+    const opponentId = playerId === this.p1.id ? this.p2.id : this.p1.id;
+    const defender = this.fighters[opponentId];
+
+    // Build combo
+    if (Date.now() - attacker.lastGigitAt <= CFG.GIGIT_COMBO_WINDOW_MS) {
+      attacker.combo = Math.min(CFG.MAX_COMBO, attacker.combo + 1);
+    } else {
+      attacker.combo = 1;
     }
+    attacker.lastGigitAt = Date.now();
+
+    attacker.state = 'gigit';
+    attacker.stateTimer = CFG.GIGIT_ANIM_MS;
+    attacker.attackCooldown = CFG.GIGIT_COOLDOWN_MS;
+
+    const comboMult = 1 + attacker.combo * CFG.COMBO_MULT;
+    let damage;
+    let blocked = false;
+
+    if (defender.state === 'blocking' && defender.shieldHP > 0) {
+      damage = CFG.BLOCKED_DAMAGE;
+      defender.shieldHP = Math.max(0, defender.shieldHP - Math.floor(CFG.SHIELD_DRAIN_PER_HIT * 0.5));
+      blocked = true;
+
+      if (defender.shieldHP <= 0) {
+        defender.state = 'hurt';
+        defender.stateTimer = CFG.HURT_STUN_MS;
+      }
+    } else {
+      damage = Math.floor(CFG.GIGIT_DAMAGE * comboMult * this._getRageMult(attacker));
+      if (defender.state === 'charging') {
+        damage = Math.floor(damage * CFG.CUBIT_VULNERABLE_MULT);
+        defender.chargeStartedAt = 0;
+      }
+      defender.state = 'hurt';
+      defender.stateTimer = Math.floor(CFG.HURT_STUN_MS * 0.6); // shorter stun from bites
+    }
+
+    defender.hp = Math.max(0, defender.hp - damage);
+    attacker.specialMeter = Math.min(CFG.SPECIAL_METER_MAX, attacker.specialMeter + CFG.GIGIT_SPECIAL_GAIN);
+    defender.specialMeter = Math.min(CFG.SPECIAL_METER_MAX, defender.specialMeter + Math.floor(CFG.SPECIAL_GAIN_ON_HURT * 0.5));
+
+    this.hitEvents.push({
+      attackerId: playerId,
+      defenderId: opponentId,
+      damage,
+      blocked,
+      isSpecial: false,
+      isGigit: true,
+      combo: attacker.combo,
+    });
+
+    if (defender.hp <= 0) this.endRound(playerId);
   }
 
   doSpecialAttack(playerId) {
@@ -248,8 +333,9 @@ export class GameState {
     attacker.stateTimer = CFG.SPECIAL_ANIM_MS;
     attacker.attackCooldown = CFG.SPECIAL_COOLDOWN_MS;
     attacker.specialMeter = 0;
+    attacker.combo = 0;
 
-    const damage = CFG.SPECIAL_DAMAGE;
+    const damage = Math.floor(CFG.SPECIAL_DAMAGE * this._getRageMult(attacker));
     defender.state = 'hurt';
     defender.stateTimer = CFG.HURT_STUN_MS * 2;
 
@@ -262,11 +348,11 @@ export class GameState {
       damage,
       blocked: false,
       isSpecial: true,
+      isGigit: false,
+      combo: 0,
     });
 
-    if (defender.hp <= 0) {
-      this.endRound(playerId);
-    }
+    if (defender.hp <= 0) this.endRound(playerId);
   }
 
   doCubitAttack(playerId) {
@@ -276,14 +362,14 @@ export class GameState {
 
     const chargeMs = Math.min(Date.now() - attacker.chargeStartedAt, CFG.CUBIT_MAX_CHARGE_MS);
     const chargeRatio = chargeMs / CFG.CUBIT_MAX_CHARGE_MS;
-    const damage = Math.floor(
-      CFG.CUBIT_MIN_DAMAGE + (CFG.CUBIT_MAX_DAMAGE - CFG.CUBIT_MIN_DAMAGE) * chargeRatio,
-    );
+    const baseDmg = CFG.CUBIT_MIN_DAMAGE + (CFG.CUBIT_MAX_DAMAGE - CFG.CUBIT_MIN_DAMAGE) * chargeRatio;
+    const damage = Math.floor(baseDmg * this._getRageMult(attacker));
 
     attacker.state = 'cubit';
     attacker.stateTimer = CFG.CUBIT_ANIM_MS;
     attacker.attackCooldown = CFG.CUBIT_COOLDOWN_MS;
     attacker.chargeStartedAt = 0;
+    attacker.combo = 0;
 
     const breaksBlock = chargeRatio >= 0.6;
 
@@ -298,8 +384,10 @@ export class GameState {
         damage: blockedDmg,
         blocked: true,
         isSpecial: false,
+        isGigit: false,
         isCubit: true,
         chargeRatio,
+        combo: 0,
       });
     } else {
       defender.hp = Math.max(0, defender.hp - damage);
@@ -312,8 +400,10 @@ export class GameState {
         damage,
         blocked: false,
         isSpecial: false,
+        isGigit: false,
         isCubit: true,
         chargeRatio,
+        combo: 0,
       });
     }
 
@@ -323,9 +413,7 @@ export class GameState {
     );
     defender.specialMeter = Math.min(CFG.SPECIAL_METER_MAX, defender.specialMeter + CFG.SPECIAL_GAIN_ON_HURT);
 
-    if (defender.hp <= 0) {
-      this.endRound(playerId);
-    }
+    if (defender.hp <= 0) this.endRound(playerId);
   }
 
   endRound(winnerId) {
@@ -386,6 +474,8 @@ export class GameState {
           shieldMax: CFG.SHIELD_MAX,
           character: pChar,
           side: pf.character,
+          combo: pf.combo || 0,
+          rage: (pf.hp ?? CFG.MAX_HP) <= CFG.RAGE_HP_THRESHOLD,
           chargePct: pf.state === 'charging' && pf.chargeStartedAt
             ? Math.min(1, (Date.now() - pf.chargeStartedAt) / CFG.CUBIT_MAX_CHARGE_MS)
             : 0,
@@ -400,6 +490,8 @@ export class GameState {
           shieldMax: CFG.SHIELD_MAX,
           character: oChar,
           side: of2.character,
+          combo: of2.combo || 0,
+          rage: (of2.hp ?? CFG.MAX_HP) <= CFG.RAGE_HP_THRESHOLD,
           chargePct: of2.state === 'charging' && of2.chargeStartedAt
             ? Math.min(1, (Date.now() - of2.chargeStartedAt) / CFG.CUBIT_MAX_CHARGE_MS)
             : 0,
@@ -446,6 +538,8 @@ export class GameState {
           shieldMax: CFG.SHIELD_MAX,
           character: pChar,
           side: pf.character,
+          combo: pf.combo || 0,
+          rage: false,
           chargePct: 0,
         },
         opp: {
@@ -458,6 +552,8 @@ export class GameState {
           shieldMax: CFG.SHIELD_MAX,
           character: oChar,
           side: of2.character,
+          combo: of2.combo || 0,
+          rage: false,
           chargePct: 0,
         },
         hitEvents: [],
