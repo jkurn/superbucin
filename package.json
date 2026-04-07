@@ -10,6 +10,7 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build": "cd server && npm install && cd ../client && npm install && npx vite build",
     "start": "cd server && node index.js",
+    "test": "node --test server/games/*/GameState.test.js",
     "lint": "eslint client/src/ server/",
     "prepare": "husky || true"
   },
