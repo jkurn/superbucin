@@ -1,6 +1,7 @@
 import { GameRegistry } from '../shared/GameRegistry.js';
 import { MEMORY_PACK_CHOICES } from '../games/memory-match/config.js';
 import { renderUserBar, bindUserBar } from '../shared/ui/UserBar.js';
+import { STICKERS, QUOTES } from '../shared/StickerPack.js';
 
 export function render(overlay, deps, options) {
   const { network, userManager, router, showScreen } = deps;
@@ -30,11 +31,26 @@ export function render(overlay, deps, options) {
     (p) => `<option value="${p.id}">${p.label}</option>`,
   ).join('');
 
+  const { isEleven11, lossStreak } = _getBucinMoments();
+
   overlay.innerHTML = `
     ${renderUserBar(userManager)}
-    <div class="lobby-ui" style="padding-top:3.5rem;">
+    <!-- Floating sticker layer — pointer-events:none, never blocks taps -->
+    <div class="lobby-sticker-layer" aria-hidden="true">
+      <img class="sticker sticker-float"
+           style="width:72px;top:12%;left:3%;animation-delay:0s;"
+           src="${STICKERS.mochiHeart}" alt="" />
+      <img class="sticker sticker-float-slow"
+           style="width:80px;bottom:22%;right:2%;animation-delay:-1.8s;"
+           src="${STICKERS.coupleBlob}" alt="" />
+      <img class="sticker sticker-drift"
+           style="width:90px;top:5%;animation-delay:-3s;"
+           src="${STICKERS.pricyRocket}" alt="" />
+      ${lossStreak >= 5 ? `<img class="easter-sign visible" src="${STICKERS.sayangilahPricy}" alt="" />` : ''}
+    </div>
+    <div class="lobby-ui" style="padding-top:3.5rem;position:relative;z-index:1;">
       <div class="lobby-title">SUPERBUCIN</div>
-      <div class="lobby-subtitle">sayang's game collection \ud83d\udc95</div>
+      <div class="lobby-quote">${QUOTES.kangenKamu}</div>
       <div class="game-grid">
         ${cardsHTML}${padHTML}
       </div>
@@ -66,6 +82,7 @@ export function render(overlay, deps, options) {
           </div>
         </div>
       </div>
+      ${isEleven11 ? `<img class="easter-overthinking" src="${STICKERS.overthinking}" alt="" />` : ''}
       <div class="room-section">
         <button class="btn btn-pink" id="btn-create">Create Room</button>
         <div class="or-divider">\u2014 or \u2014</div>
@@ -149,4 +166,31 @@ export function render(overlay, deps, options) {
   document.getElementById('input-code').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('btn-join').click();
   });
+
+  // 11:11 easter egg — show overthinking sticker for 4 seconds
+  if (isEleven11) {
+    const el = overlay.querySelector('.easter-overthinking');
+    if (el) {
+      setTimeout(() => { el.classList.add('visible'); }, 300);
+      setTimeout(() => { el.classList.remove('visible'); }, 4500);
+    }
+  }
+}
+
+/** Returns bucin moment flags for this session. */
+function _getBucinMoments() {
+  const now = new Date();
+  const isEleven11 = now.getHours() === 11 && now.getMinutes() === 11;
+  const lossStreak = Number(localStorage.getItem('superbucin_loss_streak') || 0);
+  return { isEleven11, lossStreak };
+}
+
+/** Called from VictoryScreen — updates the loss streak counter. */
+export function recordMatchResult(isWinner) {
+  if (isWinner) {
+    localStorage.removeItem('superbucin_loss_streak');
+  } else {
+    const prev = Number(localStorage.getItem('superbucin_loss_streak') || 0);
+    localStorage.setItem('superbucin_loss_streak', String(prev + 1));
+  }
 }

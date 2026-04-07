@@ -1,0 +1,212 @@
+/* ── Sticker Layer ──────────────────────────────────────────────────────────
+ * All sticker-related animations and layout classes.
+ * Loaded via main.js (Vite bundles + hashes in production).
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* Shared container — floats above content, never captures taps */
+.sticker-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.sticker {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  object-fit: contain;
+}
+
+/* ── Keyframes ────────────────────────────────────────────────────────────── */
+
+/* Gentle bob with slight rock — ambient lobby floaters */
+@keyframes stickerFloat {
+  0%   { transform: translateY(0px)   rotate(-3deg); }
+  50%  { transform: translateY(-14px) rotate(2deg);  }
+  100% { transform: translateY(0px)   rotate(-3deg); }
+}
+
+@keyframes stickerFloatSlow {
+  0%   { transform: translateY(0px)  rotate(2deg);  }
+  50%  { transform: translateY(-10px) rotate(-1deg); }
+  100% { transform: translateY(0px)  rotate(2deg);  }
+}
+
+/* Rocket drifts left-to-right across the screen top, loops */
+@keyframes stickerDrift {
+  0%   { transform: translateX(-140px) rotate(-8deg); opacity: 0; }
+  6%   { opacity: 1; }
+  94%  { opacity: 1; }
+  100% { transform: translateX(calc(100vw + 140px)) rotate(-8deg); opacity: 0; }
+}
+
+/* Bouncy loading mascot */
+@keyframes stickerBounce {
+  0%, 100% { transform: translateY(0)    scale(1);    }
+  40%       { transform: translateY(-22px) scale(1.06); }
+  55%       { transform: translateY(-18px) scale(1.04); }
+  70%       { transform: translateY(-8px)  scale(1.02); }
+}
+
+/* Pop in with overshoot — used for sticker entrances */
+@keyframes stickerPop {
+  0%   { transform: scale(0)    rotate(-10deg); opacity: 0; }
+  60%  { transform: scale(1.18) rotate(4deg);   opacity: 1; }
+  100% { transform: scale(1)    rotate(0deg);   opacity: 1; }
+}
+
+/* Fall from above — victory rain */
+@keyframes stickerRain {
+  0%   { transform: translateY(-130px) rotate(var(--rain-rot, -10deg)) scale(0.85); opacity: 0; }
+  8%   { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateY(calc(100vh + 100px)) rotate(var(--rain-rot, 15deg)) scale(1); opacity: 0; }
+}
+
+/* Gentle side-to-side wiggle — waiting room */
+@keyframes stickerWiggle {
+  0%, 100% { transform: rotate(-5deg); }
+  50%       { transform: rotate(5deg);  }
+}
+
+/* ── Animation utility classes ────────────────────────────────────────────── */
+.sticker-float      { animation: stickerFloat     3.4s ease-in-out infinite; }
+.sticker-float-slow { animation: stickerFloatSlow 5.0s ease-in-out infinite; }
+.sticker-drift      { animation: stickerDrift     14s  linear        infinite; }
+.sticker-bounce     { animation: stickerBounce    1.5s ease-in-out  infinite; }
+.sticker-pop        { animation: stickerPop       0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.sticker-wiggle     { animation: stickerWiggle    2.2s ease-in-out  infinite; }
+
+/* rain is applied inline with --rain-dur / --rain-rot CSS vars */
+.sticker-rain {
+  animation: stickerRain var(--rain-dur, 2.6s) ease-in forwards;
+}
+
+/* ── Loading screen mascot ────────────────────────────────────────────────── */
+.loading-mascot {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Lobby sticker floaters ───────────────────────────────────────────────── */
+.lobby-sticker-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+/* Quote that replaces the generic lobby subtitle */
+.lobby-quote {
+  color: #c8a8e0;
+  font-size: 0.78rem;
+  font-style: italic;
+  text-align: center;
+  margin-bottom: 1.75rem;
+  line-height: 1.5;
+  opacity: 0.9;
+  white-space: pre-line;
+}
+
+/* ── Easter egg: SAYANGILAH Pricy sign ───────────────────────────────────── */
+.easter-sign {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  width: 180px;
+  object-fit: contain;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+.easter-sign.visible {
+  opacity: 0.92;
+}
+
+/* Easter egg: overthinking → overloving (11:11 moment) */
+.easter-overthinking {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  width: 220px;
+  object-fit: contain;
+  z-index: 20;
+  pointer-events: none;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+  opacity: 0;
+}
+.easter-overthinking.visible {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+/* ── Waiting room stickers ───────────────────────────────────────────────── */
+.waiting-sticker-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.waiting-sticker {
+  width: 130px;
+  height: 130px;
+  object-fit: contain;
+}
+
+.waiting-quote {
+  color: #c0a0d0;
+  font-size: 0.75rem;
+  font-style: italic;
+  text-align: center;
+  line-height: 1.45;
+  max-width: 240px;
+  white-space: pre-line;
+  opacity: 0.85;
+}
+
+.virtual-hug-sticker {
+  width: 100px;
+  object-fit: contain;
+  margin: 0.5rem auto 0;
+  display: block;
+}
+
+/* ── Victory sticker rain container ──────────────────────────────────────── */
+.victory-sticker-rain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+/* ── Victory screen extras ───────────────────────────────────────────────── */
+.victory-loser-quote {
+  color: #c0a0d0;
+  font-size: 0.78rem;
+  font-style: italic;
+  text-align: center;
+  margin: 0.25rem 0 0.75rem;
+  opacity: 0.85;
+}
+
+/* ── Side select decoration (Pig vs Chick) ───────────────────────────────── */
+.side-select-sticker {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  opacity: 0.88;
+  margin: 0.5rem auto 0;
+  display: block;
+  animation: stickerFloat 3.4s ease-in-out infinite;
+}

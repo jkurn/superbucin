@@ -1,4 +1,5 @@
 import { GameRegistry } from '../shared/GameRegistry.js';
+import { STICKERS } from '../shared/StickerPack.js';
 
 export function render(overlay, deps, roomCode) {
   const { network, userManager } = deps;
@@ -52,6 +53,9 @@ export function render(overlay, deps, roomCode) {
         </div>
         <div id="side-status" class="waiting-text" style="min-height:1.5rem;"></div>
       </div>
+      ${gameType === 'pig-vs-chick'
+        ? `<img class="side-select-sticker" src="${STICKERS.pigChickGame}" alt="" />`
+        : ''}
     </div>
   `;
 

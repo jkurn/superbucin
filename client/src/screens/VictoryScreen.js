@@ -1,5 +1,10 @@
+import { VICTORY_POOL_WINNER, QUOTES } from '../shared/StickerPack.js';
+import { recordMatchResult } from './LobbyScreen.js';
+
 export function render(overlay, deps, data) {
   const { network, userManager, showScreen } = deps;
+
+  recordMatchResult(!data.tie && data.isWinner);
 
   const myProfile = userManager.profile;
   const opp = network.opponentIdentity;
@@ -30,8 +35,14 @@ export function render(overlay, deps, data) {
     ? `<div class="victory-points">+${pointsEarned} points \u2b50</div>`
     : '';
 
+  const isWinner = !data.tie && data.isWinner;
+  const loserQuoteHtml = !isWinner && !data.tie
+    ? `<div class="victory-loser-quote">${QUOTES.tanganBerat}</div>`
+    : '';
+
   overlay.innerHTML = `
-    <div class="victory-overlay">
+    <div class="victory-overlay" style="position:relative;">
+      <div class="victory-sticker-rain" id="sticker-rain"></div>
       <div class="victory-players">
         <div class="victory-player">
           <img class="victory-avatar" src="${myProfile.avatarUrl}" />
@@ -46,10 +57,48 @@ export function render(overlay, deps, data) {
       <div class="victory-text">${msg}</div>
       <div class="victory-sub">${sub}</div>
       ${pointsHtml}
+      ${loserQuoteHtml}
       <button class="btn btn-pink" id="btn-rematch">Play Again \ud83d\udc95</button>
       <button class="btn btn-blue btn-small" id="btn-lobby" style="margin-top:0.75rem;">Back to Lobby</button>
     </div>
   `;
   document.getElementById('btn-rematch').addEventListener('click', () => network.requestRematch());
   document.getElementById('btn-lobby').addEventListener('click', () => showScreen('lobby'));
+
+  // Sticker rain on win (skip on tie or loss)
+  if (isWinner) {
+    const pool = VICTORY_POOL_WINNER;
+    _launchStickerRain(document.getElementById('sticker-rain'), pool);
+  }
+}
+
+/**
+ * Spawns sticker rain into the given container.
+ * Each sticker falls at a random horizontal position with randomised
+ * duration and rotation so they never look mechanical.
+ */
+function _launchStickerRain(container, pool) {
+  if (!container) return;
+  const COUNT = 7;
+  for (let i = 0; i < COUNT; i++) {
+    const delay = i * 0.3 + Math.random() * 0.2;
+    const src   = pool[i % pool.length];
+    const left  = 5 + Math.random() * 82; // 5–87 vw
+    const rot   = (Math.random() * 40 - 20).toFixed(1); // -20..+20 deg
+    const dur   = (2.2 + Math.random() * 1.2).toFixed(2); // 2.2–3.4 s
+    const size  = 70 + Math.floor(Math.random() * 36); // 70–105 px
+
+    const img = document.createElement('img');
+    img.src   = src;
+    img.alt   = '';
+    img.className = 'sticker sticker-rain';
+    img.style.cssText = [
+      `left:${left}%`,
+      `width:${size}px`,
+      `--rain-rot:${rot}deg`,
+      `--rain-dur:${dur}s`,
+      `animation-delay:${delay}s`,
+    ].join(';');
+    container.appendChild(img);
+  }
 }

@@ -1,3 +1,4 @@
+import './styles/stickers.css';
 import { SceneManager } from './shared/SceneManager.js';
 import { NetworkManager } from './shared/NetworkManager.js';
 import { UIManager } from './shared/UIManager.js';

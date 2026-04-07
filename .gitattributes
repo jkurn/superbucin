@@ -1,1 +1,2 @@
 pricy-sticker/*.webp filter=lfs diff=lfs merge=lfs -text
+client/public/stickers/*.webp filter=lfs diff=lfs merge=lfs -text

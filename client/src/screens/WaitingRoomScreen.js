@@ -1,3 +1,5 @@
+import { STICKERS, QUOTES } from '../shared/StickerPack.js';
+
 export function render(overlay, deps, roomCode) {
   const { userManager, router } = deps;
   if (router) router.replace('/room/' + roomCode);
@@ -26,7 +28,12 @@ export function render(overlay, deps, roomCode) {
           <img class="waiting-player-avatar" src="${profile.avatarUrl}" alt="avatar" />
           <div class="waiting-player-name">${userManager.getDisplayLabel()}</div>
         </div>
-        <div class="waiting-text">Waiting for player 2...</div>
+        <div class="waiting-sticker-wrap">
+          <img class="waiting-sticker sticker-wiggle" src="${STICKERS.pricyLaughing}" alt="" />
+          <div class="waiting-quote">${QUOTES.janganSenyum}</div>
+        </div>
+        <div class="waiting-text">Waiting for sayang...</div>
+        <img class="virtual-hug-sticker sticker-float-slow" src="${STICKERS.virtualHug}" alt="" />
       </div>
     </div>
   `;

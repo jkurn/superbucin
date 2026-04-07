@@ -6,3 +6,6 @@ dist/
 
 # Kenney asset packs (not used at runtime, too large for git)
 kenney_*/
+
+# Personal WhatsApp sticker source (curated copies live in client/public/stickers/)
+pricy-sticker/
