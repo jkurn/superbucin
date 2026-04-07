@@ -2,7 +2,8 @@ import { io } from 'socket.io-client';
 import { EventBus } from './EventBus.js';
 
 export class NetworkManager {
-  constructor() {
+  constructor(socketFactory = io) {
+    this.socketFactory = socketFactory;
     this.socket = null;
     this.ui = null;
     this.sceneManager = null;
@@ -27,7 +28,7 @@ export class NetworkManager {
       ? 'http://localhost:3000'
       : window.location.origin;
 
-    this.socket = io(serverUrl, {
+    this.socket = this.socketFactory(serverUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
@@ -170,12 +171,16 @@ export class NetworkManager {
       // If the error relates to a room not found (deep link), go back to lobby
       const lower = msg.toLowerCase();
       if (lower.includes('room not found') || lower.includes('room is full') || lower.includes('no room')) {
-        // Lazy import to avoid circular dependency
-        import('./Router.js').then(({ Router }) => {
-          Router.navigate('/');
-          this.ui.showLobby({ fromRouter: true });
-        });
+        this._navigateToLobby();
       }
+    });
+  }
+
+  _navigateToLobby() {
+    // Lazy import to avoid circular dependency with Router
+    import('./Router.js').then(({ Router }) => {
+      Router.navigate('/');
+      this.ui.showLobby({ fromRouter: true });
     });
   }
 

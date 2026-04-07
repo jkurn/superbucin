@@ -6,13 +6,24 @@ const POINTS_FOR_TIE = 50;
 const POINTS_PER_SCORE = 2;
 
 export class UserService {
+  static _client = supabase;
+
+  static _getClient() {
+    return this._client;
+  }
+
+  static _setClientForTests(client) {
+    this._client = client;
+  }
+
   static async recordMatch({ gameType, p1, p2, winnerId, scores, isTie }) {
-    if (!supabase) return { newAchievements: {} };
+    const client = this._getClient();
+    if (!client) return { newAchievements: {} };
 
     const p1Auth = !p1.identity?.isGuest && p1.identity?.userId;
     const p2Auth = !p2.identity?.isGuest && p2.identity?.userId;
 
-    await supabase.from('match_history').insert({
+    await client.from('match_history').insert({
       game_type: gameType,
       player1_id: p1Auth || null,
       player2_id: p2Auth || null,
@@ -55,7 +66,8 @@ export class UserService {
   }
 
   static async _updateStats(userId, gameType, isWinner, isTie, points) {
-    const { data: existing } = await supabase
+    const client = this._getClient();
+    const { data: existing } = await client
       .from('user_stats')
       .select('id, wins, losses, ties, games_played, total_points')
       .eq('user_id', userId)
@@ -63,7 +75,7 @@ export class UserService {
       .single();
 
     if (existing) {
-      await supabase.from('user_stats').update({
+      await client.from('user_stats').update({
         wins: existing.wins + (isWinner ? 1 : 0),
         losses: existing.losses + (!isWinner && !isTie ? 1 : 0),
         ties: existing.ties + (isTie ? 1 : 0),
@@ -71,7 +83,7 @@ export class UserService {
         total_points: existing.total_points + points,
       }).eq('id', existing.id);
     } else {
-      await supabase.from('user_stats').insert({
+      await client.from('user_stats').insert({
         user_id: userId,
         game_type: gameType,
         wins: isWinner ? 1 : 0,
@@ -84,25 +96,27 @@ export class UserService {
   }
 
   static async _addPoints(userId, points) {
-    const { data } = await supabase
+    const client = this._getClient();
+    const { data } = await client
       .from('profiles')
       .select('points')
       .eq('id', userId)
       .single();
 
     if (data) {
-      await supabase.from('profiles')
+      await client.from('profiles')
         .update({ points: (data.points || 0) + points })
         .eq('id', userId);
     }
   }
 
   static async _checkAchievements(userId, gameType) {
+    const client = this._getClient();
     const [{ data: stats }, { data: allStats }, { data: existing }, { data: achievements }] = await Promise.all([
-      supabase.from('user_stats').select('*').eq('user_id', userId).eq('game_type', gameType).single(),
-      supabase.from('user_stats').select('*').eq('user_id', userId),
-      supabase.from('user_achievements').select('achievement_id').eq('user_id', userId),
-      supabase.from('achievements').select('*'),
+      client.from('user_stats').select('*').eq('user_id', userId).eq('game_type', gameType).single(),
+      client.from('user_stats').select('*').eq('user_id', userId),
+      client.from('user_achievements').select('achievement_id').eq('user_id', userId),
+      client.from('achievements').select('*'),
     ]);
 
     if (!achievements || !allStats) return [];
@@ -138,7 +152,7 @@ export class UserService {
       }
 
       if (met) {
-        await supabase.from('user_achievements').insert({
+        await client.from('user_achievements').insert({
           user_id: userId,
           achievement_id: ach.id,
         });
@@ -150,7 +164,8 @@ export class UserService {
   }
 
   static async _checkWinStreak(userId, required) {
-    const { data: recent } = await supabase
+    const client = this._getClient();
+    const { data: recent } = await client
       .from('match_history')
       .select('winner_id, is_tie, player1_id, player2_id')
       .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
@@ -163,8 +178,9 @@ export class UserService {
   }
 
   static async getProfile(userId) {
-    if (!supabase) return null;
-    const { data } = await supabase
+    const client = this._getClient();
+    if (!client) return null;
+    const { data } = await client
       .from('profiles')
       .select('*')
       .eq('id', userId)

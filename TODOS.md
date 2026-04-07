@@ -44,3 +44,17 @@ Suggested build order in plan: Connect Four → Quiz Race → Battleship (comple
 - [ ] Spectacle event hooks — pre-wire visual effect triggers (ENTRANCE, HIT, KILL, COMBO, NEAR_MISS, BASE_HIT). Separates "when to fire" from "what to fire". Polish layer, add after core game loop works.
 - [ ] Web Audio synthesis — spawn blips, fight sounds, base hit impact, victory jingle, BGM loop. All synthesized via Web Audio API oscillators (no audio files). Feature, independent of architecture.
 - [ ] Session state hook — `.claude/hooks/pre-compact.sh` saves game design decisions to SESSION.md before context compression. DX improvement for long dev sessions.
+
+## Deferred from plan-eng-review (testing strategy, 2026-04-07)
+
+- [ ] Socket event contract tests — enforce event name/payload/recipient rules for `RoomManager.handleGameEvent` (especially per-player privacy events like `memory-state`, `battleship-state`, `vending-state`, `bonk-state`, `cute-aggression-state`).
+- [ ] NetworkManager client contract tests — mock socket + UI/EventBus to verify server event mapping (`room-error`, reconnect banners, `achievement-unlocked`, `match-end`) and routing behavior.
+
+### Criteria gate for every game (must pass before "robust")
+
+- [ ] Rules correctness: win/lose/tie, illegal actions, turn ownership, scoring.
+- [ ] Authority/security: server rejects malformed/out-of-turn actions.
+- [ ] Payload privacy: players only receive their allowed state slices (no opponent hidden data leakage).
+- [ ] Network resilience: disconnect/reconnect, timeout windows, rejoin consistency.
+- [ ] Notification integrity: correct recipient + no duplicate/conflicting notifications.
+- [ ] Persistence side effects: `match-end` path records points/achievements correctly and degrades safely on DB failure.

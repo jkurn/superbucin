@@ -5,7 +5,11 @@ import { GameFactory } from '../games/GameFactory.js';
 
 // Register a minimal mock game so GameFactory.has() returns true
 class MockGameState {
-  constructor(_p1, _p2, _emit) { this.active = false; }
+  constructor(p1, p2, _emit) {
+    this.p1 = p1;
+    this.p2 = p2;
+    this.active = false;
+  }
   start() { this.active = true; }
   stop() { this.active = false; }
   pause() {}
@@ -331,6 +335,261 @@ describe('RoomManager', () => {
       rm.joinRoom(joiner, code);
       const err = joiner.lastEmit('room-error');
       assert.ok(err);
+    });
+  });
+
+  // ── event contracts / payload privacy ──────────────────────
+
+  describe('handleGameEvent contracts', () => {
+    it('routes memory-state as per-player slices only', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'memory-match' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+
+      await rm.handleGameEvent(room, 'memory-state', {
+        p1: { secret: 'p1-only' },
+        p2: { secret: 'p2-only' },
+      });
+
+      assert.deepEqual(host.lastEmit('memory-state'), { secret: 'p1-only' });
+      assert.deepEqual(joiner.lastEmit('memory-state'), { secret: 'p2-only' });
+    });
+
+    it('routes battleship-state slices by player id only', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'memory-match' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+
+      await rm.handleGameEvent(room, 'battleship-state', {
+        byPlayer: {
+          host: { hiddenShips: [1, 2, 3] },
+          joiner: { hiddenShips: [9, 8, 7] },
+        },
+      });
+
+      assert.deepEqual(host.lastEmit('battleship-state'), { hiddenShips: [1, 2, 3] });
+      assert.deepEqual(joiner.lastEmit('battleship-state'), { hiddenShips: [9, 8, 7] });
+    });
+
+    it('routes action-error only to the target player', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'memory-match' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+
+      await rm.handleGameEvent(room, 'action-error', {
+        playerId: 'joiner',
+        message: 'Nope',
+      });
+
+      assert.deepEqual(joiner.lastEmit('action-error'), {
+        playerId: 'joiner',
+        message: 'Nope',
+      });
+      assert.equal(host.lastEmit('action-error'), null);
+    });
+
+    it('routes speed-match-state with player-specific view fields', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'memory-match' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+
+      await rm.handleGameEvent(room, 'speed-match-state', {
+        prompt: '2+2?',
+        scores: [4, 7],
+        p1Answer: '4',
+        p2Answer: '5',
+        p1Answered: true,
+        p2Answered: false,
+      });
+
+      assert.deepEqual(host.lastEmit('speed-match-state'), {
+        prompt: '2+2?',
+        scores: [4, 7],
+        p1Answer: '4',
+        p2Answer: '5',
+        p1Answered: true,
+        p2Answered: false,
+        yourScore: 4,
+        partnerScore: 7,
+        yourAnswer: '4',
+        partnerAnswer: '5',
+        partnerAnswered: false,
+      });
+      assert.deepEqual(joiner.lastEmit('speed-match-state'), {
+        prompt: '2+2?',
+        scores: [4, 7],
+        p1Answer: '4',
+        p2Answer: '5',
+        p1Answered: true,
+        p2Answered: false,
+        yourScore: 7,
+        partnerScore: 4,
+        yourAnswer: '5',
+        partnerAnswer: '4',
+        partnerAnswered: true,
+      });
+    });
+
+    it('routes vending-state as per-player slices only', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'memory-match' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+
+      await rm.handleGameEvent(room, 'vending-state', {
+        byPlayer: {
+          host: { money: 10 },
+          joiner: { money: 99 },
+        },
+      });
+
+      assert.deepEqual(host.lastEmit('vending-state'), { money: 10 });
+      assert.deepEqual(joiner.lastEmit('vending-state'), { money: 99 });
+    });
+
+    it('routes bonk-state and cute-aggression-state as per-player slices only', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'memory-match' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+
+      await rm.handleGameEvent(room, 'bonk-state', {
+        byPlayer: {
+          host: { hp: 50 },
+          joiner: { hp: 25 },
+        },
+      });
+      await rm.handleGameEvent(room, 'cute-aggression-state', {
+        byPlayer: {
+          host: { combo: 2 },
+          joiner: { combo: 9 },
+        },
+      });
+
+      assert.deepEqual(host.lastEmit('bonk-state'), { hp: 50 });
+      assert.deepEqual(joiner.lastEmit('bonk-state'), { hp: 25 });
+      assert.deepEqual(host.lastEmit('cute-aggression-state'), { combo: 2 });
+      assert.deepEqual(joiner.lastEmit('cute-aggression-state'), { combo: 9 });
+    });
+
+    it('match-end still emits with zero points when persistence fails', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'memory-match' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+
+      const oldRecord = rm._recordMatchResult;
+      rm._recordMatchResult = async () => {
+        throw new Error('db-down');
+      };
+
+      try {
+        await rm.handleGameEvent(room, 'match-end', {
+          winnerId: 'host',
+          tie: false,
+          scores: [11, 7],
+        });
+
+        const hostEnd = host.lastEmit('match-end');
+        const joinerEnd = joiner.lastEmit('match-end');
+        assert.ok(hostEnd);
+        assert.ok(joinerEnd);
+        assert.equal(hostEnd.pointsEarned, 0);
+        assert.equal(joinerEnd.pointsEarned, 0);
+        assert.equal(hostEnd.isWinner, true);
+        assert.equal(joinerEnd.isWinner, false);
+      } finally {
+        rm._recordMatchResult = oldRecord;
+      }
+    });
+  });
+
+  // ── reconnect races / timeout behavior ─────────────────────
+
+  describe('reconnect race behavior', () => {
+    it('rejoin before timeout keeps room alive and remaps player id', () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'memory-match' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+
+      let scheduledFn = null;
+      let scheduledToken = null;
+      const oldSetTimeout = global.setTimeout;
+      const oldClearTimeout = global.clearTimeout;
+
+      global.setTimeout = (fn, _ms) => {
+        scheduledFn = fn;
+        scheduledToken = { id: 'disconnect-token' };
+        return scheduledToken;
+      };
+
+      let clearedToken = null;
+      global.clearTimeout = (token) => {
+        clearedToken = token;
+      };
+
+      try {
+        rm.handleDisconnect(host);
+        assert.ok(typeof scheduledFn === 'function');
+
+        const rejoiner = mockSocket('host-new');
+        rm.rejoinRoom(rejoiner, code);
+
+        assert.equal(clearedToken, scheduledToken);
+        assert.ok(rm.rooms.has(code));
+        assert.equal(rm.playerRooms.get('host-new'), code);
+        assert.equal(rm.playerRooms.has('host'), false);
+      } finally {
+        global.setTimeout = oldSetTimeout;
+        global.clearTimeout = oldClearTimeout;
+      }
+    });
+
+    it('timeout expiry destroys room when player does not rejoin', () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'memory-match' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+
+      let scheduledFn = null;
+      const oldSetTimeout = global.setTimeout;
+      global.setTimeout = (fn, _ms) => {
+        scheduledFn = fn;
+        return { id: 'disconnect-token' };
+      };
+
+      try {
+        rm.handleDisconnect(host);
+        assert.ok(typeof scheduledFn === 'function');
+        scheduledFn();
+
+        assert.equal(rm.rooms.has(code), false);
+        assert.equal(rm.playerRooms.has('host'), false);
+        assert.equal(rm.playerRooms.has('joiner'), false);
+      } finally {
+        global.setTimeout = oldSetTimeout;
+      }
     });
   });
 });
