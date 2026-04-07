@@ -15,6 +15,7 @@ import { quizRaceGame } from './games/quiz-race/index.js';
 import { battleshipMiniGame } from './games/battleship-mini/index.js';
 import { vendingMachineGame } from './games/vending-machine/index.js';
 import { bonkBrawlGame } from './games/bonk-brawl/index.js';
+import { cuteAggressionGame } from './games/cute-aggression/index.js';
 
 GameRegistry.register('pig-vs-chick', pigVsChickGame);
 GameRegistry.register('othello', othelloGame);
@@ -27,6 +28,7 @@ GameRegistry.register('quiz-race', quizRaceGame);
 GameRegistry.register('battleship-mini', battleshipMiniGame);
 GameRegistry.register('vending-machine', vendingMachineGame);
 GameRegistry.register('bonk-brawl', bonkBrawlGame);
+GameRegistry.register('cute-aggression', cuteAggressionGame);
 
 const app = {
   sceneManager: null,
