@@ -33,10 +33,7 @@ export let GAME_CONFIG = {
 
 // Called on game-start with server's authoritative config
 export function applyServerConfig(serverConfig) {
-  if (!serverConfig) {
-    console.warn('No server config received, using defaults');
-    return;
-  }
+  if (!serverConfig) return;
   GAME_CONFIG = {
     ...GAME_CONFIG,
     ...serverConfig,

@@ -2,6 +2,30 @@ import { io } from 'socket.io-client';
 import { EventBus } from './EventBus.js';
 import { captureEvent } from './analytics.js';
 
+const STATE_EVENT_BRIDGE = {
+  'game-state': 'game:state',
+  'word-scramble-state': 'word:state',
+  'memory-state': 'memory:state',
+  'speed-match-state': 'speed-match:state',
+  'battleship-state': 'battleship:state',
+  'vending-state': 'vending:state',
+  'bonk-state': 'bonk:state',
+  'cute-aggression-state': 'cute-aggression:state',
+};
+
+const OUTBOUND_SOCKET_EVENTS = {
+  identify: 'identify',
+  rejoinRoom: 'rejoin-room',
+  createRoom: 'create-room',
+  memoryFlip: 'memory-flip',
+  joinRoom: 'join-room',
+  selectSide: 'select-side',
+  spawnUnit: 'spawn-unit',
+  gameAction: 'game-action',
+  rematch: 'rematch',
+  submitWord: 'submit-word',
+};
+
 export class NetworkManager {
   constructor(socketFactory = io) {
     this.socketFactory = socketFactory;
@@ -41,32 +65,24 @@ export class NetworkManager {
 
     this.socket.on('connect', () => {
       this.playerId = this.socket.id;
-      console.log('Connected:', this.playerId);
-      captureEvent('socket_connected', {
-        roomCode: this.roomCode,
-        inGame: this._inGame,
-      });
+      this._track('socket_connected', this._connectionContext());
 
-      this.socket.emit('identify', this.userManager.getIdentity());
+      this._emit(OUTBOUND_SOCKET_EVENTS.identify, this.userManager.getIdentity());
 
       if (this.roomCode && this._wasInGame) {
-        console.log('Attempting rejoin:', this.roomCode);
-        this.socket.emit('rejoin-room', { roomCode: this.roomCode });
+        this._emit(OUTBOUND_SOCKET_EVENTS.rejoinRoom, { roomCode: this.roomCode });
         this._wasInGame = false;
       } else if (this.pendingJoinCode) {
         const code = this.pendingJoinCode;
         this.pendingJoinCode = null;
-        console.log('Deep-link join:', code);
         this.joinRoom(code);
       }
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('Disconnected:', reason);
-      captureEvent('socket_disconnected', {
+      this._track('socket_disconnected', {
+        ...this._connectionContext(),
         reason: reason || 'unknown',
-        roomCode: this.roomCode,
-        inGame: this._inGame,
       });
       if (this.roomCode && this._inGame) {
         this._wasInGame = true;
@@ -74,8 +90,7 @@ export class NetworkManager {
     });
 
     this.socket.on('connect_error', (err) => {
-      console.warn('Connection error:', err.message);
-      captureEvent('socket_connect_error', {
+      this._track('socket_connect_error', {
         message: err?.message || 'unknown',
       });
     });
@@ -131,55 +146,22 @@ export class NetworkManager {
       this.ui.startGame(data);
     });
 
-    this.socket.on('game-state', (state) => {
-      this._captureState('game-state', state);
-      EventBus.emit('game:state', state);
-    });
-
-    this.socket.on('word-scramble-state', (state) => {
-      this._captureState('word-scramble-state', state);
-      EventBus.emit('word:state', state);
+    Object.entries(STATE_EVENT_BRIDGE).forEach(([socketEvent, busEvent]) => {
+      this.socket.on(socketEvent, (state) => {
+        this._captureState(socketEvent, state);
+        EventBus.emit(busEvent, state);
+      });
     });
 
     this.socket.on('word-scramble-feedback', (payload) => {
       EventBus.emit('word:feedback', payload);
     });
 
-    this.socket.on('memory-state', (state) => {
-      this._captureState('memory-state', state);
-      EventBus.emit('memory:state', state);
-    });
-
-    this.socket.on('speed-match-state', (state) => {
-      this._captureState('speed-match-state', state);
-      EventBus.emit('speed-match:state', state);
-    });
-
-    this.socket.on('battleship-state', (state) => {
-      this._captureState('battleship-state', state);
-      EventBus.emit('battleship:state', state);
-    });
-
-    this.socket.on('vending-state', (state) => {
-      this._captureState('vending-state', state);
-      EventBus.emit('vending:state', state);
-    });
-
-    this.socket.on('bonk-state', (state) => {
-      this._captureState('bonk-state', state);
-      EventBus.emit('bonk:state', state);
-    });
-
-    this.socket.on('cute-aggression-state', (state) => {
-      this._captureState('cute-aggression-state', state);
-      EventBus.emit('cute-aggression:state', state);
-    });
 
     this.socket.on('match-end', (data) => {
       this._inGame = false;
-      captureEvent('match_ended', {
-        roomCode: this.roomCode,
-        gameType: this.gameType || this.roomGameType,
+      this._track('match_ended', {
+        ...this._roomAndGameContext(),
         winner: data.winner,
         loser: data.loser,
       });
@@ -221,9 +203,8 @@ export class NetworkManager {
     });
 
     this.socket.on('action-error', (data) => {
-      captureEvent('game_action_error', {
-        roomCode: this.roomCode,
-        gameType: this.gameType || this.roomGameType,
+      this._track('game_action_error', {
+        ...this._roomAndGameContext(),
         message: data?.message || null,
       });
       EventBus.emit('game:action-error', data);
@@ -232,16 +213,14 @@ export class NetworkManager {
 
     this.socket.on('room-error', (data) => {
       const msg = data.message || 'Something went wrong';
-      captureEvent('room_error', {
-        roomCode: this.roomCode,
-        gameType: this.gameType || this.roomGameType,
+      this._track('room_error', {
+        ...this._roomAndGameContext(),
         message: msg,
       });
       this.ui.showError(msg);
 
       // If the error relates to a room not found (deep link), go back to lobby
-      const lower = msg.toLowerCase();
-      if (lower.includes('room not found') || lower.includes('room is full') || lower.includes('no room')) {
+      if (this._shouldReturnToLobbyFromRoomError(msg)) {
         this._navigateToLobby();
       }
     });
@@ -271,18 +250,18 @@ export class NetworkManager {
       gameType: payload.gameType || 'pig-vs-chick',
       hasCustomPrompts: Array.isArray(payload.customPrompts) && payload.customPrompts.length > 0,
     });
-    this.socket.emit('create-room', payload);
+    this._emit(OUTBOUND_SOCKET_EVENTS.createRoom, payload);
   }
 
   memoryFlip(index) {
-    this.socket.emit('memory-flip', { index });
+    this._emit(OUTBOUND_SOCKET_EVENTS.memoryFlip, { index });
   }
 
   joinRoom(code) {
     captureEvent('join_room_attempt', {
       roomCode: code.toUpperCase(),
     });
-    this.socket.emit('join-room', { roomCode: code.toUpperCase() });
+    this._emit(OUTBOUND_SOCKET_EVENTS.joinRoom, { roomCode: code.toUpperCase() });
   }
 
   selectSide(side) {
@@ -291,27 +270,55 @@ export class NetworkManager {
       gameType: this.roomGameType,
       side,
     });
-    this.socket.emit('select-side', { side });
+    this._emit(OUTBOUND_SOCKET_EVENTS.selectSide, { side });
   }
 
   spawnUnit(tier, lane) {
-    this.socket.emit('spawn-unit', { tier, lane });
+    this._emit(OUTBOUND_SOCKET_EVENTS.spawnUnit, { tier, lane });
   }
 
   sendGameAction(action) {
-    this.socket.emit('game-action', action);
+    this._emit(OUTBOUND_SOCKET_EVENTS.gameAction, action);
   }
 
   requestRematch() {
-    captureEvent('rematch_requested', {
-      roomCode: this.roomCode,
-      gameType: this.gameType || this.roomGameType,
-    });
-    this.socket.emit('rematch');
+    this._track('rematch_requested', this._roomAndGameContext());
+    this._emit(OUTBOUND_SOCKET_EVENTS.rematch);
   }
 
   submitWord(path) {
-    this.socket.emit('submit-word', { path });
+    this._emit(OUTBOUND_SOCKET_EVENTS.submitWord, { path });
+  }
+
+  _track(eventName, properties = {}) {
+    captureEvent(eventName, properties);
+  }
+
+  _connectionContext() {
+    return {
+      roomCode: this.roomCode,
+      inGame: this._inGame,
+    };
+  }
+
+  _roomAndGameContext() {
+    return {
+      roomCode: this.roomCode,
+      gameType: this.gameType || this.roomGameType,
+    };
+  }
+
+  _shouldReturnToLobbyFromRoomError(message) {
+    const lower = String(message || '').toLowerCase();
+    return lower.includes('room not found') || lower.includes('room is full') || lower.includes('no room');
+  }
+
+  _emit(eventName, payload) {
+    if (typeof payload === 'undefined') {
+      this.socket.emit(eventName);
+      return;
+    }
+    this.socket.emit(eventName, payload);
   }
 
   _captureState(eventName, payload) {

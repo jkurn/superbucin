@@ -24,10 +24,7 @@ export const GameRegistry = {
    */
   get(gameType) {
     const game = games.get(gameType);
-    if (!game) {
-      console.error(`Unknown game type: ${gameType}`);
-      return null;
-    }
+    if (!game) return null;
     return game;
   },
 

@@ -16,7 +16,6 @@ import { capturePageView } from './analytics.js';
 
 let _ui = null;
 let _network = null;
-let _userManager = null;
 let _currentPath = '/';
 
 function matchRoute(pathname) {
@@ -69,12 +68,11 @@ function resolve(matched, { replace: _isReplace = false } = {}) {
 
 const Router = {
   /**
-   * Call once after UIManager, NetworkManager and UserManager are wired up.
+   * Call once after UIManager and NetworkManager are wired up.
    */
-  init(ui, network, userManager) {
+  init(ui, network) {
     _ui = ui;
     _network = network;
-    _userManager = userManager;
 
     // Listen for back/forward navigation
     window.addEventListener('popstate', () => {
