@@ -47,7 +47,7 @@ export function render(overlay, deps, options) {
            src="${STICKERS.pricyRocket}" alt="" />
       ${lossStreak >= 5 ? `<img class="easter-sign visible" src="${STICKERS.sayangilahPricy}" alt="" />` : ''}
     </div>
-    <div class="lobby-ui" style="padding-top:3.5rem;">
+    <div class="lobby-ui" style="padding-top:4.25rem;">
       <div class="lobby-title">SUPERBUCIN</div>
       <div class="lobby-quote">${QUOTES.kangenKamu}</div>
       <div class="game-grid">

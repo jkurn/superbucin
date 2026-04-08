@@ -210,3 +210,15 @@
   display: block;
   animation: stickerFloat 3.4s ease-in-out infinite;
 }
+
+@media (max-width: 430px) {
+  .lobby-sticker-layer .sticker-drift {
+    width: 64px !important;
+    top: 9% !important;
+    opacity: 0.5;
+  }
+
+  .lobby-sticker-layer .sticker-float {
+    top: 16% !important;
+  }
+}
