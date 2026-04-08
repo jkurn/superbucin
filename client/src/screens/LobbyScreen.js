@@ -1,4 +1,5 @@
 import { GameRegistry } from '../shared/GameRegistry.js';
+import { captureEvent } from '../shared/analytics.js';
 import { MEMORY_PACK_CHOICES } from '../games/memory-match/config.js';
 import { renderUserBar, bindUserBar } from '../shared/ui/UserBar.js';
 import { STICKERS, QUOTES } from '../shared/StickerPack.js';
@@ -145,6 +146,7 @@ export function render(overlay, deps, options) {
       overlay.querySelectorAll('.game-card[data-game-type]').forEach((c) => c.classList.remove('active'));
       card.classList.add('active');
       selectedGameType = card.dataset.gameType;
+      captureEvent('lobby_game_selected', { gameType: selectedGameType });
       syncGameOptionPanels();
     });
   });
@@ -176,6 +178,7 @@ export function render(overlay, deps, options) {
     const code = document.getElementById('input-code').value.trim();
     feedbackEl.textContent = '';
     if (code.length !== 4) {
+      captureEvent('lobby_join_validation_failed', { reason: 'invalid_code_length', length: code.length });
       feedbackEl.textContent = 'Please enter a 4-character room code';
       return;
     }

@@ -6,6 +6,7 @@ import { UserManager } from './shared/UserManager.js';
 import { Router } from './shared/Router.js';
 import { GameRegistry } from './shared/GameRegistry.js';
 import { WebAudioManager } from './shared/WebAudioManager.js';
+import { captureEvent, initAnalytics, syncUserIdentity } from './shared/analytics.js';
 import { pigVsChickGame } from './games/pig-vs-chick/index.js';
 import { othelloGame } from './games/othello/index.js';
 import { wordScrambleRaceGame } from './games/word-scramble-race/index.js';
@@ -32,6 +33,18 @@ GameRegistry.register('vending-machine', vendingMachineGame);
 GameRegistry.register('bonk-brawl', bonkBrawlGame);
 GameRegistry.register('cute-aggression', cuteAggressionGame);
 
+const appBootStartMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+function getConnectionType() {
+  const connection = navigator?.connection || navigator?.mozConnection || navigator?.webkitConnection;
+  return connection?.effectiveType || null;
+}
+
+function isMobileWeb() {
+  const userAgent = navigator?.userAgent || '';
+  return /android|iphone|ipad|ipod|mobile/i.test(userAgent);
+}
+
 const app = {
   sceneManager: null,
   network: null,
@@ -42,6 +55,8 @@ const app = {
   async init() {
     this.userManager = new UserManager();
     await this.userManager.init();
+    initAnalytics();
+    syncUserIdentity(this.userManager);
     this.audio = new WebAudioManager();
     this.audio.init();
 
@@ -64,8 +79,21 @@ const app = {
     Router.init(this.ui, this.network, this.userManager);
     this.ui.setRouter(Router);
 
+    const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - appBootStartMs;
+    captureEvent('game_loaded', {
+      load_time_ms: Math.round(elapsedMs),
+      load_time_seconds: Number((elapsedMs / 1000).toFixed(2)),
+      is_mobile_web: isMobileWeb(),
+      viewport_width: window.innerWidth,
+      viewport_height: window.innerHeight,
+      device_pixel_ratio: window.devicePixelRatio || 1,
+      connection_type: getConnectionType(),
+      route: window.location.pathname,
+    });
+
     // Listen for password recovery event from Supabase
     this.userManager.onChange(() => {
+      syncUserIdentity(this.userManager);
       if (this.userManager._passwordRecoveryPending) {
         this.userManager._passwordRecoveryPending = false;
         Router.replace('/reset-password');

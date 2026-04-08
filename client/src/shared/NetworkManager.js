@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client';
 import { EventBus } from './EventBus.js';
+import { captureEvent } from './analytics.js';
 
 export class NetworkManager {
   constructor(socketFactory = io) {
@@ -41,6 +42,10 @@ export class NetworkManager {
     this.socket.on('connect', () => {
       this.playerId = this.socket.id;
       console.log('Connected:', this.playerId);
+      captureEvent('socket_connected', {
+        roomCode: this.roomCode,
+        inGame: this._inGame,
+      });
 
       this.socket.emit('identify', this.userManager.getIdentity());
 
@@ -58,6 +63,11 @@ export class NetworkManager {
 
     this.socket.on('disconnect', (reason) => {
       console.log('Disconnected:', reason);
+      captureEvent('socket_disconnected', {
+        reason: reason || 'unknown',
+        roomCode: this.roomCode,
+        inGame: this._inGame,
+      });
       if (this.roomCode && this._inGame) {
         this._wasInGame = true;
       }
@@ -65,12 +75,19 @@ export class NetworkManager {
 
     this.socket.on('connect_error', (err) => {
       console.warn('Connection error:', err.message);
+      captureEvent('socket_connect_error', {
+        message: err?.message || 'unknown',
+      });
     });
 
     this.socket.on('room-created', (data) => {
       this.roomCode = data.roomCode;
       this.roomGameType = data.gameType || 'pig-vs-chick';
       this.isHost = true;
+      captureEvent('room_created', {
+        roomCode: data.roomCode,
+        gameType: this.roomGameType,
+      });
       this.ui.showWaitingRoom(data.roomCode);
     });
 
@@ -78,6 +95,11 @@ export class NetworkManager {
       this.roomCode = data.roomCode;
       if (data.gameType) this.roomGameType = data.gameType;
       if (data.opponentIdentity) this.opponentIdentity = data.opponentIdentity;
+      captureEvent('room_joined', {
+        roomCode: data.roomCode,
+        gameType: this.roomGameType,
+        skipSideSelect: !!data.skipSideSelect,
+      });
       if (data.skipSideSelect) return;
       this.ui.showSideSelect(data.roomCode);
     });
@@ -85,6 +107,11 @@ export class NetworkManager {
     this.socket.on('player-joined', (data) => {
       if (data?.gameType) this.roomGameType = data.gameType;
       if (data?.opponentIdentity) this.opponentIdentity = data.opponentIdentity;
+      captureEvent('room_player_joined', {
+        roomCode: this.roomCode,
+        gameType: this.roomGameType,
+        skipSideSelect: !!data?.skipSideSelect,
+      });
       if (data?.skipSideSelect) return;
       this.ui.showSideSelect(this.roomCode);
     });
@@ -96,6 +123,11 @@ export class NetworkManager {
     this.socket.on('game-start', (data) => {
       this._inGame = true;
       if (data.opponentIdentity) this.opponentIdentity = data.opponentIdentity;
+      captureEvent('game_started', {
+        roomCode: this.roomCode,
+        gameType: data.gameType || this.roomGameType,
+        isHost: this.isHost,
+      });
       this.ui.startGame(data);
     });
 
@@ -145,6 +177,12 @@ export class NetworkManager {
 
     this.socket.on('match-end', (data) => {
       this._inGame = false;
+      captureEvent('match_ended', {
+        roomCode: this.roomCode,
+        gameType: this.gameType || this.roomGameType,
+        winner: data.winner,
+        loser: data.loser,
+      });
       EventBus.emit('game:match-end', data);
       this.ui.showVictory(data);
       this.userManager.refreshProfile();
@@ -152,11 +190,23 @@ export class NetworkManager {
 
     this.socket.on('achievement-unlocked', (data) => {
       if (data.achievements && data.achievements.length > 0) {
+        captureEvent('achievement_unlocked', {
+          count: data.achievements.length,
+          ids: data.achievements
+            .map((a) => a.id || a.slug || a.key)
+            .filter(Boolean)
+            .slice(0, 24),
+        });
         this.ui.showAchievementToast(data.achievements);
       }
     });
 
     this.socket.on('opponent-disconnected', (data) => {
+      captureEvent('opponent_disconnected', {
+        reconnecting: !!(data && data.reconnecting),
+        roomCode: this.roomCode,
+        inGame: this._inGame,
+      });
       if (data && data.reconnecting) {
         this.ui.showReconnecting();
       } else {
@@ -166,16 +216,27 @@ export class NetworkManager {
     });
 
     this.socket.on('opponent-reconnected', () => {
+      captureEvent('opponent_reconnected', { roomCode: this.roomCode });
       this.ui.hideReconnecting();
     });
 
     this.socket.on('action-error', (data) => {
+      captureEvent('game_action_error', {
+        roomCode: this.roomCode,
+        gameType: this.gameType || this.roomGameType,
+        message: data?.message || null,
+      });
       EventBus.emit('game:action-error', data);
       this.ui.showError(data.message);
     });
 
     this.socket.on('room-error', (data) => {
       const msg = data.message || 'Something went wrong';
+      captureEvent('room_error', {
+        roomCode: this.roomCode,
+        gameType: this.gameType || this.roomGameType,
+        message: msg,
+      });
       this.ui.showError(msg);
 
       // If the error relates to a room not found (deep link), go back to lobby
@@ -206,6 +267,10 @@ export class NetworkManager {
         ? { ...gameTypeOrPayload }
         : { gameType: 'pig-vs-chick' };
     }
+    captureEvent('create_room_attempt', {
+      gameType: payload.gameType || 'pig-vs-chick',
+      hasCustomPrompts: Array.isArray(payload.customPrompts) && payload.customPrompts.length > 0,
+    });
     this.socket.emit('create-room', payload);
   }
 
@@ -214,10 +279,18 @@ export class NetworkManager {
   }
 
   joinRoom(code) {
+    captureEvent('join_room_attempt', {
+      roomCode: code.toUpperCase(),
+    });
     this.socket.emit('join-room', { roomCode: code.toUpperCase() });
   }
 
   selectSide(side) {
+    captureEvent('side_selected', {
+      roomCode: this.roomCode,
+      gameType: this.roomGameType,
+      side,
+    });
     this.socket.emit('select-side', { side });
   }
 
@@ -230,6 +303,10 @@ export class NetworkManager {
   }
 
   requestRematch() {
+    captureEvent('rematch_requested', {
+      roomCode: this.roomCode,
+      gameType: this.gameType || this.roomGameType,
+    });
     this.socket.emit('rematch');
   }
 

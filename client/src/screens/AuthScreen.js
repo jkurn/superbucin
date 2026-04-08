@@ -1,4 +1,5 @@
 import { AVATARS } from '../shared/ui/constants.js';
+import { captureEvent } from '../shared/analytics.js';
 
 export function render(overlay, deps, options) {
   const { userManager, router, showScreen } = deps;
@@ -69,6 +70,7 @@ export function render(overlay, deps, options) {
     const errEl = document.getElementById('auth-error');
     errEl.textContent = '';
     if (!email || !password) {
+      captureEvent('auth_sign_in_validation_failed', { reason: 'missing_fields' });
       errEl.textContent = 'Email and password are required';
       return;
     }
@@ -76,6 +78,7 @@ export function render(overlay, deps, options) {
       await userManager.signIn(email, password);
       showScreen('lobby');
     } catch (e) {
+      captureEvent('auth_sign_in_failed', { code: e.code || null });
       errEl.textContent = e.message || 'Login failed';
     }
   });
@@ -88,19 +91,35 @@ export function render(overlay, deps, options) {
     const errEl = document.getElementById('signup-error');
     errEl.textContent = '';
 
-    if (!email || !password) { errEl.textContent = 'Email and password required'; return; }
-    if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
-    if (!username) { errEl.textContent = 'Username required'; return; }
+    if (!email || !password) {
+      captureEvent('auth_sign_up_validation_failed', { reason: 'missing_email_or_password' });
+      errEl.textContent = 'Email and password required';
+      return;
+    }
+    if (password.length < 6) {
+      captureEvent('auth_sign_up_validation_failed', { reason: 'password_too_short' });
+      errEl.textContent = 'Password must be at least 6 characters';
+      return;
+    }
+    if (!username) {
+      captureEvent('auth_sign_up_validation_failed', { reason: 'missing_username' });
+      errEl.textContent = 'Username required';
+      return;
+    }
 
     try {
       await userManager.signUp(email, password, username, displayName, selectedAvatar);
       showScreen('lobby');
     } catch (e) {
+      captureEvent('auth_sign_up_failed', { code: e.code || null });
       errEl.textContent = e.message || 'Signup failed';
     }
   });
 
-  document.getElementById('btn-forgot').addEventListener('click', () => renderForgotPassword(overlay, deps));
+  document.getElementById('btn-forgot').addEventListener('click', () => {
+    captureEvent('auth_forgot_password_opened');
+    renderForgotPassword(overlay, deps);
+  });
   document.getElementById('btn-back-lobby').addEventListener('click', () => showScreen('lobby'));
 }
 
@@ -126,7 +145,11 @@ function renderForgotPassword(overlay, deps) {
     msgEl.style.color = '';
     msgEl.textContent = '';
 
-    if (!email) { msgEl.textContent = 'Please enter your email'; return; }
+    if (!email) {
+      captureEvent('auth_reset_password_validation_failed', { reason: 'missing_email' });
+      msgEl.textContent = 'Please enter your email';
+      return;
+    }
 
     try {
       await userManager.resetPassword(email);
@@ -135,6 +158,7 @@ function renderForgotPassword(overlay, deps) {
       document.getElementById('btn-send-reset').disabled = true;
       document.getElementById('btn-send-reset').textContent = 'Sent!';
     } catch (e) {
+      captureEvent('auth_reset_password_failed', { code: e.code || null });
       msgEl.textContent = e.message || 'Failed to send reset link';
     }
   });
@@ -165,8 +189,16 @@ export function renderResetPassword(overlay, deps) {
     msgEl.style.color = '';
     msgEl.textContent = '';
 
-    if (!pw || pw.length < 6) { msgEl.textContent = 'Password must be at least 6 characters'; return; }
-    if (pw !== confirmPw) { msgEl.textContent = 'Passwords do not match'; return; }
+    if (!pw || pw.length < 6) {
+      captureEvent('auth_update_password_validation_failed', { reason: 'password_too_short' });
+      msgEl.textContent = 'Password must be at least 6 characters';
+      return;
+    }
+    if (pw !== confirmPw) {
+      captureEvent('auth_update_password_validation_failed', { reason: 'mismatch' });
+      msgEl.textContent = 'Passwords do not match';
+      return;
+    }
 
     try {
       await userManager.updatePassword(pw);
@@ -174,6 +206,7 @@ export function renderResetPassword(overlay, deps) {
       msgEl.textContent = 'Password updated! Redirecting... \ud83d\udc95';
       setTimeout(() => showScreen('lobby'), 1500);
     } catch (e) {
+      captureEvent('auth_update_password_failed', { code: e.code || null });
       msgEl.textContent = e.message || 'Failed to update password';
     }
   });

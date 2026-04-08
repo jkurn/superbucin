@@ -86,6 +86,25 @@ SUPABASE_JWT_SECRET=
 LOG_LEVEL=info
 ```
 
+PostHog (optional, frontend analytics):
+
+```
+VITE_POSTHOG_KEY=phc_xxx
+VITE_POSTHOG_HOST=https://eu.i.posthog.com
+# optional (default in code matches PostHog install snippet)
+VITE_POSTHOG_DEFAULTS=2026-01-30
+# optional override, otherwise inferred from hostname
+VITE_APP_ENV=production
+```
+
+Use the **EU** host if your PostHog project is on EU cloud; use `https://us.i.posthog.com` for US. If you use PostHog’s **managed reverse proxy**, set `VITE_POSTHOG_HOST` to that URL (for example `https://t.yourdomain.com`) so the SDK sends events through your domain.
+
+If `VITE_POSTHOG_KEY` is missing, analytics is disabled automatically. Never commit real keys; set them in `.env` locally and in Render (or your host) only.
+
+PostHog filtering best practice:
+- Exclude `environment=local` in production dashboards/insights.
+- Keep internal QA users tagged and excluded (for example by email domain or person property).
+
 ---
 
 ## Engineering hygiene and observability

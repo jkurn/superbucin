@@ -19,6 +19,7 @@
 ### Deploy Checklist
 Before pushing to main (auto-deploys to Render):
 - [ ] Render env vars match local `.env` — all 4 Supabase vars: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`
+- [ ] PostHog (if enabled): `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST` (EU, US, or your reverse-proxy URL), optional `VITE_POSTHOG_DEFAULTS` — must be set on Render for production builds (`vite build` inlines `VITE_*`)
 - [ ] CORS origins in `server/index.js` include `https://superbucin.pricylia.com`
 - [ ] Supabase Auth redirect URLs include production domain (Supabase dashboard > Auth > URL Configuration)
 - [ ] Render env group is linked to this web service

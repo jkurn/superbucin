@@ -1,4 +1,5 @@
 import { showError, showAchievementToast } from './ui/toasts.js';
+import { captureEvent, trackScreen } from './analytics.js';
 import * as LobbyScreen from '../screens/LobbyScreen.js';
 import * as AuthScreen from '../screens/AuthScreen.js';
 import * as ProfileScreen from '../screens/ProfileScreen.js';
@@ -62,11 +63,13 @@ export class UIManager {
   // ==================== SCREEN DELEGATES ====================
 
   showLobby(options) {
+    trackScreen('lobby', { fromRouter: !!(options && options.fromRouter) });
     this.clear();
     LobbyScreen.render(this.overlay, this._deps(), options);
   }
 
   showAuthScreen(options) {
+    trackScreen('auth', { fromRouter: !!(options && options.fromRouter) });
     this.clear();
     AuthScreen.render(this.overlay, this._deps(), options);
   }
@@ -76,31 +79,44 @@ export class UIManager {
   }
 
   showResetPassword() {
+    trackScreen('reset_password');
     this.clear();
     AuthScreen.renderResetPassword(this.overlay, this._deps());
   }
 
   showProfile(options) {
+    trackScreen('profile');
     this.clear();
     ProfileScreen.render(this.overlay, this._deps(), options);
   }
 
   showPublicProfile(username) {
+    trackScreen('public_profile', { username: username || null });
     this.clear();
     PublicProfileScreen.render(this.overlay, this._deps(), username);
   }
 
   showWaitingRoom(roomCode) {
+    trackScreen('waiting_room', {
+      roomCode,
+      gameType: this.network?.roomGameType || null,
+      isHost: !!this.network?.isHost,
+    });
     this.clear();
     WaitingRoomScreen.render(this.overlay, this._deps(), roomCode);
   }
 
   showJoiningRoom(code) {
+    trackScreen('joining_room', { roomCode: code });
     this.clear();
     JoiningRoomScreen.render(this.overlay, this._deps(), code);
   }
 
   showSideSelect(roomCode) {
+    trackScreen('side_select', {
+      roomCode,
+      gameType: this.network?.roomGameType || null,
+    });
     this.clear();
     this.selectedSide = null;
     this._sideSelectHandle = SideSelectScreen.render(this.overlay, this._deps(), roomCode);
@@ -115,6 +131,12 @@ export class UIManager {
   }
 
   startGame(data) {
+    const gameType = data?.gameType || this.network?.roomGameType || null;
+    trackScreen('game_play', {
+      gameType,
+      roomCode: this.network?.roomCode || null,
+      isHost: !!this.network?.isHost,
+    });
     this.clear();
     const result = GameScreen.render(this.overlay, this._deps(), data);
     if (result) {
@@ -125,12 +147,17 @@ export class UIManager {
 
   showVictory(data) {
     this._cleanupGame();
+    trackScreen('victory', {
+      gameType: data?.gameType || this.network?.roomGameType || null,
+      roomCode: this.network?.roomCode || null,
+    });
     this.clear();
     VictoryScreen.render(this.overlay, this._deps(), data);
   }
 
   showDisconnect() {
     this._cleanupGame();
+    trackScreen('disconnect', { roomCode: this.network?.roomCode || null });
     this.clear();
     DisconnectScreen.render(this.overlay, this._deps());
   }
@@ -165,6 +192,7 @@ export class UIManager {
   }
 
   showReconnecting() {
+    trackScreen('opponent_reconnecting', { roomCode: this.network?.roomCode || null });
     let overlay = document.getElementById('reconnect-overlay');
     if (!overlay) {
       overlay = document.createElement('div');
@@ -181,6 +209,7 @@ export class UIManager {
   hideReconnecting() {
     const overlay = document.getElementById('reconnect-overlay');
     if (overlay) overlay.remove();
+    captureEvent('opponent_reconnected_dismissed', { roomCode: this.network?.roomCode || null });
     showError('Sayang reconnected! \ud83d\udc95');
   }
 

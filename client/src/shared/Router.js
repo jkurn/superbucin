@@ -1,3 +1,5 @@
+import { capturePageView } from './analytics.js';
+
 /**
  * Lightweight History API router for SUPERBUCIN.
  *
@@ -59,6 +61,10 @@ function resolve(matched, { replace: _isReplace = false } = {}) {
       _network.pendingJoinCode = null;
     }
   }
+
+  if (!_isReplace) {
+    capturePageView(_currentPath);
+  }
 }
 
 const Router = {
@@ -93,6 +99,7 @@ const Router = {
     if (path === _currentPath) return;
     _currentPath = path;
     window.history.pushState(null, '', path);
+    capturePageView(path);
   },
 
   /**
@@ -101,6 +108,7 @@ const Router = {
   replace(path) {
     _currentPath = path;
     window.history.replaceState(null, '', path);
+    capturePageView(path);
   },
 
   currentPath() {

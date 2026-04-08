@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient.js';
 import { AVATARS } from './ui/constants.js';
+import { captureEvent, resetAnalyticsIdentity } from './analytics.js';
 
 const ADJECTIVES = [
   'Sleepy', 'Spicy', 'Fluffy', 'Sneaky', 'Wobbly', 'Turbo', 'Cosmic',
@@ -178,6 +179,10 @@ export class UserManager {
     });
 
     if (error) throw error;
+    captureEvent('auth_sign_up_success', {
+      hasDisplayName: !!displayName,
+      hasAvatar: !!avatarUrl,
+    });
     return data;
   }
 
@@ -190,6 +195,7 @@ export class UserManager {
     });
 
     if (error) throw error;
+    captureEvent('auth_sign_in_success');
     return data;
   }
 
@@ -199,17 +205,21 @@ export class UserManager {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) throw error;
+    captureEvent('auth_password_reset_requested');
   }
 
   async updatePassword(newPassword) {
     if (!supabase) throw new Error('Supabase not configured');
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw error;
+    captureEvent('auth_password_updated');
   }
 
   async signOut() {
     if (!supabase) return;
     await supabase.auth.signOut();
+    captureEvent('auth_sign_out');
+    resetAnalyticsIdentity();
     this._loadGuest();
   }
 
