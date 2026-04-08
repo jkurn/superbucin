@@ -2,6 +2,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { RoomManager } from './RoomManager.js';
 import { GameFactory } from '../games/GameFactory.js';
+import { UserService } from '../services/UserService.js';
 
 // Register a minimal mock game so GameFactory.has() returns true
 class MockGameState {
@@ -24,6 +25,10 @@ GameFactory.register('othello', MockGameState, MOCK_CONFIG);
 GameFactory.register('pig-vs-chick', MockGameState, MOCK_CONFIG);
 GameFactory.register('doodle-guess', MockGameState, MOCK_CONFIG);
 GameFactory.register('memory-match', MockGameState, MOCK_SKIP_CONFIG);
+GameFactory.register('word-scramble-race', MockGameState, MOCK_CONFIG);
+GameFactory.register('connect-four', MockGameState, MOCK_CONFIG);
+GameFactory.register('bonk-brawl', MockGameState, MOCK_CONFIG);
+GameFactory.register('cute-aggression', MockGameState, MOCK_CONFIG);
 
 // ── Mock helpers ─────────────────────────────────────────────────────────────
 
@@ -80,6 +85,18 @@ describe('RoomManager', () => {
       const id = rm._getIdentity('unknown');
       assert.equal(id.displayName, 'Guest');
       assert.equal(id.isGuest, true);
+    });
+
+    it('_getDisplayName prefers username, then tag, then displayName', () => {
+      const a = mockSocket('a');
+      const b = mockSocket('b');
+      const c = mockSocket('c');
+      rm.setIdentity(a, { displayName: 'Anna', username: 'anna_u' });
+      rm.setIdentity(b, { displayName: 'Ben', tag: '1234' });
+      rm.setIdentity(c, { displayName: 'Cara' });
+      assert.equal(rm._getDisplayName('a'), 'anna_u');
+      assert.equal(rm._getDisplayName('b'), 'Ben #1234');
+      assert.equal(rm._getDisplayName('c'), 'Cara');
     });
   });
 
@@ -236,6 +253,33 @@ describe('RoomManager', () => {
       const ev = joiner.lastEmit('room-joined');
       assert.ok(ev);
     });
+
+    it('clears persisted waiting timer when joiner enters', () => {
+      const room = rm.rooms.get(code);
+      room._waitingTimer = { id: 'wait-token' };
+      let cleared;
+      const oldClearTimeout = globalThis.clearTimeout;
+      globalThis.clearTimeout = (token) => { cleared = token; };
+      try {
+        const joiner = mockSocket('joiner');
+        rm.joinRoom(joiner, code);
+        assert.deepEqual(cleared, { id: 'wait-token' });
+        assert.equal(room._waitingTimer, null);
+      } finally {
+        globalThis.clearTimeout = oldClearTimeout;
+      }
+    });
+
+    it('joining a host-left room with zero players emits room-created waiting payload', () => {
+      const room = rm.rooms.get(code);
+      room.players = [];
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const created = joiner.lastEmit('room-created');
+      assert.ok(created);
+      assert.equal(created.roomCode, code);
+      assert.equal(room.state, 'waiting');
+    });
   });
 
   // ── selectSide ─────────────────────────────────────────────
@@ -269,6 +313,90 @@ describe('RoomManager', () => {
       rm.selectSide(joinerSocket, 'black');
       const ev = joinerSocket.lastEmit('side-selected');
       assert.ok(ev.message.includes('taken'));
+    });
+
+    it('supports game-specific valid side sets', () => {
+      const cases = [
+        ['doodle-guess', 'drawer'],
+        ['word-scramble-race', 'sprout'],
+        ['connect-four', 'yellow'],
+        ['bonk-brawl', 'bunny'],
+        ['cute-aggression', 'merah'],
+      ];
+      for (const [gameType, side] of cases) {
+        const host = mockSocket(`h-${gameType}`);
+        rm.createRoom(host, { gameType });
+        const codeX = host.lastEmit('room-created').roomCode;
+        const joiner = mockSocket(`j-${gameType}`);
+        rm.joinRoom(joiner, codeX);
+        rm.selectSide(host, side);
+        const ev = host.lastEmit('side-selected');
+        assert.ok(ev.message.includes(side));
+      }
+    });
+
+    it('starts game once both players have selected unique valid sides', () => {
+      rm.selectSide(hostSocket, 'black');
+      rm.selectSide(joinerSocket, 'white');
+      const room = rm.rooms.get(code);
+      assert.equal(room.state, 'playing');
+      assert.ok(room.game);
+    });
+  });
+
+  describe('action wrappers', () => {
+    it('routes spawn/flip/action/doodle helper calls only when functions exist', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'doodle-guess' });
+      const code = host.lastEmit('room-created').roomCode;
+      const room = rm.rooms.get(code);
+      rm.playerRooms.set(host.id, code);
+
+      const calls = [];
+      room.game = {
+        requestSpawn: (...args) => calls.push(['spawn', ...args]),
+        submitWord: async (...args) => { calls.push(['word', ...args]); },
+        appendStroke: (...args) => calls.push(['stroke', ...args]),
+        clearCanvas: (...args) => calls.push(['clear', ...args]),
+        submitGuess: (...args) => calls.push(['guess', ...args]),
+        tryFlip: (...args) => calls.push(['flip', ...args]),
+        handleAction: (...args) => calls.push(['action', ...args]),
+      };
+      room.gameType = 'doodle-guess';
+
+      rm.spawnUnit(host, 2, 'top');
+      await rm.submitWord(host, [{ r: 0, c: 0 }]);
+      rm.doodleStroke(host, { x: 1, y: 2 });
+      rm.doodleClear(host);
+      rm.doodleGuess(host, 'cat');
+      rm.memoryFlip(host, 3);
+      rm.handleAction(host, { type: 'attack' });
+
+      assert.ok(calls.find((c) => c[0] === 'spawn'));
+      assert.ok(calls.find((c) => c[0] === 'word'));
+      assert.ok(calls.find((c) => c[0] === 'stroke'));
+      assert.ok(calls.find((c) => c[0] === 'clear'));
+      assert.ok(calls.find((c) => c[0] === 'guess'));
+      assert.ok(calls.find((c) => c[0] === 'flip'));
+      assert.ok(calls.find((c) => c[0] === 'action'));
+    });
+
+    it('submitWord catches async rejection and emits feedback', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'word-scramble-race' });
+      const code = host.lastEmit('room-created').roomCode;
+      const room = rm.rooms.get(code);
+      rm.playerRooms.set(host.id, code);
+      room.game = {
+        submitWord: async () => {
+          throw new Error('bad');
+        },
+      };
+
+      await rm.submitWord(host, [{ r: 0, c: 0 }]);
+      const fb = host.lastEmit('word-scramble-feedback');
+      assert.ok(fb);
+      assert.equal(fb.ok, false);
     });
   });
 
@@ -341,6 +469,55 @@ describe('RoomManager', () => {
   // ── event contracts / payload privacy ──────────────────────
 
   describe('handleGameEvent contracts', () => {
+    it('routes state-update in energies and broadcast modes', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'pig-vs-chick' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+
+      await rm.handleGameEvent(room, 'state-update', {
+        units: [{ id: 1 }],
+        playerHP: { host: 100, joiner: 90 },
+        energies: { host: 4, joiner: 7 },
+      });
+      assert.equal(host.lastEmit('game-state').energy, 4);
+      assert.equal(joiner.lastEmit('game-state').energy, 7);
+
+      await rm.handleGameEvent(room, 'state-update', { phase: 'x' });
+      assert.equal(host.lastEmit('game-state').yourId, 'host');
+      assert.equal(joiner.lastEmit('game-state').yourId, 'joiner');
+    });
+
+    it('routes word-scramble and doodle event families by target or per-player slice', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'memory-match' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+
+      await rm.handleGameEvent(room, 'word-scramble-state', { phase: 'playing' });
+      assert.deepEqual(host.lastEmit('word-scramble-state'), { phase: 'playing' });
+      assert.deepEqual(joiner.lastEmit('word-scramble-state'), { phase: 'playing' });
+
+      await rm.handleGameEvent(room, 'word-scramble-feedback', { targetId: 'joiner', ok: true });
+      assert.deepEqual(joiner.lastEmit('word-scramble-feedback'), { targetId: 'joiner', ok: true });
+      assert.equal(host.lastEmit('word-scramble-feedback'), null);
+
+      await rm.handleGameEvent(room, 'doodle-state', { byPlayer: { host: { me: 1 }, joiner: { me: 2 } } });
+      assert.deepEqual(host.lastEmit('doodle-state'), { me: 1 });
+      assert.deepEqual(joiner.lastEmit('doodle-state'), { me: 2 });
+
+      await rm.handleGameEvent(room, 'doodle-draw', { targetId: 'joiner', payload: { x: 1 } });
+      await rm.handleGameEvent(room, 'doodle-clear', { targetId: 'joiner' });
+      await rm.handleGameEvent(room, 'doodle-guess-wrong', { targetId: 'joiner', guess: 'dog' });
+      assert.deepEqual(joiner.lastEmit('doodle-draw'), { x: 1 });
+      assert.deepEqual(joiner.lastEmit('doodle-clear'), {});
+      assert.deepEqual(joiner.lastEmit('doodle-guess-wrong'), { guess: 'dog' });
+    });
+
     it('routes memory-state as per-player slices only', async () => {
       const host = mockSocket('host');
       rm.createRoom(host, { gameType: 'memory-match' });
@@ -589,6 +766,227 @@ describe('RoomManager', () => {
         assert.equal(rm.playerRooms.has('joiner'), false);
       } finally {
         global.setTimeout = oldSetTimeout;
+      }
+    });
+  });
+
+  describe('rejoin and rematch branches', () => {
+    it('rejoinRoom returns errors for missing room or no disconnected slot', () => {
+      const s = mockSocket('x');
+      rm.rejoinRoom(s, 'NONE');
+      assert.ok(s.lastEmit('room-error'));
+
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'othello' });
+      const code = host.lastEmit('room-created').roomCode;
+      const fresh = mockSocket('fresh');
+      rm.rejoinRoom(fresh, code);
+      assert.ok(fresh.lastEmit('room-error'));
+    });
+
+    it('rejoin in non-playing state emits room-joined fallback', () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'othello' });
+      const code = host.lastEmit('room-created').roomCode;
+      const room = rm.rooms.get(code);
+      room.players[0].disconnected = true;
+      const re = mockSocket('host-new');
+      rm.rejoinRoom(re, code);
+      assert.ok(re.lastEmit('room-joined'));
+    });
+
+    it('rejoin in doodle playing state sends game-start plus doodle sync/state', () => {
+      const host = mockSocket('host');
+      const joiner = mockSocket('joiner');
+      rm.createRoom(host, { gameType: 'doodle-guess' });
+      const code = host.lastEmit('room-created').roomCode;
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+      room.state = 'playing';
+      room.players[0].disconnected = true;
+      room.game = {
+        p1: room.players[0],
+        p2: room.players[1],
+        resume: () => {},
+        getReconnectPayload: () => ({ extra: true }),
+        getStrokeHistoryFor: () => [{ x: 1 }],
+        getPersonalStateFor: () => ({ phase: 'drawing' }),
+      };
+
+      const re = mockSocket('host-new');
+      rm.rejoinRoom(re, code);
+      assert.ok(re.lastEmit('game-start'));
+      assert.deepEqual(re.lastEmit('doodle-sync'), { strokes: [{ x: 1 }] });
+      assert.deepEqual(re.lastEmit('doodle-state'), { phase: 'drawing' });
+    });
+
+    it('rejoin migrates p1 game-owned maps from old socket id', () => {
+      const host = mockSocket('host');
+      const joiner = mockSocket('joiner');
+      rm.createRoom(host, { gameType: 'othello' });
+      const code = host.lastEmit('room-created').roomCode;
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+      room.state = 'playing';
+      room.players[0].disconnected = true;
+
+      room.game = {
+        p1: room.players[0],
+        p2: room.players[1],
+        energies: { host: 4 },
+        playerHP: { host: 100 },
+        units: [{ ownerId: 'host' }],
+        scores: { host: 11 },
+        roundWords: { host: new Set(['cat']) },
+        currentTurn: 'host',
+        resume: () => {},
+      };
+
+      const re = mockSocket('host-new');
+      rm.rejoinRoom(re, code);
+      assert.equal(room.game.energies['host-new'], 4);
+      assert.equal(room.game.playerHP['host-new'], 100);
+      assert.equal(room.game.units[0].ownerId, 'host-new');
+      assert.equal(room.game.scores['host-new'], 11);
+      assert.ok(room.game.roundWords['host-new'].has('cat'));
+      assert.equal(room.game.currentTurn, 'host-new');
+    });
+
+    it('rejoin migrates p2 game-owned maps from old socket id', () => {
+      const host = mockSocket('host');
+      const joiner = mockSocket('joiner');
+      rm.createRoom(host, { gameType: 'othello' });
+      const code = host.lastEmit('room-created').roomCode;
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+      room.state = 'playing';
+      room.players[1].disconnected = true;
+
+      room.game = {
+        p1: room.players[0],
+        p2: room.players[1],
+        energies: { joiner: 6 },
+        playerHP: { joiner: 80 },
+        units: [{ ownerId: 'joiner' }],
+        scores: { joiner: 7 },
+        roundWords: { joiner: new Set(['dog']) },
+        currentTurn: 'joiner',
+        resume: () => {},
+      };
+
+      const re = mockSocket('joiner-new');
+      rm.rejoinRoom(re, code);
+      assert.equal(room.game.energies['joiner-new'], 6);
+      assert.equal(room.game.playerHP['joiner-new'], 80);
+      assert.equal(room.game.units[0].ownerId, 'joiner-new');
+      assert.equal(room.game.scores['joiner-new'], 7);
+      assert.ok(room.game.roundWords['joiner-new'].has('dog'));
+      assert.equal(room.game.currentTurn, 'joiner-new');
+    });
+
+    it('rematch resets sides and restarts or re-enters side-select', () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'memory-match' });
+      const codeA = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, codeA);
+      const roomA = rm.rooms.get(codeA);
+      roomA.game = { stop: () => {} };
+      rm.rematch(host);
+      assert.equal(roomA.state, 'playing');
+
+      const host2 = mockSocket('host2');
+      rm.createRoom(host2, { gameType: 'othello' });
+      const codeB = host2.lastEmit('room-created').roomCode;
+      const joiner2 = mockSocket('joiner2');
+      rm.joinRoom(joiner2, codeB);
+      const roomB = rm.rooms.get(codeB);
+      roomB.game = { stop: () => {} };
+      rm.rematch(host2);
+      assert.equal(roomB.state, 'side-select');
+      const roomJoined = io._broadcasts.find((b) => b.event === 'room-joined');
+      assert.ok(roomJoined);
+    });
+  });
+
+  describe('disconnect additional branches', () => {
+    it('waiting room with one remaining player notifies reconnecting true', () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'othello' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+      room.state = 'waiting';
+      rm.handleDisconnect(host);
+      assert.deepEqual(joiner.lastEmit('opponent-disconnected'), { reconnecting: true });
+    });
+
+    it('finished state destroys room and notifies opponent reconnecting false', () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'othello' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+      room.state = 'finished';
+      room.game = { stop: () => {} };
+      rm.handleDisconnect(host);
+      assert.deepEqual(joiner.lastEmit('opponent-disconnected'), { reconnecting: false });
+      assert.equal(rm.rooms.has(code), false);
+    });
+
+    it('waiting empty-room grace callback eventually deletes room', () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'othello' });
+      const code = host.lastEmit('room-created').roomCode;
+
+      let cb = null;
+      const oldSetTimeout = globalThis.setTimeout;
+      globalThis.setTimeout = (fn) => {
+        cb = fn;
+        return { id: 'wait-token' };
+      };
+      try {
+        rm.handleDisconnect(host);
+        assert.ok(rm.rooms.has(code));
+        cb();
+        assert.equal(rm.rooms.has(code), false);
+      } finally {
+        globalThis.setTimeout = oldSetTimeout;
+      }
+    });
+  });
+
+  describe('_recordMatchResult', () => {
+    it('emits achievements only for connected players and returns points map', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'othello' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+      room.players[1].disconnected = true;
+
+      const original = UserService.recordMatch;
+      UserService.recordMatch = async () => ({
+        newAchievements: {
+          host: [{ id: 'a1' }],
+          joiner: [{ id: 'a2' }],
+        },
+        pointsByPlayer: { host: 20, joiner: 10 },
+      });
+      try {
+        const result = await rm._recordMatchResult(room, {
+          winnerId: 'host',
+          tie: false,
+          scores: [5, 1],
+        });
+        assert.deepEqual(result.pointsByPlayer, { host: 20, joiner: 10 });
+        assert.deepEqual(host.lastEmit('achievement-unlocked'), { achievements: [{ id: 'a1' }] });
+        assert.equal(joiner.lastEmit('achievement-unlocked'), null);
+      } finally {
+        UserService.recordMatch = original;
       }
     });
   });

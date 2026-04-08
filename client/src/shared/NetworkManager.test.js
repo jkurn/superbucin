@@ -220,4 +220,131 @@ describe('NetworkManager contracts', () => {
     });
     assert.deepEqual(snapshot.latestStateByEvent['battleship-state'], { phase: 'battle' });
   });
+
+  it('connect reconnects previous room and deep-link joins pending code', () => {
+    const fakeSocket = new FakeSocket('sock-r1');
+    const nm = new NetworkManager(() => fakeSocket);
+    const ui = makeUI();
+    nm.init(ui, {}, { getIdentity: () => ({ userId: 'u1' }), refreshProfile: () => {} });
+
+    nm.roomCode = 'ABCD';
+    nm._wasInGame = true;
+    fakeSocket.trigger('connect');
+    const rejoin = fakeSocket.emitted.find((e) => e.event === 'rejoin-room');
+    assert.ok(rejoin);
+    assert.deepEqual(rejoin.payload, { roomCode: 'ABCD' });
+    assert.equal(nm._wasInGame, false);
+
+    nm.pendingJoinCode = 'z9x8';
+    fakeSocket.trigger('connect');
+    const join = fakeSocket.emitted.find((e) => e.event === 'join-room');
+    assert.ok(join);
+    assert.deepEqual(join.payload, { roomCode: 'Z9X8' });
+    assert.equal(nm.pendingJoinCode, null);
+  });
+
+  it('disconnect marks wasInGame only when already in game', () => {
+    const fakeSocket = new FakeSocket();
+    const nm = new NetworkManager(() => fakeSocket);
+    const ui = makeUI();
+    nm.init(ui, {}, { getIdentity: () => ({}), refreshProfile: () => {} });
+    nm.roomCode = 'ABCD';
+
+    nm._inGame = false;
+    fakeSocket.trigger('disconnect', 'transport close');
+    assert.equal(nm._wasInGame, false);
+
+    nm._inGame = true;
+    fakeSocket.trigger('disconnect', 'transport close');
+    assert.equal(nm._wasInGame, true);
+  });
+
+  it('routes state events through EventBus and wrapper methods emit socket events', () => {
+    const fakeSocket = new FakeSocket();
+    const nm = new NetworkManager(() => fakeSocket);
+    const ui = makeUI();
+    const oldEmit = EventBus.emit;
+    const emitted = [];
+    EventBus.emit = (event, data) => emitted.push({ event, data });
+    try {
+      nm.init(ui, {}, { getIdentity: () => ({}), refreshProfile: () => {} });
+
+      fakeSocket.trigger('game-state', { hp: 10 });
+      fakeSocket.trigger('word-scramble-state', { phase: 'playing' });
+      fakeSocket.trigger('word-scramble-feedback', { ok: true });
+      fakeSocket.trigger('memory-state', { turn: 'p1' });
+      fakeSocket.trigger('speed-match-state', { q: 1 });
+      fakeSocket.trigger('vending-state', { yen: 999 });
+      fakeSocket.trigger('bonk-state', { hp: 80 });
+      fakeSocket.trigger('cute-aggression-state', { combo: 2 });
+
+      assert.ok(emitted.find((e) => e.event === 'game:state'));
+      assert.ok(emitted.find((e) => e.event === 'word:state'));
+      assert.ok(emitted.find((e) => e.event === 'word:feedback'));
+      assert.ok(emitted.find((e) => e.event === 'memory:state'));
+      assert.ok(emitted.find((e) => e.event === 'speed-match:state'));
+      assert.ok(emitted.find((e) => e.event === 'vending:state'));
+      assert.ok(emitted.find((e) => e.event === 'bonk:state'));
+      assert.ok(emitted.find((e) => e.event === 'cute-aggression:state'));
+
+      nm.createRoom('othello');
+      nm.createRoom('doodle-guess', ['cat']);
+      nm.createRoom({ gameType: 'memory-match', speedMode: true });
+      nm.createRoom(null);
+      nm.memoryFlip(3);
+      nm.joinRoom('ab12');
+      nm.selectSide('black');
+      nm.spawnUnit(2, 'top');
+      nm.sendGameAction({ type: 'answer', value: 1 });
+      nm.requestRematch();
+      nm.submitWord([{ r: 0, c: 0 }]);
+
+      const eventNames = fakeSocket.emitted.map((e) => e.event);
+      assert.ok(eventNames.includes('create-room'));
+      assert.ok(eventNames.includes('memory-flip'));
+      assert.ok(eventNames.includes('join-room'));
+      assert.ok(eventNames.includes('select-side'));
+      assert.ok(eventNames.includes('spawn-unit'));
+      assert.ok(eventNames.includes('game-action'));
+      assert.ok(eventNames.includes('rematch'));
+      assert.ok(eventNames.includes('submit-word'));
+    } finally {
+      EventBus.emit = oldEmit;
+    }
+  });
+
+  it('player/join flow branch behavior and room-error without lobby navigation', () => {
+    const fakeSocket = new FakeSocket();
+    const nm = new NetworkManager(() => fakeSocket);
+    const ui = makeUI();
+    let navCount = 0;
+    nm._navigateToLobby = () => { navCount += 1; };
+    nm.init(ui, {}, { getIdentity: () => ({}), refreshProfile: () => {} });
+
+    fakeSocket.trigger('room-joined', {
+      roomCode: 'A1B2',
+      gameType: 'memory-match',
+      skipSideSelect: true,
+      opponentIdentity: { displayName: 'opp' },
+    });
+    assert.equal(ui.calls.length, 0);
+
+    fakeSocket.trigger('player-joined', { gameType: 'othello', skipSideSelect: true });
+    assert.equal(ui.calls.length, 0);
+    fakeSocket.trigger('player-joined', { gameType: 'othello', skipSideSelect: false });
+    assert.equal(ui.calls[0].method, 'showSideSelect');
+
+    fakeSocket.trigger('side-selected', { message: 'ok' });
+    assert.equal(ui.calls.find((c) => c.method === 'updateSideSelect').args[0].message, 'ok');
+
+    fakeSocket.trigger('game-start', { yourSide: 'black', opponentIdentity: { displayName: 'new' } });
+    assert.equal(nm._inGame, true);
+    assert.deepEqual(nm.opponentIdentity, { displayName: 'new' });
+
+    fakeSocket.trigger('opponent-reconnected');
+    assert.ok(ui.calls.find((c) => c.method === 'hideReconnecting'));
+
+    fakeSocket.trigger('room-error', { message: 'Validation failed' });
+    assert.equal(navCount, 0);
+  });
 });
