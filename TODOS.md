@@ -71,7 +71,7 @@ Reference doc: `planning/2026-04-07-testing-health.md`
 
 ## Deferred from /design-review (2026-04-08)
 
-- [ ] Enforce `min-height: 44px` on mobile tappable controls (Sign In, Join Room, other CTAs) to meet touch target standards.
-- [ ] Reduce mobile header crowding by adjusting top bar height/sticker placement and increasing hero top padding.
+- [x] ~~Enforce `min-height: 44px` on mobile tappable controls (Sign In, Join Room, other CTAs) to meet touch target standards.~~ — Fixed by `/design-review` on `main`, 2026-04-08 (`798eade`).
+- [x] ~~Reduce mobile header crowding by adjusting top bar height/sticker placement and increasing hero top padding.~~ — Fixed by `/design-review` on `main`, 2026-04-08 (`34b6592`).
 - [ ] Normalize CTA glow/elevation tokens between lobby and auth screens for cross-page consistency.
-- [ ] Relax lobby card label density on small screens (title/badge spacing and badge prominence).
+- [x] ~~Relax lobby card label density on small screens (title/badge spacing and badge prominence).~~ — Fixed by `/design-review` on `main`, 2026-04-08 (`5b4a12b`).

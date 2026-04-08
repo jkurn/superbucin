@@ -1,15 +1,15 @@
 {
   "date": "2026-04-08",
   "url": "https://superbucin.pricylia.com",
-  "designScore": "B",
+  "designScore": "B+",
   "aiSlopScore": "A-",
   "categoryGrades": {
     "hierarchy": "B",
     "typography": "B",
-    "spacing": "B",
+    "spacing": "B+",
     "color": "B+",
-    "interaction": "B-",
-    "responsive": "B-",
+    "interaction": "B",
+    "responsive": "B",
     "content": "B",
     "aiSlop": "A-",
     "motion": "B",
@@ -21,28 +21,28 @@
       "title": "Mobile top bar crowds hero area",
       "impact": "high",
       "category": "responsive",
-      "fixStatus": "deferred"
+      "fixStatus": "verified"
     },
     {
       "id": "FINDING-002",
       "title": "Primary controls under 44px touch target",
       "impact": "high",
       "category": "interaction",
-      "fixStatus": "deferred"
+      "fixStatus": "verified"
     },
     {
       "id": "FINDING-003",
       "title": "Decorative stickers compete with hierarchy",
       "impact": "medium",
       "category": "hierarchy",
-      "fixStatus": "deferred"
+      "fixStatus": "best-effort"
     },
     {
       "id": "FINDING-004",
       "title": "Lobby card labels visually dense on small screens",
       "impact": "medium",
       "category": "spacing",
-      "fixStatus": "deferred"
+      "fixStatus": "verified"
     }
   ]
 }
