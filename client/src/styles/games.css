@@ -894,7 +894,8 @@
       color: #ff6b9d;
       font-size: 0.72rem;
       font-weight: 700;
-      padding: 0.35rem 0.75rem;
+      min-height: 44px;
+      padding: 0.45rem 0.85rem;
       border-radius: 12px;
       cursor: pointer;
       transition: background 0.15s;

@@ -114,6 +114,7 @@ canvas { display: block; width: 100%; height: 100%; }
   transition: transform 0.15s, box-shadow 0.15s;
   width: 100%;
   max-width: 280px;
+  min-height: 44px;
   letter-spacing: 0.05em;
 }
 .btn:active { transform: scale(0.95); }
