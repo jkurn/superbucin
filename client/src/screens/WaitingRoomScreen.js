@@ -18,8 +18,13 @@ export function render(overlay, deps, roomCode) {
         <div class="share-link-section">
           <input class="share-link-input" id="share-link-url" value="${shareUrl}" readonly onclick="this.select()" />
           <div class="share-btn-row">
-            <button class="btn btn-pink" id="btn-share-link">
-              ${hasNativeShare ? '\uD83D\uDCE4 Share' : '\uD83D\uDCCB Copy Link'}
+            <button class="btn btn-pink btn-share-action" id="btn-copy-link">\uD83D\uDCCB Copy Link</button>
+            <button
+              class="btn btn-blue btn-small btn-share-action"
+              id="btn-native-share"
+              ${hasNativeShare ? '' : 'disabled aria-disabled="true" title="Native share is not supported on this browser"'}
+            >
+              \uD83D\uDCE4 Share
             </button>
           </div>
           <div class="share-link-feedback" id="share-link-feedback"></div>
@@ -38,31 +43,33 @@ export function render(overlay, deps, roomCode) {
     </div>
   `;
 
-  document.getElementById('btn-share-link').addEventListener('click', async () => {
-    const feedback = document.getElementById('share-link-feedback');
+  const feedback = document.getElementById('share-link-feedback');
 
-    // ── Primary: native OS share sheet (mobile) ──────────────────────────
-    if (typeof navigator.share === 'function') {
+  document.getElementById('btn-copy-link').addEventListener('click', () => {
+    _copyToClipboard(shareUrl, feedback);
+  });
+
+  const shareBtn = document.getElementById('btn-native-share');
+  if (shareBtn) {
+    shareBtn.addEventListener('click', async () => {
+      if (typeof navigator.share !== 'function') {
+        _showFeedback(feedback, 'Native share not available on this browser');
+        return;
+      }
       try {
         await navigator.share({
           title: 'SUPERBUCIN',
           text: shareText,
           url: shareUrl,
         });
-        if (feedback) { feedback.textContent = 'Shared! \uD83D\uDC95'; }
+        _showFeedback(feedback, 'Shared! \uD83D\uDC95');
       } catch (err) {
-        // User cancelled share sheet — not an error, just fall through
         if (err.name !== 'AbortError') {
-          // Real error: fall back to clipboard
-          _copyToClipboard(shareUrl, feedback);
+          _showFeedback(feedback, 'Could not open share sheet');
         }
       }
-      return;
-    }
-
-    // ── Fallback: clipboard copy (desktop / old browsers) ────────────────
-    _copyToClipboard(shareUrl, feedback);
-  });
+    });
+  }
 }
 
 /** Copy URL to clipboard with user feedback. */
