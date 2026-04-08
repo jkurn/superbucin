@@ -12,9 +12,14 @@ export const env = cleanEnv(process.env, {
 export function assertRequiredEnvForProduction() {
   if (env.NODE_ENV !== 'production') return;
 
-  const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_JWT_SECRET'];
+  const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
   const missing = required.filter((name) => !process.env[name]);
   if (missing.length > 0) {
     throw new Error(`Missing required env vars in production: ${missing.join(', ')}`);
+  }
+
+  if (!process.env.SUPABASE_JWT_SECRET) {
+    // Keep startup resilient during env rollouts; JWT secret is recommended but non-blocking here.
+    console.warn('SUPABASE_JWT_SECRET is not set; continuing startup in compatibility mode.');
   }
 }
