@@ -175,6 +175,7 @@ Copy this block every week and fill values:
 - Source test strategy: `planning/2026-04-07-robust-testing-strategy.md`
 - Backlog and gates: `TODOS.md` (testing strategy + criteria gate sections)
 - Keep this file updated after significant test additions or weekly retro.
+- 2026-04-08 deploy retry: pushed an explicit no-op documentation update to re-trigger Render rollout after stale client bundle observation.
 
 ## Week of 2026-04-08
 
