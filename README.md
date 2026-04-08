@@ -69,6 +69,9 @@ npm test
 
 # Run all tests with coverage table
 npm run test:coverage
+
+# Run coverage with fail-fast quality gate
+npm run test:coverage:gate
 ```
 
 ### Environment variables
@@ -80,7 +83,20 @@ SUPABASE_URL=
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_JWT_SECRET=
+LOG_LEVEL=info
 ```
+
+---
+
+## Engineering hygiene and observability
+
+- **CI**: `.github/workflows/ci.yml` runs lint, tests, coverage gate, build, and `npm audit`.
+- **Security scanning**: `.github/workflows/codeql.yml` runs CodeQL on pushes/PRs + weekly schedule.
+- **Secret scanning**: `.github/workflows/secret-scan.yml` runs Gitleaks on pushes/PRs.
+- **Dependency updates**: `.github/dependabot.yml` enables weekly npm + GitHub Actions update PRs.
+- **Coverage gate**: `scripts/coverage-gate.mjs` enforces baseline thresholds in CI.
+- **Structured server logs**: `server/observability/logger.js` emits JSON logs with request/socket metadata.
+- **Env validation**: `server/config/env.js` validates runtime config and enforces required production vars.
 
 ---
 

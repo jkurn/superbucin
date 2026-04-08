@@ -12,6 +12,7 @@
     "start": "cd server && node index.js",
     "test": "node --test server/games/*/GameState.test.js server/rooms/RoomManager.test.js server/services/UserService.test.js client/src/shared/NetworkManager.test.js client/src/shared/IndexHtmlRefactor.test.js",
     "test:coverage": "node --experimental-test-coverage --test server/games/*/GameState.test.js server/rooms/RoomManager.test.js server/services/UserService.test.js client/src/shared/NetworkManager.test.js client/src/shared/IndexHtmlRefactor.test.js",
+    "test:coverage:gate": "node scripts/coverage-gate.mjs",
     "lint": "eslint client/src/ server/",
     "prepare": "husky || true"
   },

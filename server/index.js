@@ -3,9 +3,12 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { supabase as supabaseAdmin } from './supabaseAdmin.js';
 import { RoomManager } from './rooms/RoomManager.js';
 import { GameFactory } from './games/GameFactory.js';
+import { env, assertRequiredEnvForProduction } from './config/env.js';
+import { logger, withRequestContext } from './observability/logger.js';
 import { GameState, GAME_CONFIG } from './games/pig-vs-chick/GameState.js';
 import { GameState as WordScrambleState, GAME_CONFIG as WORD_SCRAMBLE_CONFIG } from './games/word-scramble-race/GameState.js';
 import { DoodleGuessGameState, DOODLE_GAME_CONFIG } from './games/doodle-guess/GameState.js';
@@ -39,6 +42,23 @@ const app = express();
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 app.use(express.static(clientDist));
 
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  const requestId = req.headers['x-request-id'] || randomUUID();
+  req.requestId = requestId;
+  res.setHeader('x-request-id', requestId);
+
+  res.on('finish', () => {
+    logger.info({
+      type: 'http_request',
+      ...withRequestContext(req),
+      status: res.statusCode,
+      duration_ms: Date.now() - startedAt,
+    });
+  });
+  next();
+});
+
 app.get('/health', (_req, res) => res.send('ok'));
 
 const httpServer = createServer(app);
@@ -61,7 +81,7 @@ const io = new Server(httpServer, {
 const roomManager = new RoomManager(io);
 
 io.on('connection', (socket) => {
-  console.log(`Player connected: ${socket.id}`);
+  logger.info({ type: 'socket_connected', socket_id: socket.id }, 'Player connected');
 
   socket.on('identify', (data) => {
     roomManager.setIdentity(socket, data);
@@ -116,7 +136,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log(`Player disconnected: ${socket.id}`);
+    logger.info({ type: 'socket_disconnected', socket_id: socket.id }, 'Player disconnected');
     roomManager.handleDisconnect(socket);
   });
 });
@@ -170,7 +190,7 @@ app.get('/api/profile/:username', async (req, res) => {
       achievements,
     });
   } catch (err) {
-    console.error('Error fetching profile:', err);
+    logger.error({ err, username, request_id: req.requestId }, 'Error fetching profile');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -179,7 +199,9 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(clientDist, 'index.html'));
 });
 
-const PORT = process.env.PORT || 3000;
+assertRequiredEnvForProduction();
+
+const PORT = env.PORT;
 httpServer.listen(PORT, () => {
-  console.log(`SUPERBUCIN server running on port ${PORT}`);
+  logger.info({ type: 'server_started', port: PORT }, `SUPERBUCIN server running on port ${PORT}`);
 });

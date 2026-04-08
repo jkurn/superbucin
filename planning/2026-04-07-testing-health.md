@@ -1,6 +1,6 @@
 # SUPERBUCIN Testing Health (Weekly)
 
-Last updated: 2026-04-07
+Last updated: 2026-04-08
 
 This file is the single place to review testing health week-to-week.
 
@@ -8,11 +8,11 @@ This file is the single place to review testing health week-to-week.
 
 - Test command: `npm test`
 - Coverage command: `npm run test:coverage`
-- Latest result: `196 pass, 0 fail`
+- Latest result: `295 pass, 0 fail`
 - Coverage (all files):
-  - Line: `79.70%`
-  - Branch: `76.63%`
-  - Functions: `67.48%`
+  - Line: `94.64%`
+  - Branch: `80.93%`
+  - Functions: `89.11%`
 
 ## Current Coverage Highlights
 
@@ -24,8 +24,8 @@ This file is the single place to review testing health week-to-week.
   - `server/games/battleship-mini/GameState.test.js` added
   - `server/games/quiz-race/GameState.test.js` added
 - Main gaps to target next:
-  - Add direct `GameState` unit suites for `memory-match` and `vending-machine`
-  - Increase `UserService.js` and `NetworkManager.js` function coverage depth
+  - Raise branch/function depth in lower-covered utility/config modules (`GameFactory.js`, `EventBus.js`, `vending-machine/config.js`)
+  - Add focused branch tests for complex game branches with lower branch coverage (`bonk-brawl`, `doodle-guess`)
 
 ## Engineering Discipline Taxonomy
 
@@ -175,3 +175,40 @@ Copy this block every week and fill values:
 - Source test strategy: `planning/2026-04-07-robust-testing-strategy.md`
 - Backlog and gates: `TODOS.md` (testing strategy + criteria gate sections)
 - Keep this file updated after significant test additions or weekly retro.
+
+## Week of 2026-04-08
+
+### Test Snapshot
+- `npm run lint`: pass (0 errors)
+- `npm run test:coverage`: 295 pass, 0 fail
+- coverage line/branch/functions: 94.64 / 80.93 / 89.11
+- test duration: ~63.6s
+
+### DORA
+- Deployment Frequency: daily commits to `main`; deploy cadence remains high.
+- Lead Time for Changes: short for current test/design hardening slices (same-session land).
+- Change Failure Rate: low; no test regressions in this run.
+- Failed Deployment Recovery Time: not measured in this pass.
+- Rework Rate: moderate (intentional quality hardening + design follow-up fixes).
+
+### SPACE (quick pulse)
+- Satisfaction and Wellbeing: improved by stronger confidence from broad green suite.
+- Performance: high confidence in networking/room/user and game-state paths.
+- Activity: multiple incremental commits with coverage + design hardening.
+- Communication and Collaboration: health baseline and audit artifacts kept current.
+- Efficiency and Flow: good local loop; full coverage run remains acceptable at ~1 min.
+
+### Flow
+- Flow Time: short for incremental fixes; medium for full health pass.
+- Flow Efficiency: high (most time in coding/testing, low waiting).
+- Flow Load: moderate; one remaining design consistency item in TODOs.
+
+### Quality Signals
+- Defect Density: trending down in covered surfaces (no current failures).
+- Technical Debt Ratio: improved in testing confidence; some branch-depth debt remains.
+- Largest uncovered risk area: lower branch coverage hotspots in `server/games/GameFactory.js` and selected game edge branches.
+
+### Improvement Bets
+- Structural bet: split/contract-test `GameFactory` lookup/registration seams for branch-depth gains.
+- Quality bet: add targeted branch tests for `bonk-brawl` and `doodle-guess` error/edge paths.
+- Success criteria for next week: branch coverage >83% overall while keeping line coverage >94%.
