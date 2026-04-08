@@ -155,4 +155,139 @@ describe('Mini Battleship GameState', () => {
     assert.equal(Array.isArray(end.scores), true);
     assert.equal(end.scores.length, 2);
   });
+
+  it('pause/resume handle countdown, placement, and battle branches', () => {
+    const { game } = createGame();
+    currentGame = game;
+
+    game.start();
+    game.pause();
+    assert.equal(game.paused, true);
+
+    game.phase = 'countdown';
+    game.resume();
+    assert.equal(game.paused, false);
+
+    game.phase = 'placement';
+    game.resume();
+    assert.equal(game.phase, 'placement');
+
+    startBattle(game);
+    game.pause();
+    game.phase = 'battle';
+    game.resume();
+    assert.equal(game.phase, 'battle');
+  });
+
+  it('migrates player maps and current turn on reconnect', () => {
+    const { game, p1 } = createGame();
+    currentGame = game;
+    startBattle(game);
+
+    game.currentTurn = p1.id;
+    game.migratePlayer(p1.id, 'p1-new', { id: 'p1-new', side: p1.side });
+
+    assert.equal(game.p1.id, 'p1-new');
+    assert.ok(game.boards['p1-new']);
+    assert.ok(game.shots['p1-new']);
+    assert.ok(game.ships['p1-new']);
+    assert.equal(game.currentTurn, 'p1-new');
+  });
+
+  it('startCountdown callback advances to placement phase', () => {
+    const { game } = createGame();
+    currentGame = game;
+
+    let cb = null;
+    const originalSetTimeout = globalThis.setTimeout;
+    globalThis.setTimeout = (fn) => {
+      cb = fn;
+      return 1;
+    };
+    try {
+      game.start();
+      assert.equal(game.phase, 'countdown');
+      cb();
+      assert.equal(game.phase, 'placement');
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
+    }
+  });
+
+  it('placement timeout auto-places missing players then starts battle', () => {
+    const { game, p1, p2 } = createGame();
+    currentGame = game;
+
+    let cb = null;
+    const originalSetTimeout = globalThis.setTimeout;
+    globalThis.setTimeout = (fn) => {
+      cb = fn;
+      return 1;
+    };
+    try {
+      game.start();
+      game.startPlacement();
+      game.placeShips(p1.id, validPlacementsA());
+      cb(); // placement timeout path
+
+      assert.equal(game.phase, 'battle');
+      assert.equal(game.placementReady[p1.id], true);
+      assert.equal(game.placementReady[p2.id], true);
+      assert.equal(game.ships[p2.id].length > 0, true);
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
+    }
+  });
+
+  it('autoPlace produces ship entries and autoFire can switch turn if no cells', () => {
+    const { game, p1, p2 } = createGame();
+    currentGame = game;
+
+    game.start();
+    game.startPlacement();
+    game.autoPlace(p1.id);
+    assert.equal(game.ships[p1.id].length, GAME_CONFIG.SHIPS.length);
+
+    game.phase = 'battle';
+    game.currentTurn = p1.id;
+    game.shots[p1.id] = Array.from({ length: GAME_CONFIG.GRID_SIZE }, () =>
+      Array.from({ length: GAME_CONFIG.GRID_SIZE }, () => 'M'));
+    game.startTurnTimer = () => {};
+    game.broadcastState = () => {};
+    game.autoFire(p1.id);
+    assert.equal(game.currentTurn, p2.id);
+  });
+
+  it('startTurnTimer timeout calls autoFire and finishMatch computes winner score', () => {
+    const { game, p1, p2, events } = createGame();
+    currentGame = game;
+
+    let timerCb = null;
+    const originalSetTimeout = globalThis.setTimeout;
+    globalThis.setTimeout = (fn) => {
+      timerCb = fn;
+      return 1;
+    };
+    try {
+      startBattle(game);
+      let autoFireCalled = false;
+      game.autoFire = () => { autoFireCalled = true; };
+      game.startTurnTimer();
+      timerCb();
+      assert.equal(autoFireCalled, true);
+
+      // score path in finishMatch
+      game.ships[p1.id] = [{ sunk: false, cells: [{ r: 0, c: 0 }, { r: 0, c: 1 }] }];
+      game.ships[p2.id] = [{ sunk: true, cells: [{ r: 1, c: 1 }] }];
+      game.boards[p1.id][0][0] = 'S';
+      game.boards[p1.id][0][1] = 'S';
+      game.finishMatch(p1.id);
+      const end = lastEvent(events, 'match-end');
+      assert.ok(end);
+      assert.equal(end.winnerId, p1.id);
+      assert.equal(end.scores[0] > end.scores[1], true);
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
+    }
+  });
 });

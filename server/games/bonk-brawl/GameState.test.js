@@ -71,6 +71,23 @@ describe('Bonk Brawl GameState', () => {
       game.resume();
       assert.equal(game.paused, false);
     });
+
+    it('countdown timer transitions into fighting phase', () => {
+      let countdownCb = null;
+      const originalSetTimeout = globalThis.setTimeout;
+      globalThis.setTimeout = (cb) => {
+        countdownCb = cb;
+        return 1;
+      };
+      try {
+        game.start();
+        assert.equal(game.phase, 'countdown');
+        countdownCb();
+        assert.equal(game.phase, 'fighting');
+      } finally {
+        globalThis.setTimeout = originalSetTimeout;
+      }
+    });
   });
 
   describe('handleAction', () => {
@@ -187,6 +204,29 @@ describe('Bonk Brawl GameState', () => {
         `Expected round-end/finished, got phase=${game.phase}, active=${game.active}`
       );
     });
+
+    it('blocking shield can break and stun defender', () => {
+      game.fighters.p2.state = 'blocking';
+      game.fighters.p2.shieldHP = 1;
+      game.fighters.p1.attackCooldown = 0;
+      game.fighters.p1.state = 'idle';
+
+      game.doAttack('p1');
+      assert.equal(game.fighters.p2.state, 'hurt');
+      assert.equal(game.fighters.p2.shieldHP, 0);
+    });
+
+    it('charging defender takes vulnerable bonus damage', () => {
+      game.fighters.p2.state = 'charging';
+      game.fighters.p2.chargeStartedAt = Date.now() - 500;
+      game.fighters.p1.attackCooldown = 0;
+      game.fighters.p1.state = 'idle';
+
+      const hp = game.fighters.p2.hp;
+      game.doAttack('p1');
+      assert.equal(game.fighters.p2.hp < hp, true);
+      assert.equal(game.fighters.p2.chargeStartedAt, 0);
+    });
   });
 
   describe('special attacks', () => {
@@ -248,6 +288,54 @@ describe('Bonk Brawl GameState', () => {
 
       // Should no longer be charging
       assert.notEqual(game.fighters.p1.state, 'charging');
+    });
+
+    it('cubit can be partially blocked below break threshold', () => {
+      const originalNow = Date.now;
+      let now = 10_000;
+      Date.now = () => now;
+      try {
+        game.fighters.p1.attackCooldown = 0;
+        game.fighters.p1.state = 'idle';
+        game.fighters.p2.state = 'blocking';
+        game.fighters.p2.shieldHP = 100;
+
+        game.handleAction('p1', { type: 'cubit-start' });
+        game.tick();
+        now += 100; // low charge ratio
+        game.handleAction('p1', { type: 'cubit-release' });
+        game.tick();
+
+        assert.equal(game.fighters.p2.shieldHP < 100, true);
+      } finally {
+        Date.now = originalNow;
+      }
+    });
+  });
+
+  describe('state shaping and reconnect payload', () => {
+    beforeEach(() => {
+      ({ game, events: _events } = createGame());
+      game.start();
+      skipToFighting(game);
+    });
+
+    it('state timers decay and transient states return to idle', () => {
+      game.fighters.p1.state = 'hurt';
+      game.fighters.p1.stateTimer = 10;
+      game.fighters.p1.attackCooldown = 10;
+      game.tick();
+      assert.equal(game.fighters.p1.state, 'idle');
+      assert.equal(game.fighters.p1.attackCooldown, 0);
+    });
+
+    it('getReconnectPayload returns normalized bonk state slices', () => {
+      const payload = game.getReconnectPayload('p1');
+      assert.ok(payload.bonkState);
+      assert.equal(payload.bonkState.gameType, 'bonk-brawl');
+      assert.ok(payload.bonkState.me);
+      assert.ok(payload.bonkState.opp);
+      assert.equal(Array.isArray(payload.bonkState.hitEvents), true);
     });
   });
 });

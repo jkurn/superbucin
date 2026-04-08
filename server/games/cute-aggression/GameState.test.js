@@ -589,6 +589,20 @@ describe('Virus vs Virus — GameState', () => {
       assert.equal(game.readyState.holding['p1-new'], false);
       assert.equal(game.readyState.countdownStart, null);
     });
+
+    it('migrates p2 mini-game lock/answer maps and updates player reference', () => {
+      game.start();
+      startMiniGame(game, 'memory');
+      game.miniGameState.memoryPhase = 'prompt';
+      game.miniGameState.locked.p2 = true;
+      game.miniGameState.answers.p2 = 7;
+
+      game.migratePlayer('p2', 'p2-new', { id: 'p2-new', side: 'biru' });
+      assert.equal(game.p2.id, 'p2-new');
+      assert.equal(game.miniGameState.locked['p2-new'], true);
+      assert.equal(game.miniGameState.answers['p2-new'], 7);
+      assert.equal(game.miniGameState.locked.p2, undefined);
+    });
   });
 
   // ── Reconnect payload ────────────────────────────────────────
@@ -697,6 +711,13 @@ describe('Virus vs Virus — GameState', () => {
 
         g.game.stop();
       }
+    });
+
+    it('returns empty mini slice for unknown mini-game type', () => {
+      game.start();
+      game.currentMiniGame = 'unknown-mini';
+      const slice = game._buildMiniSlice(game.p1, game.p2);
+      assert.deepEqual(slice, {});
     });
   });
 });

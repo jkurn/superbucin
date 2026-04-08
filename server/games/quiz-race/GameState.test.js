@@ -168,4 +168,76 @@ describe('Quiz Race GameState', () => {
     assert.equal(game.answerTimes['p1-new'], 1234);
     assert.equal(game.scores[p1.id], undefined);
   });
+
+  it('handleAction uses choice field and ignores while paused', () => {
+    const { game, p1 } = singleQuestionGame();
+    currentGame = game;
+
+    game.active = true;
+    game.phase = 'question';
+    game.paused = true;
+    game.questions = [{ text: '2 + 2 = ?', options: ['3', '4', '5', '6'], correct: 1, category: 'math' }];
+    game.currentIndex = 0;
+
+    game.handleAction(p1.id, { type: 'answer', choice: 1 });
+    assert.equal(game.answers[p1.id], null);
+
+    game.paused = false;
+    game.handleAction(p1.id, { type: 'answer', choice: 1 });
+    assert.equal(game.answers[p1.id], 1);
+  });
+
+  it('pause and resume restore timer flow across countdown/question/reveal', () => {
+    const { game, events } = createGame();
+    currentGame = game;
+
+    let timerCb = null;
+    const originalSetTimeout = globalThis.setTimeout;
+    globalThis.setTimeout = (cb) => {
+      timerCb = cb;
+      return 1;
+    };
+    try {
+      game.start();
+      assert.equal(game.phase, 'countdown');
+      timerCb();
+      assert.equal(game.phase, 'question');
+
+      game.pause();
+      assert.equal(game.paused, true);
+      assert.equal(game.pauseOffsetMs >= 0, true);
+      game.resume();
+      assert.equal(game.paused, false);
+      assert.equal(game.timerEndsAt > Date.now(), true);
+
+      game.revealAnswers();
+      assert.equal(game.phase, 'reveal');
+      game.pause();
+      game.resume();
+      assert.equal(game.phase, 'reveal');
+
+      const state = lastEvent(events, 'state-update');
+      assert.ok(state);
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
+    }
+  });
+
+  it('startQuestion finishes match when out of questions and handles p2 migration branch', () => {
+    const { game, events, p2 } = singleQuestionGame();
+    currentGame = game;
+
+    game.active = true;
+    game.questions = [];
+    game.currentIndex = 0;
+    game.scores[p2.id] = 9;
+    game.startQuestion();
+
+    const end = lastEvent(events, 'match-end');
+    assert.ok(end);
+
+    game.migratePlayer(p2.id, 'p2-new', { id: 'p2-new', side: p2.side });
+    assert.equal(game.p2.id, 'p2-new');
+    assert.equal(game.scores['p2-new'], 9);
+  });
 });
