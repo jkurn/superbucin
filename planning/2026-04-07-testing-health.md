@@ -135,6 +135,25 @@ Copy this block every week and fill values:
 - Success criteria for next week:
 ```
 
+## Mandatory improvement requirements for all games (going forward)
+
+These are non-negotiable quality gates for every new game mode and major game rewrite:
+
+1. **Mobile interaction contract**
+   - Include tests/checklist coverage for core touch behavior on mobile (tap, drag, swipe, long-press where relevant).
+   - Desktop click-only verification is insufficient.
+
+2. **External dependency degradation behavior**
+   - Any dependency on external APIs/services must define explicit behavior for timeout/network failure/5xx.
+   - Add tests for degraded-path behavior so gameplay remains usable.
+
+3. **Playability invariants for generated/random states**
+   - Random board/state generation must satisfy minimum playability constraints.
+   - Add invariant tests across all supported sizes/configs (not single happy-path snapshots).
+
+4. **Release QA proof for game-critical flows**
+   - Before merge, capture a short manual QA pass on game-critical mobile flows (`create/join/start/play/submit/end`) and record findings.
+
 ## Week of 2026-04-07
 
 ### Test Snapshot

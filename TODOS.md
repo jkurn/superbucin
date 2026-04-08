@@ -60,6 +60,9 @@ Suggested build order in plan: Connect Four → Quiz Race → Battleship (comple
 - [x] ~~Network resilience: disconnect/reconnect, timeout windows, rejoin consistency.~~ — Covered by reconnect race tests in `RoomManager.test.js` and client reconnect handling in `NetworkManager.test.js`.
 - [x] ~~Notification integrity: correct recipient + no duplicate/conflicting notifications.~~ — Covered by `RoomManager` recipient contract tests + `NetworkManager` event mapping tests.
 - [x] ~~Persistence side effects: `match-end` path records points/achievements correctly and degrades safely on DB failure.~~ — Covered by `UserService.test.js` and `RoomManager.test.js` match-end fallback behavior.
+- [ ] **Mobile-input contract tests (required for all new games):** verify core touch interactions on real mobile behavior (tap/drag/swipe as applicable), not only desktop click paths.
+- [ ] **Dependency degradation tests (required for all new games):** if game logic depends on external APIs/services, enforce explicit fallback behavior under timeout/network/5xx and test it.
+- [ ] **Playable-state invariant tests (required for all new games):** random generation must satisfy minimum playability constraints (e.g., guaranteed legal moves/words/targets) across supported board sizes/configs.
 
 ## Engineering scorecard (run weekly)
 
