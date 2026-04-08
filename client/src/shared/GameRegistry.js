@@ -31,6 +31,11 @@ export const GameRegistry = {
     return game;
   },
 
+  /** @param {string} gameType */
+  has(gameType) {
+    return games.has(gameType);
+  },
+
   /**
    * Returns lobby card data for all registered games.
    * @returns {Array<{type: string} & GameLobbyConfig>}

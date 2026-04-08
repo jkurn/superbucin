@@ -7,7 +7,7 @@ Owner: Product + Growth
 
 Measure and improve the viral loop:
 
-`result_viewed -> share_clicked -> new invite/session`
+`result_viewed -> share_clicked -> (recipient) challenge_deep_link_opened -> room/game_started`
 
 ## Dashboard Name
 
@@ -112,6 +112,16 @@ Optional:
 - Periods: D1 / D7 / D30
 - Why: test whether users who share have stronger retention.
 
+## Widget 11: Inbound challenge links
+
+- Type: Funnel
+- Steps:
+  1. `challenge_deep_link_opened`
+  2. `game_started`
+- Conversion window: 1 day
+- Breakdown: `game_param_matched`, `has_challenge`
+- Why: measure whether shared result URLs (`/?challenge=&game=`) convert to an actual match.
+
 ## Core KPI Definitions
 
 - Viral Share Conversion (%):
@@ -122,6 +132,8 @@ Optional:
   - `share_failed / share_clicked`
 - Platform Contribution (%):
   - `% of share_clicked by share_platform`
+- Challenge link activation (%):
+  - `unique users with game_started / unique users with challenge_deep_link_opened` (same-day window as in Widget 11)
 
 ## Recommended Targets (initial)
 

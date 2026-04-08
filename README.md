@@ -129,6 +129,7 @@ The project now uses a layered testing approach:
 - **RoomManager contract tests** (`server/rooms/RoomManager.test.js`) for event routing, payload privacy, reconnect behavior
 - **UserService persistence tests** (`server/services/UserService.test.js`)
 - **NetworkManager client contract tests** (`client/src/shared/NetworkManager.test.js`)
+- **Lobby viral deep-link parsing** (`client/src/shared/lobbyDeepLink.test.js`)
 
 Reference plan: `planning/2026-04-07-robust-testing-strategy.md`
 Weekly status and metrics: `planning/2026-04-07-testing-health.md`

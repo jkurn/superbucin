@@ -103,7 +103,7 @@ This project is a mobile-web multiplayer game collection, so analytics must answ
   - `loading_tapped` (first impatient tap during loading)
   - `game_loaded` (app boot complete + load timing + device context)
   - `ui_screen_viewed`, `game_started`, `match_ended`, `game_action_error`, `room_error`
-  - `result_viewed`, `share_clicked`, `share_failed`, `invite_link_viewed`
+  - `result_viewed`, `share_clicked`, `share_failed`, `invite_link_viewed`, `challenge_deep_link_opened`
   - connectivity and opponent reconnect events
 - Planned (next iteration):
   - `tutorial_started`
@@ -127,6 +127,9 @@ This project is a mobile-web multiplayer game collection, so analytics must answ
 - Viral funnel:
   - `result_viewed` -> `share_clicked`
   - break down by `share_platform`, `bucin_category`, `result_outcome`
+- Inbound challenge funnel (shared result URL `/?challenge=&game=`):
+  - `challenge_deep_link_opened` -> `lobby_game_selected` or `create_room_attempt` / `join_room_attempt`
+  - break down by `game_param_matched`, `game_type_preselected`, `has_challenge`
 
 ### Mobile-Web Diagnostics
 
@@ -371,6 +374,13 @@ These fields are highest priority for game balancing and mobile UX:
 - Recommended properties: `share_context`, `game_type`, `bucin_category`, `result_outcome`, `room_code`
 - Type: Failure/viral
 
+### `challenge_deep_link_opened`
+- Trigger when: lobby loads with viral query params `?challenge=` and/or `?game=` (see VictoryScreen share URL).
+- Required properties: none (emit only when at least one param is present)
+- Recommended properties: `has_challenge`, `challenge_label`, `game_param_raw`, `game_type_preselected`, `game_param_matched`
+- Type: Acquisition / viral inbound
+- QA: open `/?game=pig-vs-chick&challenge=Bucin%20Solid` and verify one event; dismiss banner clears query without breaking lobby.
+
 ### `tutorial_started` (planned)
 - Trigger when: first-run tutorial begins.
 - Required properties: `game_type`
@@ -478,3 +488,9 @@ Track these each month in a separate log:
 - Owner and due date
 
 This prevents data drift and keeps instrumentation aligned with product changes.
+
+---
+
+## /autoplan gate (2026-04-08)
+
+**Status:** Approved as-is (option A) — ship analytics + viral loop instrumentation including inbound challenge links; PostHog dashboard widgets to be created manually from `planning/2026-04-08-posthog-viral-dashboard.md`.

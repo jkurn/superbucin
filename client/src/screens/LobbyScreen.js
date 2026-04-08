@@ -1,5 +1,6 @@
 import { GameRegistry } from '../shared/GameRegistry.js';
 import { captureEvent } from '../shared/analytics.js';
+import { parseLobbyDeepLinkSearch } from '../shared/lobbyDeepLink.js';
 import { MEMORY_PACK_CHOICES } from '../games/memory-match/config.js';
 import { renderUserBar, bindUserBar } from '../shared/ui/UserBar.js';
 import { STICKERS, QUOTES } from '../shared/StickerPack.js';
@@ -51,6 +52,7 @@ export function render(overlay, deps, options) {
     <div class="lobby-ui" style="padding-top:4.25rem;">
       <div class="lobby-title">SUPERBUCIN</div>
       <div class="lobby-quote">${QUOTES.kangenKamu}</div>
+      <div id="lobby-deep-link-root" class="lobby-deep-link-root" hidden aria-live="polite"></div>
       <div class="game-grid">
         ${cardsHTML}${padHTML}
       </div>
@@ -74,7 +76,24 @@ export function render(overlay, deps, options) {
 
   bindUserBar(userManager, { showScreen });
 
+  const deepLink = _resolveLobbyDeepLink();
+  if (deepLink.hasParams) {
+    captureEvent('challenge_deep_link_opened', {
+      has_challenge: !!deepLink.challenge,
+      challenge_label: deepLink.challenge,
+      game_param_raw: deepLink.raw_game,
+      game_type_preselected: deepLink.game_type,
+      game_param_matched: !!(deepLink.raw_game && deepLink.game_type),
+    });
+  }
+
   let selectedGameType = registered[0]?.type || 'pig-vs-chick';
+  if (deepLink.game_type) {
+    selectedGameType = deepLink.game_type;
+    overlay.querySelectorAll('.game-card[data-game-type]').forEach((c) => {
+      c.classList.toggle('active', c.dataset.gameType === deepLink.game_type);
+    });
+  }
   const optionsPanel = document.getElementById('game-options-panel');
   const optionsToggle = document.getElementById('game-options-toggle');
   const optionsBody = document.getElementById('game-options-body');
@@ -151,6 +170,7 @@ export function render(overlay, deps, options) {
     });
   });
   syncGameOptionPanels();
+  _mountLobbyDeepLinkBanner(overlay, deepLink);
 
   document.getElementById('btn-create').addEventListener('click', () => {
     let customPrompts;
@@ -196,6 +216,79 @@ export function render(overlay, deps, options) {
       setTimeout(() => { el.classList.remove('visible'); }, 4500);
     }
   }
+}
+
+/**
+ * Reads ?challenge=&game= from the current URL (viral share links from VictoryScreen).
+ */
+function _resolveLobbyDeepLink() {
+  const { challenge, raw_game } = parseLobbyDeepLinkSearch(window.location.search);
+  const gameOk = !!(raw_game && GameRegistry.has(raw_game));
+  const def = gameOk ? GameRegistry.get(raw_game) : null;
+  const game_type = gameOk ? raw_game : null;
+  const game_label = def?.name || null;
+  const hasParams = !!(challenge || raw_game);
+  return {
+    challenge,
+    raw_game,
+    game_type,
+    game_label,
+    hasParams,
+  };
+}
+
+function _mountLobbyDeepLinkBanner(overlay, deep) {
+  const root = overlay.querySelector('#lobby-deep-link-root');
+  if (!root) return;
+  if (!deep.hasParams) return;
+
+  root.hidden = false;
+  root.innerHTML = '';
+
+  const textWrap = document.createElement('div');
+  textWrap.className = 'lobby-deep-link-banner__text';
+
+  if (deep.challenge && deep.game_label) {
+    textWrap.append(
+      document.createTextNode('Shared result: '),
+      _el('strong', deep.challenge),
+      document.createTextNode(` — play ${deep.game_label}!`),
+    );
+  } else if (deep.challenge) {
+    textWrap.append(
+      document.createTextNode('From link: '),
+      _el('strong', deep.challenge),
+    );
+  } else if (deep.game_label) {
+    textWrap.textContent = `Game from link: ${deep.game_label}`;
+  } else if (deep.raw_game) {
+    textWrap.textContent = 'This link named an unknown game — pick one below.';
+  }
+
+  const banner = document.createElement('div');
+  banner.className = 'lobby-deep-link-banner';
+  banner.appendChild(textWrap);
+
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.className = 'lobby-deep-link-banner__dismiss';
+  dismiss.setAttribute('aria-label', 'Dismiss');
+  dismiss.textContent = '\u2715';
+  dismiss.addEventListener('click', () => {
+    root.hidden = true;
+    root.innerHTML = '';
+    const path = window.location.pathname || '/';
+    window.history.replaceState(null, '', path);
+  });
+
+  banner.appendChild(dismiss);
+  root.appendChild(banner);
+}
+
+function _el(tag, text) {
+  const n = document.createElement(tag);
+  n.textContent = text;
+  return n;
 }
 
 /** Returns bucin moment flags for this session. */
