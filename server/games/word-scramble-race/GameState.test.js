@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameState, GAME_CONFIG } from './GameState.js';
+import { generateGrid, randomGridSize } from './gridUtils.js';
 
 function createGame() {
   const events = [];
@@ -16,6 +17,44 @@ function lastEvent(events, name) {
     if (events[i].event === name) return events[i].data;
   }
   return null;
+}
+
+function hasWordPath(grid, word) {
+  const target = word.toLowerCase();
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const dirs = [-1, 0, 1];
+  const used = new Set();
+
+  function dfs(r, c, idx) {
+    if (grid[r][c].toLowerCase() !== target[idx]) return false;
+    if (idx === target.length - 1) return true;
+    const key = `${r},${c}`;
+    used.add(key);
+    for (const dr of dirs) {
+      for (const dc of dirs) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+        const nKey = `${nr},${nc}`;
+        if (used.has(nKey)) continue;
+        if (dfs(nr, nc, idx + 1)) {
+          used.delete(key);
+          return true;
+        }
+      }
+    }
+    used.delete(key);
+    return false;
+  }
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (dfs(r, c, 0)) return true;
+    }
+  }
+  return false;
 }
 
 describe('Word Scramble Race GameState', () => {
@@ -66,7 +105,7 @@ describe('Word Scramble Race GameState', () => {
     assert.ok(shortWord.message.includes('at least'));
   });
 
-  it('rejects dictionary miss and accepts valid dictionary word with scoring', async () => {
+  it('rejects dictionary 404 miss and accepts valid dictionary word with scoring', async () => {
     const { game, p1, p2, events } = createGame();
     currentGame = game;
     game.active = true;
@@ -76,7 +115,7 @@ describe('Word Scramble Race GameState', () => {
       ['T', 'S'],
     ];
 
-    globalThis.fetch = async () => ({ ok: false });
+    globalThis.fetch = async () => ({ ok: false, status: 404 });
     await game.submitWord(p1.id, [{ r: 0, c: 0 }, { r: 0, c: 1 }, { r: 1, c: 0 }]); // cat
     const miss = lastEvent(events, 'word-scramble-feedback');
     assert.equal(miss.ok, false);
@@ -96,6 +135,25 @@ describe('Word Scramble Race GameState', () => {
     const hit2 = lastEvent(events, 'word-scramble-feedback');
     assert.equal(hit2.ok, true);
     assert.equal(hit2.multiplier, 1);
+  });
+
+  it('accepts words when dictionary service is temporarily unreachable', async () => {
+    const { game, p1, events } = createGame();
+    currentGame = game;
+    game.active = true;
+    game.phase = 'playing';
+    game.grid = [
+      ['C', 'A'],
+      ['R', 'S'],
+    ];
+    globalThis.fetch = async () => {
+      throw new Error('network down');
+    };
+
+    await game.submitWord(p1.id, [{ r: 0, c: 0 }, { r: 0, c: 1 }, { r: 1, c: 0 }]); // car
+    const hit = lastEvent(events, 'word-scramble-feedback');
+    assert.equal(hit.ok, true);
+    assert.equal(hit.word, 'car');
   });
 
   it('rejects duplicate word by same player in same round', async () => {
@@ -162,5 +220,23 @@ describe('Word Scramble Race GameState', () => {
 
     await game.submitWord('intruder', [{ r: 0, c: 0 }]);
     await game.submitWord(p1.id, []);
+  });
+
+  it('randomGridSize only returns 4 or 6', () => {
+    for (let i = 0; i < 100; i++) {
+      const s = randomGridSize();
+      assert.ok(s === 4 || s === 6);
+    }
+  });
+
+  it('4x4 and 6x6 grids always embed at least one guaranteed word path', () => {
+    const expectedWords = ['love', 'heart', 'hug', 'kiss', 'smile', 'spark', 'bloom', 'sweet'];
+    for (const size of [4, 6]) {
+      for (let i = 0; i < 20; i++) {
+        const grid = generateGrid(size);
+        const found = expectedWords.some((w) => hasWordPath(grid, w));
+        assert.equal(found, true, `Expected at least one guaranteed word in ${size}x${size} grid`);
+      }
+    }
   });
 });

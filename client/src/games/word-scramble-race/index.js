@@ -76,6 +76,7 @@ export const wordScrambleRaceGame = {
     let lastGridKey = '';
     let rafId = 0;
     let lastState = null;
+    let activePointerId = null;
 
     const gridEl = root.querySelector('#wsr-grid');
     const timerEl = root.querySelector('#wsr-timer');
@@ -103,6 +104,11 @@ export const wordScrambleRaceGame = {
           cell.dataset.c = String(c);
           cell.textContent = grid[r][c];
           cell.addEventListener('click', () => onCellClick(r, c));
+          cell.addEventListener('pointerdown', (ev) => {
+            ev.preventDefault();
+            activePointerId = ev.pointerId;
+            startPathAt(r, c);
+          });
           gridEl.appendChild(cell);
         }
       }
@@ -151,6 +157,42 @@ export const wordScrambleRaceGame = {
       }
       syncPathHighlight();
       currentEl.textContent = wordFromPath(g);
+    }
+
+    function startPathAt(r, c) {
+      const state = lastState;
+      if (!state || state.phase !== 'playing') return;
+      path = [{ r, c }];
+      syncPathHighlight();
+      currentEl.textContent = wordFromPath(state.grid);
+    }
+
+    function extendPathTo(r, c) {
+      const state = lastState;
+      if (!state || state.phase !== 'playing') return;
+      if (!path.length) {
+        startPathAt(r, c);
+        return;
+      }
+      const last = path[path.length - 1];
+      if (last.r === r && last.c === c) return;
+      const key = `${r},${c}`;
+      const used = new Set(path.map((p) => `${p.r},${p.c}`));
+      if (!isAdjacent(last, { r, c }) || used.has(key)) return;
+      path.push({ r, c });
+      syncPathHighlight();
+      currentEl.textContent = wordFromPath(state.grid);
+    }
+
+    function readCellFromEvent(ev) {
+      const source = document.elementFromPoint(ev.clientX, ev.clientY);
+      if (!source) return null;
+      const cell = source.closest('.wsr-cell');
+      if (!cell) return null;
+      return {
+        r: Number(cell.dataset.r),
+        c: Number(cell.dataset.c),
+      };
     }
 
     function updateFromState(state) {
@@ -223,6 +265,21 @@ export const wordScrambleRaceGame = {
     EventBus.on('word:state', onWordState);
     EventBus.on('word:feedback', onFeedback);
 
+    gridEl.addEventListener('pointermove', (ev) => {
+      if (activePointerId === null || ev.pointerId !== activePointerId) return;
+      const pos = readCellFromEvent(ev);
+      if (!pos) return;
+      extendPathTo(pos.r, pos.c);
+    });
+
+    const stopDrag = (ev) => {
+      if (activePointerId === null) return;
+      if (ev.pointerId !== undefined && ev.pointerId !== activePointerId) return;
+      activePointerId = null;
+    };
+    window.addEventListener('pointerup', stopDrag);
+    window.addEventListener('pointercancel', stopDrag);
+
     root.querySelector('#wsr-clear').addEventListener('click', () => {
       path = [];
       syncPathHighlight();
@@ -245,6 +302,8 @@ export const wordScrambleRaceGame = {
         cancelAnimationFrame(rafId);
         EventBus.off('word:state', onWordState);
         EventBus.off('word:feedback', onFeedback);
+        window.removeEventListener('pointerup', stopDrag);
+        window.removeEventListener('pointercancel', stopDrag);
         root.remove();
       },
     };
