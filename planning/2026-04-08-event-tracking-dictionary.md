@@ -8,6 +8,8 @@ Analytics tool: PostHog
 
 This document defines what we track, why we track it, and how to keep event data consistent enough for fast product decisions.
 
+**Product context:** North Star, roadmap phases, and backlog priorities live in [2026-04-08-product-plan.md](./2026-04-08-product-plan.md).
+
 ## Conventions
 
 - Event names: `lowercase_snake_case` with action verbs.

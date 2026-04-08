@@ -4,6 +4,12 @@
 
 Live at **[superbucin.pricylia.com](https://superbucin.pricylia.com)**
 
+### Product & planning
+
+- **Roadmap & metrics:** [planning/2026-04-08-product-plan.md](./planning/2026-04-08-product-plan.md) — pillars, journeys, phased roadmap, backlog, links to all other plans
+- **Analytics spec:** [planning/2026-04-08-event-tracking-dictionary.md](./planning/2026-04-08-event-tracking-dictionary.md)
+- **PostHog viral dashboard (setup guide):** [planning/2026-04-08-posthog-viral-dashboard.md](./planning/2026-04-08-posthog-viral-dashboard.md)
+
 ---
 
 ## Games

@@ -3,6 +3,8 @@
 Last updated: 2026-04-08
 Owner: Product + Growth
 
+**Product roadmap:** [2026-04-08-product-plan.md](./2026-04-08-product-plan.md) (metrics, phases, backlog).
+
 ## Goal
 
 Measure and improve the viral loop:
