@@ -35,6 +35,10 @@ GameRegistry.register('cute-aggression', cuteAggressionGame);
 
 const appBootStartMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
+function nowMs() {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
 function getConnectionType() {
   const connection = navigator?.connection || navigator?.mozConnection || navigator?.webkitConnection;
   return connection?.effectiveType || null;
@@ -56,6 +60,13 @@ function getTelemetryContext() {
   };
 }
 
+function captureWithTelemetry(eventName, properties = {}) {
+  captureEvent(eventName, {
+    ...getTelemetryContext(),
+    ...properties,
+  });
+}
+
 const app = {
   sceneManager: null,
   network: null,
@@ -65,20 +76,17 @@ const app = {
 
   async init() {
     initAnalytics();
-    const loadingStartMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const loadingStartMs = nowMs();
     const loading = document.getElementById('loading-screen');
     let loadingTappedOnce = false;
-    captureEvent('loading_started', {
-      ...getTelemetryContext(),
-    });
+    captureWithTelemetry('loading_started');
 
     if (loading) {
       loading.addEventListener('pointerdown', () => {
         if (loadingTappedOnce) return;
         loadingTappedOnce = true;
-        const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - loadingStartMs;
-        captureEvent('loading_tapped', {
-          ...getTelemetryContext(),
+        const elapsedMs = nowMs() - loadingStartMs;
+        captureWithTelemetry('loading_tapped', {
           elapsed_ms_since_loading_start: Math.round(elapsedMs),
         });
       });
@@ -107,21 +115,19 @@ const app = {
     }
 
     // Let the Router decide which screen to show based on the URL
-    Router.init(this.ui, this.network, this.userManager);
+    Router.init(this.ui, this.network);
     this.ui.setRouter(Router);
 
-    const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - appBootStartMs;
-    const loadingElapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - loadingStartMs;
-    captureEvent('loading_completed', {
-      ...getTelemetryContext(),
+    const elapsedMs = nowMs() - appBootStartMs;
+    const loadingElapsedMs = nowMs() - loadingStartMs;
+    captureWithTelemetry('loading_completed', {
       loading_time_ms: Math.round(loadingElapsedMs),
       loading_time_seconds: Number((loadingElapsedMs / 1000).toFixed(2)),
       exceeded_5s: loadingElapsedMs > 5000,
       was_tapped_during_loading: loadingTappedOnce,
     });
 
-    captureEvent('game_loaded', {
-      ...getTelemetryContext(),
+    captureWithTelemetry('game_loaded', {
       load_time_ms: Math.round(elapsedMs),
       load_time_seconds: Number((elapsedMs / 1000).toFixed(2)),
     });
@@ -155,4 +161,8 @@ const app = {
   },
 };
 
-app.init().catch(console.error);
+app.init().catch((error) => {
+  captureEvent('app_init_failed', {
+    message: error?.message || String(error),
+  });
+});
