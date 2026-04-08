@@ -1,0 +1,40 @@
+{
+  "date": "2026-04-07",
+  "window": "7d",
+  "metrics": {
+    "commits": 53,
+    "contributors": 2,
+    "prs_merged": 0,
+    "insertions": 32367,
+    "deletions": 4466,
+    "net_loc": 27901,
+    "test_loc": 2713,
+    "test_ratio": 8.4,
+    "active_days": 5,
+    "sessions": 16,
+    "fix_ratio": 24.5,
+    "ai_assisted_pct": 5.7
+  },
+  "authors": {
+    "Jonathan Kurniawan": {
+      "commits": 50,
+      "insertions": 29790,
+      "deletions": 4419,
+      "top_area": "pricy-sticker/"
+    },
+    "Claude": {
+      "commits": 3,
+      "insertions": 2577,
+      "deletions": 47,
+      "top_area": "client/"
+    }
+  },
+  "version_range": "985938772208..fe61ab4141d2",
+  "streak_days": 5,
+  "hotspot_files": [
+    "client/index.html",
+    "client/src/shared/UIManager.js",
+    "server/rooms/RoomManager.js"
+  ],
+  "tweetable": "Superbucin went from sprint mode to systems mode: 53 commits in 7 days, 12 games live, LFS asset pipeline stabilized, and test coverage infrastructure now part of daily flow."
+}
