@@ -1,16 +1,16 @@
 {
-  "date": "2026-04-05",
+  "date": "2026-04-08",
   "url": "https://superbucin.pricylia.com",
-  "designScore": "B+",
+  "designScore": "B",
   "aiSlopScore": "A-",
   "categoryGrades": {
-    "hierarchy": "B+",
+    "hierarchy": "B",
     "typography": "B",
     "spacing": "B",
     "color": "B+",
     "interaction": "B-",
-    "responsive": "B+",
-    "content": "A-",
+    "responsive": "B-",
+    "content": "B",
     "aiSlop": "A-",
     "motion": "B",
     "performanceFeel": "B"
@@ -18,23 +18,30 @@
   "findings": [
     {
       "id": "FINDING-001",
-      "title": "Lobby clipped on small viewports",
+      "title": "Mobile top bar crowds hero area",
       "impact": "high",
       "category": "responsive",
-      "fixStatus": "fixed"
+      "fixStatus": "deferred"
     },
     {
       "id": "FINDING-002",
-      "title": "Game cards and side options not semantic buttons",
-      "impact": "medium",
-      "category": "accessibility",
+      "title": "Primary controls under 44px touch target",
+      "impact": "high",
+      "category": "interaction",
       "fixStatus": "deferred"
     },
     {
       "id": "FINDING-003",
-      "title": "Viewport prevents user zoom",
+      "title": "Decorative stickers compete with hierarchy",
       "impact": "medium",
-      "category": "accessibility",
+      "category": "hierarchy",
+      "fixStatus": "deferred"
+    },
+    {
+      "id": "FINDING-004",
+      "title": "Lobby card labels visually dense on small screens",
+      "impact": "medium",
+      "category": "spacing",
       "fixStatus": "deferred"
     }
   ]

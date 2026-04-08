@@ -68,3 +68,10 @@ Reference doc: `planning/2026-04-07-testing-health.md`
 - [x] ~~Run weekly engineering scorecard (10 categories: maintainability, DRY/reuse, SOLID boundaries, tests, reliability, delivery hygiene, change size, observability, docs freshness, focus/flow).~~ — Done for week `2026-04-07` in `planning/2026-04-07-testing-health.md`.
 - [x] ~~Track and log baseline metrics weekly: commit size distribution, hotspot churn, test ratio, coverage trend, change failure rate, deploy health.~~ — Done baseline snapshot for week `2026-04-07` in `planning/2026-04-07-testing-health.md`.
 - [x] ~~Set weekly improvement bet (one structural bet + one quality bet) and review outcome in next retro.~~ — Done: added structural + quality bets for next review cycle in `planning/2026-04-07-testing-health.md`.
+
+## Deferred from /design-review (2026-04-08)
+
+- [ ] Enforce `min-height: 44px` on mobile tappable controls (Sign In, Join Room, other CTAs) to meet touch target standards.
+- [ ] Reduce mobile header crowding by adjusting top bar height/sticker placement and increasing hero top padding.
+- [ ] Normalize CTA glow/elevation tokens between lobby and auth screens for cross-page consistency.
+- [ ] Relax lobby card label density on small screens (title/badge spacing and badge prominence).
