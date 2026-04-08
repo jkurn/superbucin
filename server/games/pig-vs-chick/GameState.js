@@ -6,7 +6,8 @@ export const GAME_CONFIG = {
   STARTING_ENERGY: 20,
   ENERGY_REGEN: 3,
   TICK_RATE: 20,
-  BASE_DAMAGE: [60, 35, 18, 8],
+  // Higher tiers should threaten bases more than low tiers.
+  BASE_DAMAGE: [8, 18, 35, 60],
 
   // Tug-of-war push combat
   PUSH_SPEED: 0.015,        // push speed per weight-difference unit
@@ -144,12 +145,7 @@ export class GameState {
 
       const opponent = this.findClosestOpponent(unit, alive);
       if (opponent && Math.abs(unit.z - opponent.z) < GAME_CONFIG.COLLISION_DIST) {
-        unit.state = 'push';
-        unit.targetId = opponent.id;
-        if (opponent.state === 'march') {
-          opponent.state = 'push';
-          opponent.targetId = unit.id;
-        }
+        this._lockPushPair(unit, opponent);
       }
     }
 
@@ -157,12 +153,38 @@ export class GameState {
     for (const unit of alive) {
       if (unit.state !== 'march') continue;
 
+      unit.prevZ = unit.z;
       unit.z -= unit.speed * unit.direction * dt;
 
       if (unit.direction === 1 && unit.z <= -halfLane) {
         this.onUnitReachedBase(unit);
       } else if (unit.direction === -1 && unit.z >= halfLane) {
         this.onUnitReachedBase(unit);
+      }
+    }
+
+    // Phase 2.5: Reconcile overshoot collisions to prevent pass-through.
+    for (let lane = 0; lane < GAME_CONFIG.NUM_LANES; lane++) {
+      const p1March = alive
+        .filter((u) => u.state === 'march' && u.lane === lane && u.direction === 1)
+        .sort((a, b) => a.z - b.z);
+      const p2March = alive
+        .filter((u) => u.state === 'march' && u.lane === lane && u.direction === -1)
+        .sort((a, b) => b.z - a.z);
+
+      while (p1March.length > 0 && p2March.length > 0) {
+        const p1Front = p1March[0];
+        const p2Front = p2March[0];
+        const dist = Math.abs(p1Front.z - p2Front.z);
+        const crossed = (p1Front.prevZ ?? p1Front.z) >= (p2Front.prevZ ?? p2Front.z) && p1Front.z < p2Front.z;
+        if (dist < GAME_CONFIG.COLLISION_DIST || crossed) {
+          this._lockPushPair(p1Front, p2Front);
+          p1March.shift();
+          p2March.shift();
+        } else {
+          // Frontline units are still separated; deeper units cannot be crossed yet.
+          break;
+        }
       }
     }
 
@@ -242,6 +264,22 @@ export class GameState {
         }
       }
     }
+  }
+
+  _lockPushPair(unitA, unitB) {
+    const p1Like = unitA.direction === 1 ? unitA : unitB;
+    const p2Like = p1Like === unitA ? unitB : unitA;
+    const mid = (unitA.z + unitB.z) / 2;
+    const halfGap = GAME_CONFIG.COLLISION_DIST / 2;
+
+    // Keep deterministic ordering: direction 1 unit stays "above" direction -1 unit.
+    p1Like.z = mid + halfGap;
+    p2Like.z = mid - halfGap;
+
+    unitA.state = 'push';
+    unitA.targetId = unitB.id;
+    unitB.state = 'push';
+    unitB.targetId = unitA.id;
   }
 
   findClosestOpponent(unit, alive) {

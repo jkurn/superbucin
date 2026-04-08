@@ -21,7 +21,7 @@ export function render(overlay, deps, options) {
         <input class="auth-input" id="auth-password" type="password" placeholder="Password" autocomplete="current-password" />
         <button class="btn btn-pink" id="btn-login">Log In</button>
         <button class="auth-link" id="btn-forgot" type="button">Forgot password?</button>
-        <div id="auth-error" class="auth-error"></div>
+        <div id="auth-error" class="auth-error" role="alert" aria-live="polite"></div>
       </div>
 
       <div class="auth-form hidden" id="auth-signup-form">
@@ -36,7 +36,7 @@ export function render(overlay, deps, options) {
         </div>
         <input class="auth-input" id="signup-password" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password" />
         <button class="btn btn-pink" id="btn-signup">Create Account</button>
-        <div id="signup-error" class="auth-error"></div>
+        <div id="signup-error" class="auth-error" role="alert" aria-live="polite"></div>
       </div>
 
       <button class="btn btn-blue btn-small" id="btn-back-lobby" style="margin-top:1rem;">\u2190 Back to Lobby</button>
@@ -68,6 +68,10 @@ export function render(overlay, deps, options) {
     const password = document.getElementById('auth-password').value;
     const errEl = document.getElementById('auth-error');
     errEl.textContent = '';
+    if (!email || !password) {
+      errEl.textContent = 'Email and password are required';
+      return;
+    }
     try {
       await userManager.signIn(email, password);
       showScreen('lobby');
@@ -110,7 +114,7 @@ function renderForgotPassword(overlay, deps) {
       <div class="auth-form">
         <input class="auth-input" id="reset-email" type="email" placeholder="Email" autocomplete="email" />
         <button class="btn btn-pink" id="btn-send-reset">Send Reset Link</button>
-        <div id="reset-msg" class="auth-error"></div>
+        <div id="reset-msg" class="auth-error" role="alert" aria-live="polite"></div>
       </div>
       <button class="btn btn-blue btn-small" id="btn-back-auth" style="margin-top:1rem;">\u2190 Back to Sign In</button>
     </div>

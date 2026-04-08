@@ -53,13 +53,59 @@ export function render(overlay, deps, options) {
       <div class="game-grid">
         ${cardsHTML}${padHTML}
       </div>
-      <div class="game-options-panel" id="game-options-panel" style="display:none;">
+      <div class="game-options-panel" id="game-options-panel" style="display:none;" hidden aria-hidden="true" inert>
         <button class="game-options-toggle" id="game-options-toggle" type="button">
           <span id="game-options-label">Game Options</span>
           <span class="game-options-chevron" id="game-options-chevron">\u203a</span>
         </button>
-        <div class="game-options-body" id="game-options-body" style="display:none;">
-          <div id="memory-room-options" style="display:none;">
+        <div class="game-options-body" id="game-options-body" style="display:none;" hidden aria-hidden="true"></div>
+      </div>
+      ${isEleven11 ? `<img class="easter-overthinking" src="${STICKERS.overthinking}" alt="" />` : ''}
+      <div class="room-section">
+        <button class="btn btn-pink" id="btn-create">Create Room</button>
+        <div class="or-divider">\u2014 or \u2014</div>
+        <input class="room-code-input" id="input-code" placeholder="Enter code" maxlength="4" />
+        <button class="btn btn-blue btn-small" id="btn-join">Join Room</button>
+        <div id="join-feedback" class="auth-error" role="alert" aria-live="polite"></div>
+      </div>
+    </div>
+  `;
+
+  bindUserBar(userManager, { showScreen });
+
+  let selectedGameType = registered[0]?.type || 'pig-vs-chick';
+  const optionsPanel = document.getElementById('game-options-panel');
+  const optionsToggle = document.getElementById('game-options-toggle');
+  const optionsBody = document.getElementById('game-options-body');
+  const optionsChevron = document.getElementById('game-options-chevron');
+  const optionsLabel = document.getElementById('game-options-label');
+  let optionsOpen = false;
+
+  const GAME_OPTION_LABELS = {
+    'memory-match': 'Memory Match Options',
+    'doodle-guess': 'Doodle Options',
+  };
+
+  optionsToggle.addEventListener('click', () => {
+    optionsOpen = !optionsOpen;
+    optionsBody.style.display = optionsOpen ? 'block' : 'none';
+    optionsBody.hidden = !optionsOpen;
+    optionsBody.setAttribute('aria-hidden', String(!optionsOpen));
+    optionsChevron.classList.toggle('open', optionsOpen);
+  });
+
+  const syncGameOptionPanels = () => {
+    const hasOptions = selectedGameType === 'doodle-guess' || selectedGameType === 'memory-match';
+    optionsPanel.style.display = hasOptions ? 'block' : 'none';
+    optionsPanel.hidden = !hasOptions;
+    optionsPanel.setAttribute('aria-hidden', String(!hasOptions));
+    if (hasOptions) optionsPanel.removeAttribute('inert');
+    else optionsPanel.setAttribute('inert', '');
+    optionsLabel.textContent = GAME_OPTION_LABELS[selectedGameType] || 'Game Options';
+    if (hasOptions) {
+      optionsBody.innerHTML = selectedGameType === 'memory-match'
+        ? `
+          <div id="memory-room-options">
             <div class="game-options-group">
               <label class="game-options-field-label">Card pack</label>
               <select id="memory-pack" class="memory-pack-select">${packOptionsHtml}</select>
@@ -73,56 +119,23 @@ export function render(overlay, deps, options) {
             </div>
             <label class="game-options-check"><input type="checkbox" id="memory-speed" /><span>Speed mode (timer)</span></label>
           </div>
-          <div id="doodle-custom-wrap" style="display:none;">
+        `
+        : `
+          <div id="doodle-custom-wrap">
             <div class="game-options-group">
               <label class="game-options-field-label">Custom prompts <span style="color:#666;">(optional)</span></label>
               <textarea class="doodle-custom-textarea" id="doodle-custom-prompts" placeholder="Inside jokes, memories, nicknames\u2026 one per line" rows="3" maxlength="8000"></textarea>
             </div>
           </div>
-        </div>
-      </div>
-      ${isEleven11 ? `<img class="easter-overthinking" src="${STICKERS.overthinking}" alt="" />` : ''}
-      <div class="room-section">
-        <button class="btn btn-pink" id="btn-create">Create Room</button>
-        <div class="or-divider">\u2014 or \u2014</div>
-        <input class="room-code-input" id="input-code" placeholder="Enter code" maxlength="4" />
-        <button class="btn btn-blue btn-small" id="btn-join">Join Room</button>
-      </div>
-    </div>
-  `;
-
-  bindUserBar(userManager, { showScreen });
-
-  let selectedGameType = registered[0]?.type || 'pig-vs-chick';
-  const optionsPanel = document.getElementById('game-options-panel');
-  const optionsToggle = document.getElementById('game-options-toggle');
-  const optionsBody = document.getElementById('game-options-body');
-  const optionsChevron = document.getElementById('game-options-chevron');
-  const optionsLabel = document.getElementById('game-options-label');
-  const customWrap = document.getElementById('doodle-custom-wrap');
-  const memOpts = document.getElementById('memory-room-options');
-  let optionsOpen = false;
-
-  const GAME_OPTION_LABELS = {
-    'memory-match': 'Memory Match Options',
-    'doodle-guess': 'Doodle Options',
-  };
-
-  optionsToggle.addEventListener('click', () => {
-    optionsOpen = !optionsOpen;
-    optionsBody.style.display = optionsOpen ? 'block' : 'none';
-    optionsChevron.classList.toggle('open', optionsOpen);
-  });
-
-  const syncGameOptionPanels = () => {
-    const hasOptions = selectedGameType === 'doodle-guess' || selectedGameType === 'memory-match';
-    optionsPanel.style.display = hasOptions ? 'block' : 'none';
-    optionsLabel.textContent = GAME_OPTION_LABELS[selectedGameType] || 'Game Options';
-    if (customWrap) customWrap.style.display = selectedGameType === 'doodle-guess' ? 'block' : 'none';
-    if (memOpts) memOpts.style.display = selectedGameType === 'memory-match' ? 'block' : 'none';
+        `;
+    } else {
+      optionsBody.innerHTML = '';
+    }
     if (!hasOptions) {
       optionsOpen = false;
       optionsBody.style.display = 'none';
+      optionsBody.hidden = true;
+      optionsBody.setAttribute('aria-hidden', 'true');
       optionsChevron.classList.remove('open');
     }
   };
@@ -159,8 +172,14 @@ export function render(overlay, deps, options) {
     }
   });
   document.getElementById('btn-join').addEventListener('click', () => {
+    const feedbackEl = document.getElementById('join-feedback');
     const code = document.getElementById('input-code').value.trim();
-    if (code.length === 4) network.joinRoom(code);
+    feedbackEl.textContent = '';
+    if (code.length !== 4) {
+      feedbackEl.textContent = 'Please enter a 4-character room code';
+      return;
+    }
+    network.joinRoom(code);
   });
   document.getElementById('input-code').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('btn-join').click();

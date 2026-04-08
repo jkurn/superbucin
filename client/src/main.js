@@ -56,6 +56,8 @@ const app = {
 
     const loading = document.getElementById('loading-screen');
     loading.classList.add('hidden');
+    loading.setAttribute('aria-hidden', 'true');
+    loading.setAttribute('hidden', '');
     setTimeout(() => loading.remove(), 500);
 
     // Let the Router decide which screen to show based on the URL
