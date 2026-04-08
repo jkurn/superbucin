@@ -1,4 +1,5 @@
 import { STICKERS, QUOTES } from '../shared/StickerPack.js';
+import { captureEvent } from '../shared/analytics.js';
 
 export function render(overlay, deps, roomCode) {
   const { userManager, router } = deps;
@@ -8,6 +9,11 @@ export function render(overlay, deps, roomCode) {
   const shareUrl = `${window.location.origin}/room/${roomCode}`;
   const shareText = 'Join my game on SUPERBUCIN! \uD83D\uDC95\uD83E\uDDA0';
   const hasNativeShare = typeof navigator.share === 'function';
+
+  captureEvent('invite_link_viewed', {
+    room_code: roomCode,
+    is_native_share_supported: hasNativeShare,
+  });
 
   overlay.innerHTML = `
     <div class="lobby-ui">
@@ -46,16 +52,32 @@ export function render(overlay, deps, roomCode) {
   const feedback = document.getElementById('share-link-feedback');
 
   document.getElementById('btn-copy-link').addEventListener('click', () => {
-    _copyToClipboard(shareUrl, feedback);
+    captureEvent('share_clicked', {
+      share_platform: 'copy_link',
+      share_context: 'invite',
+      room_code: roomCode,
+    });
+    _copyToClipboard(shareUrl, feedback, roomCode);
   });
 
   const shareBtn = document.getElementById('btn-native-share');
   if (shareBtn) {
     shareBtn.addEventListener('click', async () => {
       if (typeof navigator.share !== 'function') {
+        captureEvent('share_failed', {
+          share_platform: 'native',
+          share_context: 'invite',
+          room_code: roomCode,
+          error_code: 'unsupported',
+        });
         _showFeedback(feedback, 'Native share not available on this browser');
         return;
       }
+      captureEvent('share_clicked', {
+        share_platform: 'native',
+        share_context: 'invite',
+        room_code: roomCode,
+      });
       try {
         await navigator.share({
           title: 'SUPERBUCIN',
@@ -65,6 +87,12 @@ export function render(overlay, deps, roomCode) {
         _showFeedback(feedback, 'Shared! \uD83D\uDC95');
       } catch (err) {
         if (err.name !== 'AbortError') {
+          captureEvent('share_failed', {
+            share_platform: 'native',
+            share_context: 'invite',
+            room_code: roomCode,
+            error_code: err.name || 'native_share_failed',
+          });
           _showFeedback(feedback, 'Could not open share sheet');
         }
       }
@@ -73,11 +101,17 @@ export function render(overlay, deps, roomCode) {
 }
 
 /** Copy URL to clipboard with user feedback. */
-function _copyToClipboard(url, feedbackEl) {
+function _copyToClipboard(url, feedbackEl, roomCode) {
   if (navigator.clipboard) {
     navigator.clipboard.writeText(url).then(() => {
       _showFeedback(feedbackEl, 'Copied! \uD83D\uDC95');
-    }).catch(() => {
+    }).catch((err) => {
+      captureEvent('share_failed', {
+        share_platform: 'copy_link',
+        share_context: 'invite',
+        room_code: roomCode,
+        error_code: err?.name || 'clipboard_write_failed',
+      });
       _selectInput();
       _showFeedback(feedbackEl, 'Select & copy the link above');
     });

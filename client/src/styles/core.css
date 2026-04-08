@@ -10,6 +10,13 @@
   --color-pink-600: #ff4081;
   --color-blue-500: #6bc5ff;
   --color-blue-600: #4081ff;
+  /* Shared CTA elevation (lobby, auth, room — same tokens) */
+  --elev-cta-pink: 0 4px 15px rgba(255, 107, 157, 0.4);
+  --elev-cta-blue: 0 4px 15px rgba(107, 197, 255, 0.4);
+  --focus-ring-pink: 0 0 0 3px rgba(255, 107, 157, 0.35);
+  --focus-ring-blue: 0 0 0 3px rgba(107, 197, 255, 0.35);
+  /* Selection glow aligned with CTA pink family */
+  --glow-pink-selected: 0 0 22px rgba(255, 107, 157, 0.3);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -121,12 +128,20 @@ canvas { display: block; width: 100%; height: 100%; }
 .btn-pink {
   background: linear-gradient(135deg, var(--color-pink-500), var(--color-pink-600));
   color: var(--color-text-primary);
-  box-shadow: 0 4px 15px rgba(255, 107, 157, 0.4);
+  box-shadow: var(--elev-cta-pink);
+}
+.btn-pink:focus-visible {
+  outline: none;
+  box-shadow: var(--elev-cta-pink), var(--focus-ring-pink);
 }
 .btn-blue {
   background: linear-gradient(135deg, var(--color-blue-500), var(--color-blue-600));
   color: var(--color-text-primary);
-  box-shadow: 0 4px 15px rgba(107, 197, 255, 0.4);
+  box-shadow: var(--elev-cta-blue);
+}
+.btn-blue:focus-visible {
+  outline: none;
+  box-shadow: var(--elev-cta-blue), var(--focus-ring-blue);
 }
 .btn-small {
   padding: 0.6rem 1.5rem;
@@ -245,7 +260,7 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .game-card.active {
   border-color: #ff6b9d;
-  box-shadow: 0 0 20px rgba(255, 107, 157, 0.3);
+  box-shadow: var(--glow-pink-selected);
 }
 .game-card.disabled {
   opacity: 0.4;
@@ -315,7 +330,7 @@ canvas { display: block; width: 100%; height: 100%; }
     }
     .side-option.selected {
       border-color: #ff6b9d;
-      box-shadow: 0 0 25px rgba(255, 107, 157, 0.3);
+      box-shadow: var(--glow-pink-selected);
     }
     .side-option.suggested {
       border-color: rgba(107, 255, 157, 0.6);

@@ -45,6 +45,17 @@ function isMobileWeb() {
   return /android|iphone|ipad|ipod|mobile/i.test(userAgent);
 }
 
+function getTelemetryContext() {
+  return {
+    is_mobile_web: isMobileWeb(),
+    viewport_width: window.innerWidth,
+    viewport_height: window.innerHeight,
+    device_pixel_ratio: window.devicePixelRatio || 1,
+    connection_type: getConnectionType(),
+    route: window.location.pathname,
+  };
+}
+
 const app = {
   sceneManager: null,
   network: null,
@@ -53,9 +64,28 @@ const app = {
   audio: null,
 
   async init() {
+    initAnalytics();
+    const loadingStartMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const loading = document.getElementById('loading-screen');
+    let loadingTappedOnce = false;
+    captureEvent('loading_started', {
+      ...getTelemetryContext(),
+    });
+
+    if (loading) {
+      loading.addEventListener('pointerdown', () => {
+        if (loadingTappedOnce) return;
+        loadingTappedOnce = true;
+        const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - loadingStartMs;
+        captureEvent('loading_tapped', {
+          ...getTelemetryContext(),
+          elapsed_ms_since_loading_start: Math.round(elapsedMs),
+        });
+      });
+    }
+
     this.userManager = new UserManager();
     await this.userManager.init();
-    initAnalytics();
     syncUserIdentity(this.userManager);
     this.audio = new WebAudioManager();
     this.audio.init();
@@ -69,26 +99,31 @@ const app = {
     this.ui.init(this.network, this.sceneManager, this.userManager);
     this.network.init(this.ui, this.sceneManager, this.userManager);
 
-    const loading = document.getElementById('loading-screen');
-    loading.classList.add('hidden');
-    loading.setAttribute('aria-hidden', 'true');
-    loading.setAttribute('hidden', '');
-    setTimeout(() => loading.remove(), 500);
+    if (loading) {
+      loading.classList.add('hidden');
+      loading.setAttribute('aria-hidden', 'true');
+      loading.setAttribute('hidden', '');
+      setTimeout(() => loading.remove(), 500);
+    }
 
     // Let the Router decide which screen to show based on the URL
     Router.init(this.ui, this.network, this.userManager);
     this.ui.setRouter(Router);
 
     const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - appBootStartMs;
+    const loadingElapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - loadingStartMs;
+    captureEvent('loading_completed', {
+      ...getTelemetryContext(),
+      loading_time_ms: Math.round(loadingElapsedMs),
+      loading_time_seconds: Number((loadingElapsedMs / 1000).toFixed(2)),
+      exceeded_5s: loadingElapsedMs > 5000,
+      was_tapped_during_loading: loadingTappedOnce,
+    });
+
     captureEvent('game_loaded', {
+      ...getTelemetryContext(),
       load_time_ms: Math.round(elapsedMs),
       load_time_seconds: Number((elapsedMs / 1000).toFixed(2)),
-      is_mobile_web: isMobileWeb(),
-      viewport_width: window.innerWidth,
-      viewport_height: window.innerHeight,
-      device_pixel_ratio: window.devicePixelRatio || 1,
-      connection_type: getConnectionType(),
-      route: window.location.pathname,
     });
 
     // Listen for password recovery event from Supabase

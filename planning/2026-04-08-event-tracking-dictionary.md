@@ -98,8 +98,12 @@ This project is a mobile-web multiplayer game collection, so analytics must answ
 ### Core Event Set for Mobile-Web Games
 
 - Already implemented:
+  - `loading_started` (entry into loading state)
+  - `loading_completed` (loading UI replaced by game UI)
+  - `loading_tapped` (first impatient tap during loading)
   - `game_loaded` (app boot complete + load timing + device context)
   - `ui_screen_viewed`, `game_started`, `match_ended`, `game_action_error`, `room_error`
+  - `result_viewed`, `share_clicked`, `share_failed`, `invite_link_viewed`
   - connectivity and opponent reconnect events
 - Planned (next iteration):
   - `tutorial_started`
@@ -112,7 +116,7 @@ This project is a mobile-web multiplayer game collection, so analytics must answ
 ### Funnel Templates (PostHog)
 
 - Onboarding funnel:
-  - `$pageview` -> `game_loaded` -> `ui_screen_viewed(screen=lobby)` -> `game_started`
+  - `$pageview` -> `loading_started` -> `loading_completed` -> `game_loaded` -> `ui_screen_viewed(screen=lobby)` -> `game_started`
   - If/when tutorial is added: insert `tutorial_started` and `tutorial_completed` before first `game_started`.
 - Progression/balance funnel (per game mode):
   - `level_started` -> `level_completed`
@@ -120,6 +124,9 @@ This project is a mobile-web multiplayer game collection, so analytics must answ
 - Reliability funnel:
   - `game_started` -> `match_ended`
   - drop-offs broken down by `socket_disconnected`, `opponent_disconnected`, `game_action_error`
+- Viral funnel:
+  - `result_viewed` -> `share_clicked`
+  - break down by `share_platform`, `bucin_category`, `result_outcome`
 
 ### Mobile-Web Diagnostics
 
@@ -174,6 +181,27 @@ These fields are highest priority for game balancing and mobile UX:
 - Required properties: `path`, `url`
 - Type: Context
 - QA: confirm initial load and route changes emit pageviews.
+
+### `loading_started`
+- Trigger when: app init begins and loading screen is shown.
+- Required properties: none
+- Recommended properties: `is_mobile_web`, `viewport_width`, `viewport_height`, `device_pixel_ratio`, `connection_type`, `route`
+- Type: Onboarding/performance
+- QA: hard-refresh page and verify event fires once.
+
+### `loading_completed`
+- Trigger when: loading UI is hidden and replaced by playable UI.
+- Required properties: `loading_time_ms`, `loading_time_seconds`, `exceeded_5s`, `was_tapped_during_loading`
+- Recommended properties: `is_mobile_web`, `viewport_width`, `viewport_height`, `connection_type`, `route`
+- Type: Onboarding/performance
+- QA: verify event always follows `loading_started` and timing is non-negative.
+
+### `loading_tapped`
+- Trigger when: user taps/clicks the loading screen (first tap only).
+- Required properties: `elapsed_ms_since_loading_start`
+- Recommended properties: `is_mobile_web`, `viewport_width`, `viewport_height`, `connection_type`, `route`
+- Type: Friction signal
+- QA: tap loading screen during throttled load and verify event fires once.
 
 ### `game_loaded`
 - Trigger when: first playable app state is reached after boot/init.
@@ -276,6 +304,11 @@ These fields are highest priority for game balancing and mobile UX:
 - Required properties: `room_code`, `game_type`
 - Type: Success
 
+### `invite_link_viewed`
+- Trigger when: waiting room invite/share block is rendered.
+- Required properties: `room_code`, `is_native_share_supported`
+- Type: Intent/context
+
 ### `join_room_attempt`
 - Trigger when: user submits a room code.
 - Required properties: `room_code`
@@ -319,6 +352,24 @@ These fields are highest priority for game balancing and mobile UX:
 - Required properties: `room_code`, `game_type`
 - Recommended properties: `winner`, `loser`, `is_winner`, `tie`, `points_earned`
 - Type: Success/outcome
+
+### `result_viewed`
+- Trigger when: victory/result screen is rendered.
+- Required properties: `game_type`, `result_outcome`, `bucin_category`
+- Recommended properties: `points_earned`, `your_score`, `opp_score`
+- Type: Success/outcome
+
+### `share_clicked`
+- Trigger when: user taps a share CTA (result share or invite share).
+- Required properties: `share_platform`
+- Recommended properties: `share_context`, `game_type`, `bucin_category`, `result_outcome`, `room_code`
+- Type: Intent/viral
+
+### `share_failed`
+- Trigger when: share action fails due to unsupported API or runtime error.
+- Required properties: `share_platform`, `error_code`
+- Recommended properties: `share_context`, `game_type`, `bucin_category`, `result_outcome`, `room_code`
+- Type: Failure/viral
 
 ### `tutorial_started` (planned)
 - Trigger when: first-run tutorial begins.

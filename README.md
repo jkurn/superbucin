@@ -105,6 +105,8 @@ PostHog filtering best practice:
 - Exclude `environment=local` in production dashboards/insights.
 - Keep internal QA users tagged and excluded (for example by email domain or person property).
 
+Viral loop dashboard (widgets, funnels, KPI formulas): see `planning/2026-04-08-posthog-viral-dashboard.md`.
+
 ---
 
 ## Engineering hygiene and observability
