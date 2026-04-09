@@ -66,11 +66,11 @@ Suggested build order in plan: Connect Four → Quiz Race → Battleship (comple
 
 ## Engineering scorecard (run weekly)
 
-Reference doc: `planning/2026-04-07-testing-health.md`
+**Canonical:** `PROJECT-HEALTH.md` (weekly EngEx scorecard). **Snapshots:** `planning/2026-04-09-eng-health.md` (latest), `planning/2026-04-07-testing-health.md` (historical).
 
-- [x] ~~Run weekly engineering scorecard (10 categories: maintainability, DRY/reuse, SOLID boundaries, tests, reliability, delivery hygiene, change size, observability, docs freshness, focus/flow).~~ — Done for week `2026-04-07` in `planning/2026-04-07-testing-health.md`.
-- [x] ~~Track and log baseline metrics weekly: commit size distribution, hotspot churn, test ratio, coverage trend, change failure rate, deploy health.~~ — Done baseline snapshot for week `2026-04-07` in `planning/2026-04-07-testing-health.md`.
-- [x] ~~Set weekly improvement bet (one structural bet + one quality bet) and review outcome in next retro.~~ — Done: added structural + quality bets for next review cycle in `planning/2026-04-07-testing-health.md`.
+- [x] ~~Run weekly engineering scorecard (10 categories: maintainability, DRY/reuse, SOLID boundaries, tests, reliability, delivery hygiene, change size, observability, docs freshness, focus/flow).~~ — Done for week `2026-04-07` in `planning/2026-04-07-testing-health.md`; full EngEx taxonomy now in `PROJECT-HEALTH.md` (updated 2026-04-09).
+- [x] ~~Track and log baseline metrics weekly: commit size distribution, hotspot churn, test ratio, coverage trend, change failure rate, deploy health.~~ — Snapshot `planning/2026-04-09-eng-health.md` + tables in `PROJECT-HEALTH.md` Section 1 (2026-04-09).
+- [x] ~~Set weekly improvement bet (one structural bet + one quality bet) and review outcome in next retro.~~ — Next bets listed in `PROJECT-HEALTH.md` Section 5 (2026-04-09); review at next retro.
 
 ## Deferred from /design-review (2026-04-08)
 

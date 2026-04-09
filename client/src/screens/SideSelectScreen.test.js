@@ -56,6 +56,26 @@ describe('SideSelectScreen', () => {
     assert.ok(status.textContent.includes('Waiting'));
   });
 
+  it('renders opponent row when opponentIdentity is present', () => {
+    const network = {
+      roomGameType: 'custom-duel',
+      opponentIdentity: { avatarUrl: '/opp.png', displayName: 'Sayang' },
+      selectSide: () => {},
+    };
+    const overlay = document.createElement('div');
+    document.body.appendChild(overlay);
+    renderSideSelect(overlay, {
+      network,
+      userManager: {
+        profile: { avatarUrl: '/me.png' },
+        getDisplayLabel: () => 'Aku',
+      },
+    }, 'CODE9');
+    assert.ok(overlay.querySelector('.side-select-players'));
+    assert.ok(overlay.textContent.includes('Sayang'));
+    assert.ok(overlay.textContent.includes('VS'));
+  });
+
   it('updateSideSelect sets status text and suggests remaining side when opponent picked', () => {
     const network = {
       roomGameType: 'custom-duel',

@@ -143,6 +143,40 @@ describe('LobbyScreen render', () => {
     assert.equal(root.hidden, true);
   });
 
+  it('deep link with registered game+challenge shows game label in banner', () => {
+    GameRegistry.register('viral-game', {
+      name: 'Viral Game Title',
+      lobby: { name: 'Viral Game Title', icon: '\u2b50', badge: 'VG' },
+    });
+    installDom('https://example.com/?challenge=BucinLevel&game=viral-game');
+    const network = { createRoom: () => {}, joinRoom: () => {} };
+    const overlay = document.createElement('div');
+    document.body.appendChild(overlay);
+    renderLobby(overlay, {
+      network,
+      userManager: stubUserManager(),
+      showScreen: () => {},
+    });
+    const root = overlay.querySelector('#lobby-deep-link-root');
+    assert.equal(root.hidden, false);
+    assert.ok(root.textContent.includes('BucinLevel'));
+    assert.ok(root.textContent.includes('Viral Game Title'));
+  });
+
+  it('deep link with unknown game param shows unknown-game copy', () => {
+    installDom('https://example.com/?game=not-a-registered-type');
+    const network = { createRoom: () => {}, joinRoom: () => {} };
+    const overlay = document.createElement('div');
+    document.body.appendChild(overlay);
+    renderLobby(overlay, {
+      network,
+      userManager: stubUserManager(),
+      showScreen: () => {},
+    });
+    const root = overlay.querySelector('#lobby-deep-link-root');
+    assert.ok(root.textContent.includes('unknown game'));
+  });
+
   it('memory-match options toggle expands and collapses the options body', () => {
     const network = { createRoom: () => {}, joinRoom: () => {} };
     const overlay = document.createElement('div');
