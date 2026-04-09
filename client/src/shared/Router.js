@@ -17,8 +17,10 @@ import { capturePageView } from './analytics.js';
 let _ui = null;
 let _network = null;
 let _currentPath = '/';
+let _popstateHandler = null;
 
-function matchRoute(pathname) {
+/** Pure path → route match (exported for unit tests and tooling). */
+export function matchRoute(pathname) {
   const p = pathname.replace(/\/+$/, '') || '/';
 
   if (p === '/') return { route: 'lobby' };
@@ -74,8 +76,12 @@ const Router = {
     _ui = ui;
     _network = network;
 
-    // Listen for back/forward navigation
-    window.addEventListener('popstate', () => {
+    if (typeof window !== 'undefined' && _popstateHandler) {
+      window.removeEventListener('popstate', _popstateHandler);
+      _popstateHandler = null;
+    }
+
+    _popstateHandler = () => {
       const matched = matchRoute(window.location.pathname);
       // During an active game, do not disrupt it; just update internal path
       if (_network._inGame) {
@@ -83,7 +89,8 @@ const Router = {
         return;
       }
       resolve(matched);
-    });
+    };
+    window.addEventListener('popstate', _popstateHandler);
 
     // Resolve initial URL
     const initial = matchRoute(window.location.pathname);
@@ -113,5 +120,16 @@ const Router = {
     return _currentPath;
   },
 };
+
+/** @internal Resets module state between node tests; removes popstate listener if present. */
+export function __resetRouterForTests() {
+  if (typeof window !== 'undefined' && _popstateHandler) {
+    window.removeEventListener('popstate', _popstateHandler);
+  }
+  _popstateHandler = null;
+  _ui = null;
+  _network = null;
+  _currentPath = '/';
+}
 
 export { Router };

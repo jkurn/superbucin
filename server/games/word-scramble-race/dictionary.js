@@ -45,3 +45,8 @@ export async function isValidEnglishWord(word) {
     return true;
   }
 }
+
+/** @internal Clears the in-memory dictionary cache between unit tests. */
+export function __clearDictionaryCacheForTests() {
+  cache.clear();
+}

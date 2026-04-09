@@ -43,4 +43,9 @@ export const GameRegistry = {
       ...mod.lobby,
     }));
   },
+
+  /** @internal Clears registrations between isolated client tests. */
+  __clearForTests() {
+    games.clear();
+  },
 };

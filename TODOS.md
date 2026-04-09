@@ -47,7 +47,7 @@ Suggested build order in plan: Connect Four → Quiz Race → Battleship (comple
 
 ## Deferred from plan-eng-review (testing strategy, 2026-04-07)
 
-- [x] ~~Socket event contract tests~~ — Done: `RoomManager.test.js` enforces event name/payload/recipient routing for privacy-sensitive game events (`memory-state`, `battleship-state`, `vending-state`, `bonk-state`, `cute-aggression-state`).
+- [x] ~~Socket event contract tests~~ — Done: `RoomManager.contracts.test.js` (and related `RoomManager.*.test.js`) enforces event name/payload/recipient routing for privacy-sensitive game events (`memory-state`, `battleship-state`, `vending-state`, `bonk-state`, `cute-aggression-state`).
 - [x] ~~NetworkManager client contract tests~~ — Done: `NetworkManager.test.js` covers server event mapping (`room-error`, reconnect/error notifications, `achievement-unlocked`, `match-end`) and routing behavior.
 - [x] ~~Battleship mini rules/privacy unit suite~~ — Done: `server/games/battleship-mini/GameState.test.js` covers placement validation, turn ownership, hidden-state slices, and match-end behavior.
 - [x] ~~Quiz race rules/authority unit suite~~ — Done: `server/games/quiz-race/GameState.test.js` covers answer validation, scoring (+ speed bonus), phase visibility (`correct` hidden until reveal), finish behavior, and reconnect identity migration.
@@ -56,10 +56,10 @@ Suggested build order in plan: Connect Four → Quiz Race → Battleship (comple
 
 - [x] ~~Rules correctness: win/lose/tie, illegal actions, turn ownership, scoring.~~ — Covered by `server/games/*/GameState.test.js` suites (including connect-four, othello, bonk-brawl, cute-aggression, battleship-mini, quiz-race).
 - [x] ~~Authority/security: server rejects malformed/out-of-turn actions.~~ — Covered by GameState invalid-action tests and server-side action handling checks.
-- [x] ~~Payload privacy: players only receive their allowed state slices (no opponent hidden data leakage).~~ — Covered by `RoomManager.test.js` contract routing for `memory-state`, `battleship-state`, `vending-state`, `bonk-state`, `cute-aggression-state`.
-- [x] ~~Network resilience: disconnect/reconnect, timeout windows, rejoin consistency.~~ — Covered by reconnect race tests in `RoomManager.test.js` and client reconnect handling in `NetworkManager.test.js`.
+- [x] ~~Payload privacy: players only receive their allowed state slices (no opponent hidden data leakage).~~ — Covered by `RoomManager.contracts.test.js` contract routing for `memory-state`, `battleship-state`, `vending-state`, `bonk-state`, `cute-aggression-state`.
+- [x] ~~Network resilience: disconnect/reconnect, timeout windows, rejoin consistency.~~ — Covered by reconnect tests in `RoomManager.reconnect.test.js` and client reconnect handling in `NetworkManager.test.js`.
 - [x] ~~Notification integrity: correct recipient + no duplicate/conflicting notifications.~~ — Covered by `RoomManager` recipient contract tests + `NetworkManager` event mapping tests.
-- [x] ~~Persistence side effects: `match-end` path records points/achievements correctly and degrades safely on DB failure.~~ — Covered by `UserService.test.js` and `RoomManager.test.js` match-end fallback behavior.
+- [x] ~~Persistence side effects: `match-end` path records points/achievements correctly and degrades safely on DB failure.~~ — Covered by `UserService.test.js`, `RoomManager.contracts.test.js` (`match-end` DB-down fallback), and `RoomManager.persistence.test.js` (`_recordMatchResult`).
 - [ ] **Mobile-input contract tests (required for all new games):** verify core touch interactions on real mobile behavior (tap/drag/swipe as applicable), not only desktop click paths.
 - [ ] **Dependency degradation tests (required for all new games):** if game logic depends on external APIs/services, enforce explicit fallback behavior under timeout/network/5xx and test it.
 - [ ] **Playable-state invariant tests (required for all new games):** random generation must satisfy minimum playability constraints (e.g., guaranteed legal moves/words/targets) across supported board sizes/configs.
@@ -78,3 +78,18 @@ Reference doc: `planning/2026-04-07-testing-health.md`
 - [x] ~~Reduce mobile header crowding by adjusting top bar height/sticker placement and increasing hero top padding.~~ — Fixed by `/design-review` on `main`, 2026-04-08 (`34b6592`).
 - [x] ~~Normalize CTA glow/elevation tokens between lobby and auth screens for cross-page consistency.~~ — Done: shared `--elev-cta-*`, `--focus-ring-*`, and `--glow-pink-selected` in `client/src/styles/core.css` (lobby CTAs, auth CTAs via `.btn-*`, aligned game-card/side-select selection glow).
 - [x] ~~Relax lobby card label density on small screens (title/badge spacing and badge prominence).~~ — Fixed by `/design-review` on `main`, 2026-04-08 (`5b4a12b`).
+
+## Testing strategy backlog (/testing-strategy-coverage, 2026-04-08)
+
+- [x] ~~**T-01 (0.5d): Add `analytics.js` unit tests** — cover `initAnalytics`, `captureEvent`, `capturePageView`, `syncUserIdentity`, `resetAnalyticsIdentity` with browser/no-browser + missing-key paths.~~ — Done in `client/src/shared/analytics.test.js` (`analytics.js` line coverage now `100%`).
+- [x] ~~**T-02 (0.25d): Add `env.js` startup safety tests** — validate required var failures + defaults.~~ — Done in `server/config/env.test.js` (production missing-required, non-prod bypass, JWT warning path).
+- [x] ~~**T-03 (0.5d): Add `GameFactory.getConfig` contract tests** — lock shape per registered game type.~~ — Done in `server/games/GameFactory.test.js` (`GameFactory.js` line coverage now `100%`).
+- [x] ~~**T-04 (0.5d): Add `Router.js` route/deep-link tests** — `/`, `/auth`, `/u/:username`, `/room/:code`, fallback, uppercase normalization.~~ — Done: `client/src/shared/Router.test.js` (`matchRoute` + History API + `init` branches including in-game `popstate`).
+- [x] ~~**T-05 (1.0d): Add lobby + side-select client integration tests** — touch/mobile-focused create/join/select flows.~~ — Done: `client/src/screens/LobbyScreen.test.js`, `client/src/screens/SideSelectScreen.test.js` (jsdom; create/join validation, memory options payload, side pick + `updateSideSelect`).
+- [x] ~~**T-06 (0.5d): Add dictionary degradation tests** — timeout/network/5xx fallback behavior in word-scramble path.~~ — Done: `server/games/word-scramble-race/dictionary.test.js` (`__clearDictionaryCacheForTests` + mocked `fetch`: 2xx/404/5xx/429/throw paths + cache).
+- [x] ~~**T-07 (0.25d): Add repeat-run stability CI check** — run `npm test` 3x and fail on any inconsistent exit status.~~ — Done: `scripts/test-repeat.mjs`, `npm run test:repeat`; CI `Tests` step runs 3× via that script.
+
+- [x] ~~**Q-01 (0.5d): Split `RoomManager.test.js` by concern** — room lifecycle, reconnect races, event privacy contracts, persistence side-effects.~~ — Done: `RoomManager.{lifecycle,contracts,reconnect,persistence}.test.js`.
+  - Regression: `assertAllowedKeysOnly` / `assertRequiredKeys` on `memory-state`, `battleship-state`, `vending-state`, `bonk-state`, `cute-aggression-state` slices in `RoomManager.contracts.test.js`.
+- [x] ~~**Q-02 (0.5d): Extract shared test factories** (`mockSocket`, `createGame`, event helpers) to reduce copy-paste.~~ — Done: `server/test-helpers/roomManagerTestKit.js` (`MockGameState`, `GameFactory` registrations, `mockSocket`, `mockIo`).
+- [x] ~~**Q-03 (0.25d): Add payload schema assertion helpers** for game-state events.~~ — Done: `server/test-helpers/payloadShape.js` + `payloadShape.test.js` (`assertRequiredKeys`, `assertAllowedKeysOnly`).

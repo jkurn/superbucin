@@ -10,8 +10,9 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build": "cd server && npm install && cd ../client && npm install && npx vite build",
     "start": "cd server && node index.js",
-    "test": "node --test server/games/*/GameState.test.js server/rooms/RoomManager.test.js server/services/UserService.test.js client/src/shared/NetworkManager.test.js client/src/shared/IndexHtmlRefactor.test.js client/src/shared/lobbyDeepLink.test.js",
-    "test:coverage": "node --experimental-test-coverage --test server/games/*/GameState.test.js server/rooms/RoomManager.test.js server/services/UserService.test.js client/src/shared/NetworkManager.test.js client/src/shared/IndexHtmlRefactor.test.js client/src/shared/lobbyDeepLink.test.js",
+    "test": "node --test server/games/*/GameState.test.js server/games/word-scramble-race/dictionary.test.js server/games/GameFactory.test.js server/config/env.test.js server/rooms/RoomManager.lifecycle.test.js server/rooms/RoomManager.contracts.test.js server/rooms/RoomManager.reconnect.test.js server/rooms/RoomManager.persistence.test.js server/test-helpers/payloadShape.test.js server/services/UserService.test.js client/src/shared/NetworkManager.test.js client/src/shared/IndexHtmlRefactor.test.js client/src/shared/lobbyDeepLink.test.js client/src/shared/analytics.test.js client/src/shared/Router.test.js client/src/screens/LobbyScreen.test.js client/src/screens/SideSelectScreen.test.js",
+    "test:repeat": "node scripts/test-repeat.mjs",
+    "test:coverage": "node --experimental-test-coverage --test server/games/*/GameState.test.js server/games/word-scramble-race/dictionary.test.js server/games/GameFactory.test.js server/config/env.test.js server/rooms/RoomManager.lifecycle.test.js server/rooms/RoomManager.contracts.test.js server/rooms/RoomManager.reconnect.test.js server/rooms/RoomManager.persistence.test.js server/test-helpers/payloadShape.test.js server/services/UserService.test.js client/src/shared/NetworkManager.test.js client/src/shared/IndexHtmlRefactor.test.js client/src/shared/lobbyDeepLink.test.js client/src/shared/analytics.test.js client/src/shared/Router.test.js client/src/screens/LobbyScreen.test.js client/src/screens/SideSelectScreen.test.js",
     "test:coverage:gate": "node scripts/coverage-gate.mjs",
     "lint": "eslint client/src/ server/",
     "prepare": "husky || true"
@@ -27,6 +28,7 @@
     "eslint": "^10.2.0",
     "globals": "^17.4.0",
     "husky": "^9.1.7",
+    "jsdom": "^24.1.3",
     "lint-staged": "^16.4.0"
   }
 }

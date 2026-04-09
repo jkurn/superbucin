@@ -1,11 +1,10 @@
 import posthog from 'posthog-js';
 
-const _env = typeof import.meta !== 'undefined' ? import.meta.env : undefined;
-const POSTHOG_KEY = _env?.VITE_POSTHOG_KEY;
-const POSTHOG_HOST = _env?.VITE_POSTHOG_HOST || 'https://eu.i.posthog.com';
-/** PostHog-recommended SDK defaults version (matches install snippet from dashboard). */
-const POSTHOG_DEFAULTS = _env?.VITE_POSTHOG_DEFAULTS || '2026-01-30';
-const APP_ENV = _env?.VITE_APP_ENV || null;
+function envSource() {
+  const override = globalThis.__SUPERBUCIN_ANALYTICS_ENV__;
+  if (override && typeof override === 'object') return override;
+  return typeof import.meta !== 'undefined' ? import.meta.env : undefined;
+}
 
 let initialized = false;
 let identifiedId = null;
@@ -15,20 +14,32 @@ function hasBrowser() {
 }
 
 function resolveEnvironment() {
-  if (APP_ENV) return APP_ENV;
+  const appEnv = envSource()?.VITE_APP_ENV || null;
+  if (appEnv) return appEnv;
   if (!hasBrowser()) return 'unknown';
   const host = window.location.hostname || '';
   if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) return 'local';
   return 'production';
 }
 
-export function initAnalytics() {
-  if (initialized) return true;
-  if (!hasBrowser() || !POSTHOG_KEY) return false;
+function resolvePosthogConfig() {
+  const env = envSource();
+  return {
+    key: env?.VITE_POSTHOG_KEY,
+    host: env?.VITE_POSTHOG_HOST || 'https://eu.i.posthog.com',
+    // PostHog-recommended SDK defaults version (matches install snippet from dashboard).
+    defaults: env?.VITE_POSTHOG_DEFAULTS || '2026-01-30',
+  };
+}
 
-  posthog.init(POSTHOG_KEY, {
-    api_host: POSTHOG_HOST,
-    defaults: POSTHOG_DEFAULTS,
+export function initAnalytics() {
+  const cfg = resolvePosthogConfig();
+  if (initialized) return true;
+  if (!hasBrowser() || !cfg.key) return false;
+
+  posthog.init(cfg.key, {
+    api_host: cfg.host,
+    defaults: cfg.defaults,
     capture_pageview: false,
     capture_pageleave: true,
     autocapture: true,
@@ -89,4 +100,9 @@ export function resetAnalyticsIdentity() {
   if (!analyticsReady()) return;
   identifiedId = null;
   posthog.reset();
+}
+
+export function __resetAnalyticsForTests() {
+  initialized = false;
+  identifiedId = null;
 }

@@ -132,7 +132,7 @@ Viral loop dashboard (widgets, funnels, KPI formulas): see `planning/2026-04-08-
 The project now uses a layered testing approach:
 
 - **GameState unit tests** (`server/games/*/GameState.test.js`)
-- **RoomManager contract tests** (`server/rooms/RoomManager.test.js`) for event routing, payload privacy, reconnect behavior
+- **RoomManager tests** (`server/rooms/RoomManager.*.test.js` — lifecycle, contracts, reconnect, persistence) for routing, payload privacy, reconnect behavior
 - **UserService persistence tests** (`server/services/UserService.test.js`)
 - **NetworkManager client contract tests** (`client/src/shared/NetworkManager.test.js`)
 - **Lobby viral deep-link parsing** (`client/src/shared/lobbyDeepLink.test.js`)

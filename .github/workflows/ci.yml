@@ -30,8 +30,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Tests
-        run: npm test
+      - name: Tests (3× repeat stability)
+        run: npm run test:repeat
 
       - name: Coverage gate
         run: npm run test:coverage:gate
