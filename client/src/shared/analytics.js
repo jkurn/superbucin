@@ -2,7 +2,7 @@ import posthog from 'posthog-js';
 
 // Public PostHog project key (client-side key, not a secret).
 const DEFAULT_POSTHOG_KEY = 'phc_vmb7NHFvtRdRsA7C42LFpWmyz3kT6veXrqe9AACAHhJh';
-const DEFAULT_POSTHOG_HOST = 'https://t.superbucin.pricylia.com';
+const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com';
 
 function envSource() {
   const override = globalThis.__SUPERBUCIN_ANALYTICS_ENV__;
