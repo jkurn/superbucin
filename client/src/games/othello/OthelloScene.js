@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { EventBus } from '../../shared/EventBus.js';
-import { DISPLAY_CONFIG } from './config.js';
+import { DISPLAY_CONFIG, GAME_CONFIG } from './config.js';
 
 export class OthelloScene {
   constructor(sceneManager, network, ui, gameData) {
@@ -14,6 +14,11 @@ export class OthelloScene {
     this.mySide = gameData.yourSide;
     this.myId = null;
     this.gameActive = false;
+    this.turnDeadlineAt = null;
+    this.turnTimeMs = GAME_CONFIG.TURN_TIME_MS;
+    this.turnStickerKey = GAME_CONFIG.TURN_STICKERS[0];
+    this.isMyTurn = false;
+    this._turnHudInterval = null;
 
     // Board meshes
     this.boardGroup = null;
@@ -64,9 +69,11 @@ export class OthelloScene {
     this.sceneManager.onUpdate = (dt) => this.update(dt);
 
     this._onState = (state) => this.onServerState(state);
-    this._onError = () => {};
+    this._onError = (payload) => this.onActionError(payload);
     EventBus.on('game:state', this._onState);
     EventBus.on('game:action-error', this._onError);
+
+    this._turnHudInterval = setInterval(() => this.updateTurnHUD(), 200);
 
     if (this.gameData.reconnect) {
       this.gameActive = true;
@@ -381,7 +388,13 @@ export class OthelloScene {
     if (!state.board) return;
 
     this.myId = state.yourId;
-    this._currentValidMoves = (state.currentTurn === this.myId) ? state.validMoves : [];
+    this.isMyTurn = state.currentTurn === this.myId;
+    this._currentValidMoves = this.isMyTurn ? state.validMoves : [];
+    this.turnDeadlineAt = Number.isFinite(state.turnDeadlineAt) ? state.turnDeadlineAt : null;
+    this.turnTimeMs = Number.isFinite(state.turnTimeMs) ? state.turnTimeMs : GAME_CONFIG.TURN_TIME_MS;
+    this.turnStickerKey = typeof state.turnStickerKey === 'string'
+      ? state.turnStickerKey
+      : GAME_CONFIG.TURN_STICKERS[0];
 
     if (state.lastMove && !this.gameData.reconnect) {
       // Animate the new disc + flips
@@ -414,7 +427,7 @@ export class OthelloScene {
     // Update HUD
     if (this.ui.activeHUD) {
       if (this.ui.activeHUD.updateScore) this.ui.activeHUD.updateScore(state.scores);
-      if (this.ui.activeHUD.updateTurn) this.ui.activeHUD.updateTurn(state.currentTurn === this.myId, this.mySide);
+      if (this.ui.activeHUD.updateTurn) this.updateTurnHUD();
     }
 
     // Pass toast
@@ -481,6 +494,20 @@ export class OthelloScene {
 
   // ==================== CLEANUP ====================
 
+  onActionError(payload) {
+    if (!payload || payload.code !== 'TURN_TIMEOUT') return;
+    if (!this.ui.activeHUD || typeof this.ui.activeHUD.showTimeoutPenalty !== 'function') return;
+    this.ui.activeHUD.showTimeoutPenalty(payload);
+  }
+
+  updateTurnHUD() {
+    if (!this.ui.activeHUD || !this.ui.activeHUD.updateTurn) return;
+    const msLeft = this.turnDeadlineAt ? Math.max(0, this.turnDeadlineAt - Date.now()) : 0;
+    this.ui.activeHUD.updateTurn(this.isMyTurn, this.mySide, msLeft, this.turnTimeMs, {
+      turnStickerKey: this.turnStickerKey,
+    });
+  }
+
   disposeMesh(obj) {
     obj.traverse((child) => {
       if (child.isMesh) {
@@ -497,6 +524,10 @@ export class OthelloScene {
     this.sceneManager.onUpdate = null;
     EventBus.off('game:state', this._onState);
     EventBus.off('game:action-error', this._onError);
+    if (this._turnHudInterval) {
+      clearInterval(this._turnHudInterval);
+      this._turnHudInterval = null;
+    }
 
     if (this.boardGroup) {
       this.boardGroup.traverse((child) => {

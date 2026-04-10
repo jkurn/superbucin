@@ -70,6 +70,8 @@ export const GameFactory = {
     if (gameType === 'othello') {
       return {
         BOARD_SIZE: config.BOARD_SIZE,
+        TURN_TIME_MS: config.TURN_TIME_MS,
+        TURN_STICKERS: config.TURN_STICKERS,
       };
     }
 

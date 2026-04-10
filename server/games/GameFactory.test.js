@@ -63,7 +63,12 @@ describe('GameFactory', () => {
       REVEAL_DURATION_MS: 1200,
       COUNTDOWN_MS: 3000,
     });
-    GameFactory.register('othello', DummyGameState, { ...baseConfig, BOARD_SIZE: 8 });
+    GameFactory.register('othello', DummyGameState, {
+      ...baseConfig,
+      BOARD_SIZE: 8,
+      TURN_TIME_MS: 10000,
+      TURN_STICKERS: ['mochiHappy', 'mochiHeart'],
+    });
     GameFactory.register('connect-four', DummyGameState, { ...baseConfig, ROWS: 6, COLS: 7 });
     GameFactory.register('quiz-race', DummyGameState, {
       ...baseConfig,
@@ -118,7 +123,11 @@ describe('GameFactory', () => {
     assert.equal(speed.BONUS_MATCH_POINTS, 2);
 
     const othello = GameFactory.getConfig('othello');
-    assert.deepEqual(othello, { BOARD_SIZE: 8 });
+    assert.deepEqual(othello, {
+      BOARD_SIZE: 8,
+      TURN_TIME_MS: 10000,
+      TURN_STICKERS: ['mochiHappy', 'mochiHeart'],
+    });
 
     const c4 = GameFactory.getConfig('connect-four');
     assert.deepEqual(c4, { ROWS: 6, COLS: 7 });

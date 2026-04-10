@@ -1,14 +1,14 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { GameState } from './GameState.js';
+import { GameState, GAME_CONFIG } from './GameState.js';
 
 // Helper: create a game with two mock players
-function createGame() {
+function createGame(options = {}) {
   const events = [];
   const p1 = { id: 'p1', side: 'black', socket: null };
   const p2 = { id: 'p2', side: 'white', socket: null };
   const emit = (event, data) => events.push({ event, data });
-  const game = new GameState(p1, p2, emit);
+  const game = new GameState(p1, p2, emit, options);
   return { game, events, p1, p2 };
 }
 
@@ -20,6 +20,12 @@ function lastEvent(events, type) {
 }
 
 describe('Othello GameState', () => {
+  it('uses a 12-sticker Tiny Toes rotation pool', () => {
+    assert.equal(GAME_CONFIG.TURN_STICKERS.length, 12);
+    assert.ok(GAME_CONFIG.TURN_STICKERS.includes('pricyWine'));
+    assert.ok(GAME_CONFIG.TURN_STICKERS.includes('overthinking'));
+    assert.ok(GAME_CONFIG.TURN_STICKERS.includes('sayangilahPricy'));
+  });
 
   describe('start()', () => {
     it('initializes standard Othello opening', () => {
@@ -48,6 +54,10 @@ describe('Othello GameState', () => {
       assert.equal(state.scores.black, 2);
       assert.equal(state.scores.white, 2);
       assert.equal(state.passed, null);
+      assert.equal(state.turnTimeMs, 10000);
+      assert.equal(typeof state.turnDeadlineAt, 'number');
+      assert.ok(state.turnTimeLeftMs > 0);
+      assert.equal(state.turnStickerKey, GAME_CONFIG.TURN_STICKERS[0]);
     });
 
     it('initial valid moves are correct', () => {
@@ -313,6 +323,47 @@ describe('Othello GameState', () => {
       game.resume();
       assert.equal(game.paused, false);
       assert.ok(lastEvent(events, 'state-update'));
+    });
+  });
+
+  describe('turn timer', () => {
+    it('rotates countdown sticker each turn', () => {
+      const { game, events } = createGame();
+      game.start();
+      const initialState = lastEvent(events, 'state-update');
+      assert.equal(initialState.turnStickerKey, GAME_CONFIG.TURN_STICKERS[0]);
+
+      events.length = 0;
+      game.placeDisc('p1', 2, 3);
+      const secondTurnState = lastEvent(events, 'state-update');
+      assert.equal(secondTurnState.turnStickerKey, GAME_CONFIG.TURN_STICKERS[1]);
+      game.stop();
+    });
+
+    it('auto-plays a move when turn timer expires', async () => {
+      const { game, events } = createGame({ turnTimeMs: 30 });
+      const realRandom = Math.random;
+      let idx = 0;
+      Math.random = () => {
+        idx += 1;
+        return idx % 2 === 0 ? 0.2 : 0;
+      };
+      try {
+        game.start();
+
+        await new Promise((resolve) => setTimeout(resolve, 40));
+
+        assert.ok(game.lastMove, 'expected timeout to force a move');
+        assert.ok(game.scores.black + game.scores.white > 4);
+        const timeoutErr = lastEvent(events, 'action-error');
+        assert.equal(timeoutErr.code, 'TURN_TIMEOUT');
+        assert.ok(GAME_CONFIG.TURN_STICKERS.includes(timeoutErr.stickerKey));
+        assert.equal(typeof timeoutErr.flavorText, 'string');
+        assert.ok(timeoutErr.flavorText.length > 8);
+      } finally {
+        Math.random = realRandom;
+        game.stop();
+      }
     });
   });
 

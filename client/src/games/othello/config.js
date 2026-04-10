@@ -10,6 +10,21 @@ export const DISPLAY_CONFIG = {
 // Merged config — server gameplay values + client display values
 export let GAME_CONFIG = {
   BOARD_SIZE: 8,
+  TURN_TIME_MS: 10_000,
+  TURN_STICKERS: [
+    'mochiHappy',
+    'mochiHeart',
+    'coupleBlob',
+    'pricyLaughing',
+    'virtualHug',
+    'pricyRocket',
+    'pricyWine',
+    'kangenKamu',
+    'tanganBerat',
+    'janganSenyum',
+    'overthinking',
+    'sayangilahPricy',
+  ],
   ...DISPLAY_CONFIG,
 };
 
