@@ -12,6 +12,22 @@ function stickerSrc(stickerKey) {
   return STICKERS[stickerKey] || STICKERS.mochiHappy;
 }
 
+const TIMEOUT_STICKER_DURATION_MS = {
+  mochiHappy: 5200,
+  mochiHeart: 5200,
+  coupleBlob: 5200,
+  pricyLaughing: 6200,
+  virtualHug: 5600,
+  pricyRocket: 6200,
+  pricyWine: 6200,
+  kangenKamu: 5800,
+  tanganBerat: 5800,
+  janganSenyum: 5800,
+  overthinking: 6200,
+  sayangilahPricy: 6400,
+};
+const DEFAULT_TIMEOUT_STICKER_DURATION_MS = 5800;
+
 /** @type {GameDefinition} */
 export const othelloGame = {
   type: 'othello',
@@ -41,6 +57,8 @@ export const othelloGame = {
   applyConfig: applyServerConfig,
 
   createHUD(overlay) {
+    let timeoutHideTimer = null;
+
     // Turn indicator bar (top)
     const turnBar = document.createElement('div');
     turnBar.className = 'othello-turn-bar';
@@ -144,16 +162,25 @@ export const othelloGame = {
         const timeoutText = document.getElementById('timeout-text');
         if (!popEl || !timeoutSticker || !timeoutText) return;
 
+        if (timeoutHideTimer) {
+          clearTimeout(timeoutHideTimer);
+          timeoutHideTimer = null;
+        }
+
         timeoutSticker.src = stickerSrc(payload.stickerKey);
         timeoutText.textContent = payload.flavorText || payload.message || 'Tiny Toes took over your turn.';
         popEl.hidden = false;
         popEl.classList.remove('show');
         void popEl.offsetWidth; // restart animation
         popEl.classList.add('show');
-        setTimeout(() => {
+        const displayDurationMs = Number.isFinite(payload.displayDurationMs)
+          ? payload.displayDurationMs
+          : (TIMEOUT_STICKER_DURATION_MS[payload.stickerKey] || DEFAULT_TIMEOUT_STICKER_DURATION_MS);
+        timeoutHideTimer = setTimeout(() => {
           popEl.classList.remove('show');
           popEl.hidden = true;
-        }, 2400);
+          timeoutHideTimer = null;
+        }, displayDurationMs);
       },
     };
   },
