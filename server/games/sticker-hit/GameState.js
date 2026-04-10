@@ -225,15 +225,16 @@ export class GameState {
     if (!this.active || this.phase !== 'playing') return;
     if (!action || typeof action !== 'object') return;
     if (action.type !== 'throw-sticker') return;
-    this._throwSticker(playerId);
+    const flightMs = Number.isFinite(action.flightMs) ? Math.max(0, Math.min(700, action.flightMs)) : 0;
+    this._throwSticker(playerId, flightMs);
   }
 
-  _throwSticker(playerId) {
+  _throwSticker(playerId, flightMs = 0) {
     const ps = this.stateByPlayer[playerId];
     if (!ps || ps.crashed || ps.finished) return;
 
     const stage = ps.stage;
-    const rotation = targetRotationDeg(stage.timeline, Date.now());
+    const rotation = targetRotationDeg(stage.timeline, Date.now() + flightMs);
     const impactAngle = normalizeDeg(270 - rotation);
     const occupied = [
       ...stage.obstacleStickers.map((x) => x.angle),
