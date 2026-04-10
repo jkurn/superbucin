@@ -13,6 +13,7 @@ import {
 
 const originalWindow = globalThis.window;
 const originalEnvOverride = globalThis.__SUPERBUCIN_ANALYTICS_ENV__;
+const originalConsoleWarn = console.warn;
 const originalFns = {
   init: posthog.init,
   register: posthog.register,
@@ -32,6 +33,7 @@ function setBrowserWindow(hostname = 'localhost') {
 
 describe('analytics', () => {
   let calls;
+  let warnMessages;
 
   beforeEach(() => {
     calls = {
@@ -40,6 +42,10 @@ describe('analytics', () => {
       capture: [],
       identify: [],
       reset: 0,
+    };
+    warnMessages = [];
+    console.warn = (...args) => {
+      warnMessages.push(args.join(' '));
     };
     posthog.init = (...args) => calls.init.push(args);
     posthog.register = (...args) => calls.register.push(args);
@@ -60,6 +66,7 @@ describe('analytics', () => {
     posthog.identify = originalFns.identify;
     posthog.reset = originalFns.reset;
     __resetAnalyticsForTests();
+    console.warn = originalConsoleWarn;
     if (typeof originalWindow === 'undefined') {
       delete globalThis.window;
     } else {
@@ -91,6 +98,23 @@ describe('analytics', () => {
     assert.equal(calls.init.length, 1);
     assert.equal(calls.register.length, 1);
     assert.equal(calls.register[0][0].environment, 'local');
+  });
+
+  it('initAnalytics falls back to built-in key when env key is missing', () => {
+    setBrowserWindow('app.example.com');
+    globalThis.__SUPERBUCIN_ANALYTICS_ENV__ = {
+      VITE_POSTHOG_HOST: 'https://example.posthog',
+      VITE_POSTHOG_DEFAULTS: '2026-01-30',
+    };
+
+    const first = initAnalytics();
+    const second = initAnalytics();
+
+    assert.equal(first, true);
+    assert.equal(second, true);
+    assert.equal(calls.init.length, 1);
+    assert.equal(warnMessages.length, 1);
+    assert.ok(warnMessages[0].includes('using built-in fallback key'));
   });
 
   it('captureEvent/capturePageView/trackScreen forward expected events', () => {

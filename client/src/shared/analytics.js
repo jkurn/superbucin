@@ -1,5 +1,9 @@
 import posthog from 'posthog-js';
 
+// Public PostHog project key (client-side key, not a secret).
+const DEFAULT_POSTHOG_KEY = 'phc_vmb7NHFvtRdRsA7C42LFpWmyz3kT6veXrqe9AACAHhJh';
+const DEFAULT_POSTHOG_HOST = 'https://t.superbucin.pricylia.com';
+
 function envSource() {
   const override = globalThis.__SUPERBUCIN_ANALYTICS_ENV__;
   if (override && typeof override === 'object') return override;
@@ -8,6 +12,7 @@ function envSource() {
 
 let initialized = false;
 let identifiedId = null;
+let missingKeyWarned = false;
 
 function hasBrowser() {
   return typeof window !== 'undefined';
@@ -24,9 +29,12 @@ function resolveEnvironment() {
 
 function resolvePosthogConfig() {
   const env = envSource();
+  const keyFromEnv = env?.VITE_POSTHOG_KEY;
+  const usingFallbackKey = !keyFromEnv;
   return {
-    key: env?.VITE_POSTHOG_KEY,
-    host: env?.VITE_POSTHOG_HOST || 'https://eu.i.posthog.com',
+    key: keyFromEnv || DEFAULT_POSTHOG_KEY,
+    usingFallbackKey,
+    host: env?.VITE_POSTHOG_HOST || DEFAULT_POSTHOG_HOST,
     // PostHog-recommended SDK defaults version (matches install snippet from dashboard).
     defaults: env?.VITE_POSTHOG_DEFAULTS || '2026-01-30',
   };
@@ -35,7 +43,18 @@ function resolvePosthogConfig() {
 export function initAnalytics() {
   const cfg = resolvePosthogConfig();
   if (initialized) return true;
-  if (!hasBrowser() || !cfg.key) return false;
+  if (!hasBrowser()) return false;
+  if (!cfg.key) {
+    if (!missingKeyWarned) {
+      missingKeyWarned = true;
+      console.warn('[analytics] PostHog key missing. Analytics disabled.');
+    }
+    return false;
+  }
+  if (cfg.usingFallbackKey && !missingKeyWarned) {
+    missingKeyWarned = true;
+    console.warn('[analytics] VITE_POSTHOG_KEY missing; using built-in fallback key.');
+  }
 
   posthog.init(cfg.key, {
     api_host: cfg.host,
@@ -105,4 +124,5 @@ export function resetAnalyticsIdentity() {
 export function __resetAnalyticsForTests() {
   initialized = false;
   identifiedId = null;
+  missingKeyWarned = false;
 }
