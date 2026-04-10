@@ -39,6 +39,7 @@ export const stickerHitGame = {
         <span class="sh-pill">You: <strong id="sh-hud-you">0/0</strong></span>
         <span class="sh-pill">Sayang: <strong id="sh-hud-opp">0/0</strong></span>
       </div>
+      <div class="sh-hud-race">Race mode: first to clear all stages. Crash = instant loss.</div>
       <div class="sh-hud-status" id="sh-hud-status">Tap to throw sticker!</div>
     `;
     overlay.appendChild(hud);

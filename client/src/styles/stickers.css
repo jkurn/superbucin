@@ -256,6 +256,12 @@
   text-align: center;
 }
 
+.sh-hud-race {
+  font-size: 0.66rem;
+  color: #9bc0df;
+  text-align: center;
+}
+
 .sh-layer {
   position: absolute;
   inset: 0;
@@ -284,9 +290,11 @@
 }
 
 .sh-status {
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   color: #d9ecff;
-  text-shadow: 0 0 12px rgba(60, 140, 255, 0.45);
+  text-shadow: 0 0 10px rgba(60, 140, 255, 0.35);
+  text-align: center;
+  max-width: min(78vw, 360px);
 }
 
 .sh-board {
@@ -297,6 +305,18 @@
   background: linear-gradient(180deg, #0f2f47 0%, #0b1d2e 65%, #08131f 100%);
   border: 1px solid rgba(171, 220, 255, 0.18);
   overflow: hidden;
+}
+
+.sh-board-fallback-bg {
+  background: linear-gradient(180deg, #113b59 0%, #0b2740 55%, #081a2d 100%);
+}
+
+.sh-board-hit {
+  animation: shBoardHit 130ms ease-out;
+}
+
+.sh-board-crash {
+  animation: shBoardCrash 260ms ease-in-out;
 }
 
 .sh-board-bg {
@@ -425,8 +445,20 @@
 .sh-stage-pip {
   width: 18px;
   height: 18px;
-  object-fit: contain;
+  display: inline-block;
+  border-radius: 999px;
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+}
+
+.sh-stage-pip[data-active='false'] {
+  opacity: 0.5;
+}
+
+.sh-stage-pip[data-active='true'] {
+  opacity: 1;
 }
 
 .sh-throw-btn {
@@ -447,6 +479,36 @@
   height: 40px;
   object-fit: contain;
   display: block;
+}
+
+.sh-projectile {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
+}
+
+.sh-projectile-fallback {
+  width: 16px;
+  height: 50px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fdf2b9 0%, #ff9c2f 70%, #c45317 100%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.sh-impact {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(255, 246, 183, 0.95) 0%, rgba(255, 171, 66, 0.75) 45%, rgba(255, 123, 0, 0) 75%);
+  animation: shImpact 220ms ease-out forwards;
+  pointer-events: none;
+  z-index: 4;
 }
 
 .sh-side {
@@ -482,6 +544,47 @@
   100% {
     opacity: 0;
     transform: translateX(-50%) translateY(-180px) scale(0.85);
+  }
+}
+
+@keyframes shImpact {
+  0% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(0.45);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.6);
+  }
+}
+
+@keyframes shBoardHit {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.99);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes shBoardCrash {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-8px);
+  }
+  40% {
+    transform: translateX(7px);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(4px);
   }
 }
 

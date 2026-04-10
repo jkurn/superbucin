@@ -44,11 +44,13 @@ const app = express();
 
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 const pricyStickerDir = path.join(__dirname, '..', 'pricy-sticker');
+const curatedStickerDir = path.join(__dirname, '..', 'client', 'public', 'stickers');
 const kenneyShootingGalleryPngDir = path.join(__dirname, '..', 'kenney_shooting-gallery', 'PNG');
 const kenneyUiPackPngDir = path.join(__dirname, '..', 'kenney_ui-pack', 'PNG');
 const kenneyBoardgamePackPngDir = path.join(__dirname, '..', 'kenney_boardgame-pack', 'PNG');
 app.use(express.static(clientDist));
 app.use('/pricy-sticker', express.static(pricyStickerDir));
+app.use('/stickers', express.static(curatedStickerDir));
 app.use('/kenney/shooting-gallery', express.static(kenneyShootingGalleryPngDir));
 app.use('/kenney/ui-pack', express.static(kenneyUiPackPngDir));
 app.use('/kenney/boardgame', express.static(kenneyBoardgamePackPngDir));
@@ -89,19 +91,28 @@ function parseAnimatedWebpDurationMs(buffer) {
   return Math.max(200, totalMs);
 }
 
+function isLikelyGitLfsPointer(buffer) {
+  if (!buffer || buffer.length < 48) return false;
+  const firstLine = buffer.subarray(0, Math.min(buffer.length, 80)).toString('utf8');
+  return firstLine.startsWith('version https://git-lfs.github.com/spec/v1');
+}
+
 async function getStickerDurationMs(absPath, fileName) {
   const ext = path.extname(fileName).toLowerCase();
-  if (ext !== '.webp') return 1200;
+  if (ext !== '.webp') return { durationMs: 1200, valid: true };
   try {
     const buf = await readFile(absPath);
+    if (isLikelyGitLfsPointer(buf)) {
+      return { durationMs: 1200, valid: false };
+    }
     const parsed = parseAnimatedWebpDurationMs(buf);
-    return parsed || 1200;
+    return { durationMs: parsed || 1200, valid: true };
   } catch {
-    return 1200;
+    return { durationMs: 1200, valid: false };
   }
 }
 
-async function buildStickerManifest() {
+async function collectStickersFromDir(rootDir, publicPrefix) {
   /** @type {{ src: string, durationMs: number }[]} */
   const out = [];
   /** @type {string[]} */
@@ -109,7 +120,7 @@ async function buildStickerManifest() {
 
   while (stack.length) {
     const relDir = stack.pop();
-    const absDir = path.join(pricyStickerDir, relDir);
+    const absDir = path.join(rootDir, relDir);
     let entries;
     try {
       entries = await readdir(absDir, { withFileTypes: true });
@@ -131,13 +142,24 @@ async function buildStickerManifest() {
         .map((part) => encodeURIComponent(part))
         .join('/');
       const absPath = path.join(absDir, entry.name);
-      const durationMs = await getStickerDurationMs(absPath, entry.name);
-      out.push({ src: `/pricy-sticker/${encoded}`, durationMs });
+      const info = await getStickerDurationMs(absPath, entry.name);
+      if (!info.valid) continue;
+      out.push({ src: `${publicPrefix}/${encoded}`, durationMs: info.durationMs });
     }
   }
 
   out.sort((a, b) => a.src.localeCompare(b.src));
   return out;
+}
+
+async function buildStickerManifest() {
+  const fromPricy = await collectStickersFromDir(pricyStickerDir, '/pricy-sticker');
+  const fromCurated = await collectStickersFromDir(curatedStickerDir, '/stickers');
+  const unique = new Map();
+  [...fromPricy, ...fromCurated].forEach((entry) => {
+    if (!unique.has(entry.src)) unique.set(entry.src, entry);
+  });
+  return [...unique.values()];
 }
 
 app.use((req, res, next) => {

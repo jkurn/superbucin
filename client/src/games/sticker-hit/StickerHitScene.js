@@ -1,11 +1,11 @@
 import { EventBus } from '../../shared/EventBus.js';
 
 const KENNEY_ASSETS = {
-  stallBg: '/kenney/shooting-gallery/stall/bg_wood.png',
-  targetOverlay: '/kenney/shooting-gallery/objects/target_back.png',
-  crosshair: '/kenney/shooting-gallery/hud/crosshair_outline_small.png',
-  pipOff: '/kenney/boardgame/pieces-yellow/pieceYellow_border00.png',
-  pipOn: '/kenney/boardgame/pieces-yellow/pieceYellow_multi00.png',
+  stallBg: '/kenney/shooting-gallery/Stall/bg_wood.png',
+  targetOverlay: '/kenney/shooting-gallery/Objects/target_back.png',
+  crosshair: '/kenney/shooting-gallery/HUD/crosshair_outline_small.png',
+  pipOff: '/kenney/boardgame/Pieces%20(Yellow)/pieceYellow_border00.png',
+  pipOn: '/kenney/boardgame/Pieces%20(Yellow)/pieceYellow_multi00.png',
 };
 
 function backendOrigin() {
@@ -102,6 +102,7 @@ export class StickerHitScene {
     this.gameData = gameData;
     this.rootEl = null;
     this.state = null;
+    this.prevState = null;
     this.targetRotorEl = null;
     this.targetStageLabelEl = null;
     this.countdownEl = null;
@@ -136,7 +137,6 @@ export class StickerHitScene {
     this.rootEl.innerHTML = `
       <div class="sh-wrap">
         <div class="sh-board-wrap">
-          <div class="sh-status" id="sh-scene-status">Tap to throw sticker</div>
           <div class="sh-board" id="sh-board">
             <img class="sh-board-bg" id="sh-board-bg" alt="" draggable="false" />
             <div class="sh-countdown" id="sh-countdown"></div>
@@ -149,6 +149,7 @@ export class StickerHitScene {
           </div>
           <div class="sh-stage-label" id="sh-stage-label">Stage 1</div>
           <div class="sh-stage-pips" id="sh-stage-pips"></div>
+          <div class="sh-status" id="sh-scene-status">Throw sticker to empty spaces. First to clear all stages wins.</div>
           <button class="btn btn-pink sh-throw-btn" id="sh-throw-btn" type="button">Throw Sticker</button>
         </div>
         <div class="sh-side">
@@ -192,9 +193,28 @@ export class StickerHitScene {
     const boardBg = this.rootEl?.querySelector('#sh-board-bg');
     const targetOverlay = this.rootEl?.querySelector('#sh-target-overlay');
     const crosshair = this.rootEl?.querySelector('#sh-crosshair');
-    if (boardBg) boardBg.src = toBackendAssetUrl(KENNEY_ASSETS.stallBg);
-    if (targetOverlay) targetOverlay.src = toBackendAssetUrl(KENNEY_ASSETS.targetOverlay);
-    if (crosshair) crosshair.src = toBackendAssetUrl(KENNEY_ASSETS.crosshair);
+    const board = this.rootEl?.querySelector('#sh-board');
+    if (boardBg) {
+      boardBg.src = toBackendAssetUrl(KENNEY_ASSETS.stallBg);
+      boardBg.onerror = () => {
+        boardBg.style.display = 'none';
+        board?.classList.add('sh-board-fallback-bg');
+      };
+    } else {
+      board?.classList.add('sh-board-fallback-bg');
+    }
+    if (targetOverlay) {
+      targetOverlay.src = toBackendAssetUrl(KENNEY_ASSETS.targetOverlay);
+      targetOverlay.onerror = () => {
+        targetOverlay.style.display = 'none';
+      };
+    }
+    if (crosshair) {
+      crosshair.src = toBackendAssetUrl(KENNEY_ASSETS.crosshair);
+      crosshair.onerror = () => {
+        crosshair.style.display = 'none';
+      };
+    }
   }
 
   async _hydrateStickerPool() {
@@ -246,6 +266,13 @@ export class StickerHitScene {
     if (!img || !sticker?.src) return;
     img.dataset.baseSrc = sticker.src;
     img.src = sticker.src;
+    img.onerror = () => {
+      const fallback = this._pickRandomSticker();
+      if (!fallback?.src) return;
+      img.dataset.baseSrc = fallback.src;
+      img.src = fallback.src;
+      this._scheduleImageLoop(img, fallback.durationMs);
+    };
     this._scheduleImageLoop(img, sticker.durationMs);
   }
 
@@ -283,21 +310,75 @@ export class StickerHitScene {
 
   _playThrowAnim() {
     if (!this.rootEl) return;
-    const fx = document.createElement('div');
-    fx.className = 'sh-throw-fx';
+    const board = this.rootEl.querySelector('#sh-board');
+    if (!board) return;
+    const fx = document.createElement('img');
+    fx.className = 'sh-projectile';
     const sticker = this._pickRandomSticker();
     if (sticker?.src) {
-      const img = document.createElement('img');
-      img.src = sticker.src;
-      img.alt = '';
-      img.className = 'sh-throw-fx-img';
-      img.draggable = false;
-      fx.appendChild(img);
+      fx.src = sticker.src;
+      fx.alt = '';
+      fx.draggable = false;
+      fx.onerror = () => {
+        fx.removeAttribute('src');
+        fx.classList.add('sh-projectile-fallback');
+      };
     } else {
-      fx.textContent = '🏷️';
+      fx.classList.add('sh-projectile-fallback');
     }
-    this.rootEl.querySelector('#sh-board')?.appendChild(fx);
-    setTimeout(() => fx.remove(), 220);
+    board.appendChild(fx);
+
+    const startX = 50;
+    const startY = 86;
+    const endY = 44;
+    const startedAt = performance.now();
+    const duration = 260;
+
+    const animate = () => {
+      const t = Math.min(1, (performance.now() - startedAt) / duration);
+      const eased = 1 - ((1 - t) * (1 - t));
+      const y = startY + ((endY - startY) * eased);
+      const arcX = startX + (Math.sin(t * Math.PI) * 2.2);
+      fx.style.left = `${arcX}%`;
+      fx.style.top = `${y}%`;
+      fx.style.transform = `translate(-50%, -50%) rotate(${t * 360}deg) scale(${1 - (t * 0.12)})`;
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        fx.remove();
+        this._spawnImpactFx(50, endY);
+      }
+    };
+    requestAnimationFrame(animate);
+  }
+
+  _spawnImpactFx(xPct, yPct) {
+    if (!this.rootEl) return;
+    const board = this.rootEl.querySelector('#sh-board');
+    if (!board) return;
+    const burst = document.createElement('div');
+    burst.className = 'sh-impact';
+    burst.style.left = `${xPct}%`;
+    burst.style.top = `${yPct}%`;
+    board.appendChild(burst);
+    setTimeout(() => burst.remove(), 220);
+  }
+
+  _playBoardHit() {
+    const board = this.rootEl?.querySelector('#sh-board');
+    if (!board) return;
+    board.classList.remove('sh-board-hit');
+    // force reflow to restart animation
+    void board.offsetWidth;
+    board.classList.add('sh-board-hit');
+  }
+
+  _playBoardCrash() {
+    const board = this.rootEl?.querySelector('#sh-board');
+    if (!board) return;
+    board.classList.remove('sh-board-crash');
+    void board.offsetWidth;
+    board.classList.add('sh-board-crash');
   }
 
   _syncMarkers() {
@@ -338,9 +419,23 @@ export class StickerHitScene {
   }
 
   applyState(state) {
+    const previous = this.prevState;
     this.state = state;
     this._syncMarkers();
     this._renderText();
+
+    const prevStuck = previous?.you?.stage?.stuckStickers?.length || 0;
+    const nextStuck = state?.you?.stage?.stuckStickers?.length || 0;
+    if (nextStuck > prevStuck) {
+      this._playBoardHit();
+    }
+
+    const crashedNow = !!state?.you?.crashed;
+    const crashedBefore = !!previous?.you?.crashed;
+    if (crashedNow && !crashedBefore) {
+      this._playBoardCrash();
+    }
+    this.prevState = state;
   }
 
   _renderText() {
@@ -356,11 +451,10 @@ export class StickerHitScene {
       const active = Math.max(0, Math.min(total, myStage));
       this.stagePipsEl.innerHTML = '';
       for (let i = 0; i < total; i += 1) {
-        const pip = document.createElement('img');
+        const pip = document.createElement('span');
         pip.className = 'sh-stage-pip';
-        pip.alt = '';
-        pip.draggable = false;
-        pip.src = toBackendAssetUrl(i < active ? KENNEY_ASSETS.pipOn : KENNEY_ASSETS.pipOff);
+        pip.dataset.active = i < active ? 'true' : 'false';
+        pip.style.backgroundImage = `url("${toBackendAssetUrl(i < active ? KENNEY_ASSETS.pipOn : KENNEY_ASSETS.pipOff)}")`;
         this.stagePipsEl.appendChild(pip);
       }
     }
