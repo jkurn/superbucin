@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { readdir, readFile } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { supabase as supabaseAdmin } from './supabaseAdmin.js';
 import { RoomManager } from './rooms/RoomManager.js';
@@ -22,6 +23,7 @@ import { GameState as BattleshipState, GAME_CONFIG as BATTLESHIP_CONFIG } from '
 import { GameState as VendingState, GAME_CONFIG as VENDING_CONFIG } from './games/vending-machine/GameState.js';
 import { GameState as BonkBrawlState, GAME_CONFIG as BONK_BRAWL_CONFIG } from './games/bonk-brawl/GameState.js';
 import { GameState as CuteAggressionState, GAME_CONFIG as CUTE_AGGRESSION_CONFIG } from './games/cute-aggression/GameState.js';
+import { GameState as StickerHitState, GAME_CONFIG as STICKER_HIT_CONFIG } from './games/sticker-hit/GameState.js';
 
 GameFactory.register('pig-vs-chick', GameState, GAME_CONFIG);
 GameFactory.register('word-scramble-race', WordScrambleState, WORD_SCRAMBLE_CONFIG);
@@ -35,12 +37,108 @@ GameFactory.register('battleship-mini', BattleshipState, BATTLESHIP_CONFIG);
 GameFactory.register('vending-machine', VendingState, VENDING_CONFIG);
 GameFactory.register('bonk-brawl', BonkBrawlState, BONK_BRAWL_CONFIG);
 GameFactory.register('cute-aggression', CuteAggressionState, CUTE_AGGRESSION_CONFIG);
+GameFactory.register('sticker-hit', StickerHitState, STICKER_HIT_CONFIG);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
+const pricyStickerDir = path.join(__dirname, '..', 'pricy-sticker');
+const kenneyShootingGalleryPngDir = path.join(__dirname, '..', 'kenney_shooting-gallery', 'PNG');
+const kenneyUiPackPngDir = path.join(__dirname, '..', 'kenney_ui-pack', 'PNG');
+const kenneyBoardgamePackPngDir = path.join(__dirname, '..', 'kenney_boardgame-pack', 'PNG');
 app.use(express.static(clientDist));
+app.use('/pricy-sticker', express.static(pricyStickerDir));
+app.use('/kenney/shooting-gallery', express.static(kenneyShootingGalleryPngDir));
+app.use('/kenney/ui-pack', express.static(kenneyUiPackPngDir));
+app.use('/kenney/boardgame', express.static(kenneyBoardgamePackPngDir));
+
+let stickerManifestCache = null;
+
+function parseAnimatedWebpDurationMs(buffer) {
+  if (!buffer || buffer.length < 16) return null;
+  if (buffer.toString('ascii', 0, 4) !== 'RIFF') return null;
+  if (buffer.toString('ascii', 8, 12) !== 'WEBP') return null;
+
+  let hasAnimation = false;
+  let totalMs = 0;
+  let hasFrame = false;
+  let offset = 12;
+
+  while (offset + 8 <= buffer.length) {
+    const chunkType = buffer.toString('ascii', offset, offset + 4);
+    const chunkSize = buffer.readUInt32LE(offset + 4);
+    const dataOffset = offset + 8;
+    if (dataOffset + chunkSize > buffer.length) break;
+
+    if (chunkType === 'VP8X' && chunkSize >= 1) {
+      const flags = buffer[dataOffset];
+      hasAnimation = (flags & 0x02) !== 0;
+    } else if (chunkType === 'ANMF' && chunkSize >= 16) {
+      hasFrame = true;
+      const duration = buffer[dataOffset + 12]
+        | (buffer[dataOffset + 13] << 8)
+        | (buffer[dataOffset + 14] << 16);
+      totalMs += Math.max(10, duration);
+    }
+
+    offset = dataOffset + chunkSize + (chunkSize % 2);
+  }
+
+  if (!hasAnimation || !hasFrame) return null;
+  return Math.max(200, totalMs);
+}
+
+async function getStickerDurationMs(absPath, fileName) {
+  const ext = path.extname(fileName).toLowerCase();
+  if (ext !== '.webp') return 1200;
+  try {
+    const buf = await readFile(absPath);
+    const parsed = parseAnimatedWebpDurationMs(buf);
+    return parsed || 1200;
+  } catch {
+    return 1200;
+  }
+}
+
+async function buildStickerManifest() {
+  /** @type {{ src: string, durationMs: number }[]} */
+  const out = [];
+  /** @type {string[]} */
+  const stack = [''];
+
+  while (stack.length) {
+    const relDir = stack.pop();
+    const absDir = path.join(pricyStickerDir, relDir);
+    let entries;
+    try {
+      entries = await readdir(absDir, { withFileTypes: true });
+    } catch (_err) {
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue;
+      const relPath = relDir ? path.posix.join(relDir, entry.name) : entry.name;
+      if (entry.isDirectory()) {
+        stack.push(relPath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      if (!/\.(webp|png|jpg|jpeg|gif)$/i.test(entry.name)) continue;
+      const encoded = relPath
+        .split('/')
+        .map((part) => encodeURIComponent(part))
+        .join('/');
+      const absPath = path.join(absDir, entry.name);
+      const durationMs = await getStickerDurationMs(absPath, entry.name);
+      out.push({ src: `/pricy-sticker/${encoded}`, durationMs });
+    }
+  }
+
+  out.sort((a, b) => a.src.localeCompare(b.src));
+  return out;
+}
 
 app.use((req, res, next) => {
   const startedAt = Date.now();
@@ -60,6 +158,18 @@ app.use((req, res, next) => {
 });
 
 app.get('/health', (_req, res) => res.send('ok'));
+
+app.get('/api/sticker-hit/sticker-manifest', async (_req, res) => {
+  try {
+    if (!stickerManifestCache) {
+      stickerManifestCache = await buildStickerManifest();
+    }
+    res.json({ stickers: stickerManifestCache });
+  } catch (err) {
+    logger.error({ err }, 'Failed to build sticker manifest');
+    res.status(500).json({ stickers: [] });
+  }
+});
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {

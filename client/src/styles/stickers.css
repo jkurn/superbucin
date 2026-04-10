@@ -222,3 +222,281 @@
     top: 16% !important;
   }
 }
+
+/* ── Sticker Hit ──────────────────────────────────────────────────────────── */
+.sh-hud {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.sh-hud-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sh-pill {
+  background: rgba(5, 15, 28, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f4f8ff;
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.75rem;
+}
+
+.sh-hud-status {
+  font-size: 0.74rem;
+  color: #b8d6ff;
+  text-align: center;
+}
+
+.sh-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+}
+
+.sh-wrap {
+  width: min(100%, 860px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.5rem 0.75rem 2rem;
+}
+
+.sh-board-wrap {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.sh-status {
+  font-size: 0.82rem;
+  color: #d9ecff;
+  text-shadow: 0 0 12px rgba(60, 140, 255, 0.45);
+}
+
+.sh-board {
+  position: relative;
+  width: min(78vw, 360px);
+  aspect-ratio: 1 / 1.25;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #0f2f47 0%, #0b1d2e 65%, #08131f 100%);
+  border: 1px solid rgba(171, 220, 255, 0.18);
+  overflow: hidden;
+}
+
+.sh-board-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.2;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.sh-countdown {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+  font-weight: 900;
+  color: #fff6da;
+  text-shadow: 0 0 24px rgba(255, 195, 72, 0.8);
+  z-index: 4;
+}
+
+.sh-countdown.visible {
+  display: flex;
+}
+
+.sh-target-rotor {
+  position: absolute;
+  left: 50%;
+  top: 43%;
+  width: 58%;
+  aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+
+.sh-target-core {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #ffd48a 0%, #ff9c1a 55%, #e36f11 100%);
+  border: 10px solid #ffd884;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.35);
+}
+
+.sh-target-overlay {
+  position: absolute;
+  inset: 18%;
+  width: 64%;
+  height: 64%;
+  object-fit: contain;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.sh-marker {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.sh-marker-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.sh-stuck {
+  filter: drop-shadow(0 1px 5px rgba(79, 235, 255, 0.55));
+}
+
+.sh-obstacle {
+  filter: drop-shadow(0 1px 5px rgba(255, 100, 100, 0.5));
+}
+
+.sh-shooter {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  transform: translateX(-50%);
+  text-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+.sh-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 9%;
+  width: 32px;
+  height: 32px;
+  transform: translateX(-50%);
+  opacity: 0.75;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.sh-shooter img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.sh-shooter img.ready {
+  opacity: 1;
+}
+
+.sh-stage-label {
+  color: #ffd68c;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.sh-stage-pips {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.sh-stage-pip {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+}
+
+.sh-throw-btn {
+  min-width: 170px;
+}
+
+.sh-throw-fx {
+  position: absolute;
+  left: 50%;
+  bottom: 10%;
+  transform: translateX(-50%);
+  animation: shThrow 220ms ease-out forwards;
+  pointer-events: none;
+}
+
+.sh-throw-fx-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  display: block;
+}
+
+.sh-side {
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.sh-progress-card {
+  border-radius: 14px;
+  background: rgba(7, 17, 34, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.65rem 0.7rem;
+}
+
+.sh-progress-title {
+  color: #9bc0df;
+  font-size: 0.72rem;
+}
+
+.sh-progress-value {
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+@keyframes shThrow {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-180px) scale(0.85);
+  }
+}
+
+@media (max-width: 760px) {
+  .sh-wrap {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+
+  .sh-side {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .sh-progress-card {
+    min-width: 124px;
+  }
+}

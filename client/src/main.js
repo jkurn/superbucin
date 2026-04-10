@@ -19,6 +19,7 @@ import { battleshipMiniGame } from './games/battleship-mini/index.js';
 import { vendingMachineGame } from './games/vending-machine/index.js';
 import { bonkBrawlGame } from './games/bonk-brawl/index.js';
 import { cuteAggressionGame } from './games/cute-aggression/index.js';
+import { stickerHitGame } from './games/sticker-hit/index.js';
 
 GameRegistry.register('pig-vs-chick', pigVsChickGame);
 GameRegistry.register('othello', othelloGame);
@@ -32,6 +33,7 @@ GameRegistry.register('battleship-mini', battleshipMiniGame);
 GameRegistry.register('vending-machine', vendingMachineGame);
 GameRegistry.register('bonk-brawl', bonkBrawlGame);
 GameRegistry.register('cute-aggression', cuteAggressionGame);
+GameRegistry.register('sticker-hit', stickerHitGame);
 
 const appBootStartMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
 

@@ -107,6 +107,15 @@ export const GameFactory = {
       };
     }
 
+    if (gameType === 'sticker-hit') {
+      return {
+        COUNTDOWN_MS: config.COUNTDOWN_MS,
+        TICK_MS: config.TICK_MS,
+        COLLISION_DEGREES: config.COLLISION_DEGREES,
+        STAGES: config.STAGES,
+      };
+    }
+
     if (gameType === 'doodle-guess') {
       return {
         ROUND_TIME_MS: config.ROUND_TIME_MS,

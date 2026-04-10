@@ -89,6 +89,13 @@ describe('GameFactory', () => {
       MIN_WORD_LENGTH: 3,
       INTERMISSION_MS: 1500,
     });
+    GameFactory.register('sticker-hit', DummyGameState, {
+      ...baseConfig,
+      COUNTDOWN_MS: 2500,
+      TICK_MS: 100,
+      COLLISION_DEGREES: 14,
+      STAGES: [{ stickersToLand: 6, obstacles: 1 }],
+    });
     GameFactory.register('doodle-guess', DummyGameState, {
       ...baseConfig,
       ROUND_TIME_MS: 45000,
@@ -140,6 +147,10 @@ describe('GameFactory', () => {
 
     const word = GameFactory.getConfig('word-scramble-race');
     assert.equal(word.MIN_WORD_LENGTH, 3);
+
+    const sticker = GameFactory.getConfig('sticker-hit');
+    assert.equal(sticker.COLLISION_DEGREES, 14);
+    assert.equal(Array.isArray(sticker.STAGES), true);
 
     const doodle = GameFactory.getConfig('doodle-guess');
     assert.equal(typeof doodle.defaultPackId, 'string');

@@ -224,6 +224,27 @@ describe('RoomManager — handleGameEvent contracts', () => {
       assertAllowedKeysOnly(joiner.lastEmit('cute-aggression-state'), ['combo'], 'joiner cute-aggression-state');
     });
 
+    it('routes sticker-hit-state as per-player slices only', async () => {
+      const host = mockSocket('host');
+      rm.createRoom(host, { gameType: 'memory-match' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+
+      await rm.handleGameEvent(room, 'sticker-hit-state', {
+        byPlayer: {
+          host: { stage: 2, remain: 3 },
+          joiner: { stage: 1, remain: 7 },
+        },
+      });
+
+      assert.deepEqual(host.lastEmit('sticker-hit-state'), { stage: 2, remain: 3 });
+      assert.deepEqual(joiner.lastEmit('sticker-hit-state'), { stage: 1, remain: 7 });
+      assertAllowedKeysOnly(host.lastEmit('sticker-hit-state'), ['stage', 'remain'], 'host sticker-hit-state');
+      assertAllowedKeysOnly(joiner.lastEmit('sticker-hit-state'), ['stage', 'remain'], 'joiner sticker-hit-state');
+    });
+
     it('match-end still emits with zero points when persistence fails', async () => {
       const host = mockSocket('host');
       rm.createRoom(host, { gameType: 'memory-match' });

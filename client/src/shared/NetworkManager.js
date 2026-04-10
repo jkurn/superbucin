@@ -11,6 +11,7 @@ const STATE_EVENT_BRIDGE = {
   'vending-state': 'vending:state',
   'bonk-state': 'bonk:state',
   'cute-aggression-state': 'cute-aggression:state',
+  'sticker-hit-state': 'sticker-hit:state',
 };
 
 const OUTBOUND_SOCKET_EVENTS = {

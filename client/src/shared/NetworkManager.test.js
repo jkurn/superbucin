@@ -277,6 +277,7 @@ describe('NetworkManager contracts', () => {
       fakeSocket.trigger('vending-state', { yen: 999 });
       fakeSocket.trigger('bonk-state', { hp: 80 });
       fakeSocket.trigger('cute-aggression-state', { combo: 2 });
+      fakeSocket.trigger('sticker-hit-state', { stage: 3 });
 
       assert.ok(emitted.find((e) => e.event === 'game:state'));
       assert.ok(emitted.find((e) => e.event === 'word:state'));
@@ -286,6 +287,7 @@ describe('NetworkManager contracts', () => {
       assert.ok(emitted.find((e) => e.event === 'vending:state'));
       assert.ok(emitted.find((e) => e.event === 'bonk:state'));
       assert.ok(emitted.find((e) => e.event === 'cute-aggression:state'));
+      assert.ok(emitted.find((e) => e.event === 'sticker-hit:state'));
 
       nm.createRoom('othello');
       nm.createRoom('doodle-guess', ['cat']);

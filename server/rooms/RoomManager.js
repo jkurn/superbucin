@@ -445,6 +445,14 @@ export class RoomManager {
         break;
       }
 
+      case 'sticker-hit-state': {
+        connected.forEach((p) => {
+          const slice = data.byPlayer[p.id];
+          if (slice) p.socket.emit('sticker-hit-state', slice);
+        });
+        break;
+      }
+
       case 'action-error':
         connected.forEach((p) => {
           if (p.id === data.playerId) {
