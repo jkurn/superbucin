@@ -12,7 +12,7 @@ const KENNEY_ASSETS = {
   pipOn: '/kenney/boardgame/Pieces%20(Yellow)/pieceYellow_multi00.png',
 };
 
-const THROW_FLIGHT_MS = 320;
+const THROW_FLIGHT_MS = 420;
 const TARGET_RADIUS = 2.05;
 
 function backendOrigin() {
@@ -100,6 +100,8 @@ export class StickerHitScene {
     this.textureCache = new Map();
     this.targetStageLabelEl = null;
     this.statusEl = null;
+    this.guideEl = null;
+    this.feedbackEl = null;
     this.progressYouEl = null;
     this.progressOppEl = null;
     this.stagePipsEl = null;
@@ -112,6 +114,7 @@ export class StickerHitScene {
     this.timeMs = 0;
     this.cameraShakeUntil = 0;
     this.targetPulseUntil = 0;
+    this.pendingThrows = 0;
 
     this._onState = (s) => this.applyState(s);
     this._onShoot = () => this.shoot();
@@ -133,7 +136,9 @@ export class StickerHitScene {
         <div class="sh-board-wrap">
           <div class="sh-stage-label" id="sh-stage-label">Stage 1</div>
           <div class="sh-stage-pips" id="sh-stage-pips"></div>
+          <div class="sh-guide" id="sh-guide">Throw -> land on empty gap. Hit sticker = crash. First to finish all stages wins.</div>
           <div class="sh-status" id="sh-scene-status">Throw sticker to empty spaces. First to clear all stages wins.</div>
+          <div class="sh-feedback" id="sh-feedback"></div>
           <button class="btn btn-pink sh-throw-btn" id="sh-throw-btn" type="button">Throw Sticker</button>
         </div>
         <div class="sh-side">
@@ -151,7 +156,9 @@ export class StickerHitScene {
 
     document.getElementById('ui-overlay')?.appendChild(this.rootEl);
     this.targetStageLabelEl = this.rootEl.querySelector('#sh-stage-label');
+    this.guideEl = this.rootEl.querySelector('#sh-guide');
     this.statusEl = this.rootEl.querySelector('#sh-scene-status');
+    this.feedbackEl = this.rootEl.querySelector('#sh-feedback');
     this.progressYouEl = this.rootEl.querySelector('#sh-you-progress');
     this.progressOppEl = this.rootEl.querySelector('#sh-opp-progress');
     this.stagePipsEl = this.rootEl.querySelector('#sh-stage-pips');
@@ -351,9 +358,20 @@ export class StickerHitScene {
     if (this.state.you?.crashed || this.state.you?.finished) return;
 
     this.throwCooldownUntil = Date.now() + 160;
+    this.pendingThrows += 1;
     this.network.sendGameAction({ type: 'throw-sticker', flightMs: THROW_FLIGHT_MS });
     this._playThrowAnim();
+    this._showFeedback('THROW!', 'throw');
     this._updateShooterSticker();
+  }
+
+  _showFeedback(text, tone = 'neutral') {
+    if (!this.feedbackEl) return;
+    this.feedbackEl.textContent = text;
+    this.feedbackEl.dataset.tone = tone;
+    this.feedbackEl.classList.remove('show');
+    void this.feedbackEl.offsetWidth;
+    this.feedbackEl.classList.add('show');
   }
 
   _playThrowAnim() {
@@ -465,12 +483,22 @@ export class StickerHitScene {
     const nextStuck = state?.you?.stage?.stuckStickers?.length || 0;
     if (nextStuck > prevStuck) {
       this._playBoardHit();
+      if (this.pendingThrows > 0) this.pendingThrows -= 1;
+      this._showFeedback('STICK!', 'hit');
     }
 
     const crashedNow = !!state?.you?.crashed;
     const crashedBefore = !!previous?.you?.crashed;
     if (crashedNow && !crashedBefore) {
       this._playBoardCrash();
+      this.pendingThrows = 0;
+      this._showFeedback('CRASH!', 'crash');
+    }
+
+    const prevStage = previous?.you?.stageIndex ?? 0;
+    const nextStage = state?.you?.stageIndex ?? 0;
+    if (nextStage > prevStage) {
+      this._showFeedback('STAGE CLEAR!', 'stage');
     }
     this.prevState = state;
   }
@@ -484,6 +512,9 @@ export class StickerHitScene {
     if (this.progressYouEl) this.progressYouEl.textContent = `${Math.min(myStage, total)}/${total}`;
     if (this.progressOppEl) this.progressOppEl.textContent = `${Math.min(oppStage, total)}/${total}`;
     if (this.targetStageLabelEl) this.targetStageLabelEl.textContent = `Stage ${Math.min(myStage, total)} / ${total}`;
+    if (this.guideEl) {
+      this.guideEl.textContent = `Race: You ${Math.min(myStage, total)}/${total} vs Opp ${Math.min(oppStage, total)}/${total} | Throw -> gap, sticker hit = crash`;
+    }
     if (this.stagePipsEl) {
       const active = Math.max(0, Math.min(total, myStage));
       this.stagePipsEl.innerHTML = '';
@@ -550,8 +581,9 @@ export class StickerHitScene {
       const t = Math.min(1, (now - p.startedAt) / p.durationMs);
       const eased = 1 - ((1 - t) ** 3);
       p.sprite.position.lerpVectors(p.start, p.end, eased);
-      p.sprite.position.x += Math.sin(t * Math.PI) * 0.22;
-      p.sprite.position.y += Math.sin(t * Math.PI) * 0.5;
+      p.sprite.position.x += Math.sin(t * Math.PI) * 0.42;
+      p.sprite.position.y += Math.sin(t * Math.PI) * 0.9;
+      p.sprite.scale.setScalar(0.95 + (Math.sin(t * Math.PI) * 0.24));
       p.sprite.material.rotation += dt * 16;
       if (t >= 1) {
         this.scene.remove(p.sprite);
