@@ -64,6 +64,44 @@ Suggested build order in plan: Connect Four → Quiz Race → Battleship (comple
 - [ ] **Dependency degradation tests (required for all new games):** if game logic depends on external APIs/services, enforce explicit fallback behavior under timeout/network/5xx and test it.
 - [ ] **Playable-state invariant tests (required for all new games):** random generation must satisfy minimum playability constraints (e.g., guaranteed legal moves/words/targets) across supported board sizes/configs.
 
+## Sticker Hit — user story / parity checklist (2026-04-11)
+
+Legend: `[x]` shipped in current product direction · `[~]` partial / cosmetic or not full physics · `[ ]` not started / explicitly deferred
+
+**Epic 1 — core loop**
+
+- [~] **US01** Tap / straight-line throw at fixed feel — server resolves impact at `now + flightMs`; client arc only (no full ballistic sim).
+- [x] **US02** Safe hit embeds and rotates with target — `stuckStickers` + `targetGroup` rotation.
+- [x] **US03** Target rotation speed / direction / pause — shared timeline segments + DPS bands per stage.
+- [~] **US04** Overlap fail + bounce — collision ends run; **client bounce mesh** from `throwFx` impact angle (not true rebound physics).
+- [x] **US05** Final sticker / stage beat “break” feel — **shatter burst** on `stageBreakSeq` increase; `throwFx` persists across tick broadcasts for VFX de-dupe by `seq`.
+- [x] **Spikes vs knives** — `kind` + wider spike angular threshold.
+
+**Epic 2 — HUD**
+
+- [x] **US06** Ammo stack — per-stage throw chips (`sh-ammo`).
+- [x] **US07** Boss / stage prominence — five-stage ladder; **BOSS** label on boss tier.
+- [x] **US08** Apple currency HUD — match `apples` + opponent apples in dock.
+
+**Epic 3–4 — boss, apples, store**
+
+- [x] **US09** Fifth stage boss tier — `STAGES[4].isBoss` with harder counts.
+- [x] **US10** Boss defeated feedback — `BOSS DOWN!` + `bossSkinUnlocked`.
+- [x] **US11** Equip / meta — **match-scoped** `ownedSkinIds`, `equippedSkinId`, `boss_glow` equip; gold / tint on throws from server state.
+- [x] **US12–13** Ring apples + pickup + `apples` counter — server ring + pickup + spark `throwFx.appleBonus`.
+- [x] **US14** Spend apples on skins — **`sticker-buy-skin`** / **`sticker-equip-skin`**; prices from `GAME_CONFIG.SKINS`; **no cross-match persistence** (modal copy + TODOS below).
+
+**PvP / presence**
+
+- [x] **Ghost opponent disc** — `opponent.stage` includes obstacles, stuck, apples, **timeline**; mini disc + rotation in lobby column.
+- [ ] **Cross-match cosmetics + apples** — needs profile/Supabase (or agreed persistence layer).
+
+**Sticker Hit — quality gates (still open)**
+
+- [ ] Mobile-input contract tests (throw, store, equip buttons) in jsdom or browser harness.
+- [~] Sticker manifest degradation — runtime timeout + errors; add **automated** tests (see global gate above).
+- [ ] Fuzz / invariant tests for ring placement (apple vs obstacle angular separation) under worst random draws.
+
 ## Engineering scorecard (run weekly)
 
 **Canonical:** `PROJECT-HEALTH.md` (weekly EngEx scorecard). **Snapshots:** `planning/2026-04-09-eng-health.md` (latest), `planning/2026-04-07-testing-health.md` (historical).

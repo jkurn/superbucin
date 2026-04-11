@@ -132,6 +132,13 @@ export class GameState {
       stageIndex: 0,
       apples: 0,
       bossSkinUnlocked: false,
+      /** Monotonic; client plays shatter when this increases (survives tick-only broadcasts). */
+      stageBreakSeq: 0,
+      /** Last throw outcome for VFX; persists across TICK broadcasts until the next throw overwrites. */
+      throwFx: null,
+      throwFxSeq: 0,
+      ownedSkinIds: [],
+      equippedSkinId: null,
       stage: this._createStage(0),
     };
   }
@@ -242,27 +249,70 @@ export class GameState {
   handleAction(playerId, action) {
     if (!this.active || this.phase !== 'playing') return;
     if (!action || typeof action !== 'object') return;
-    if (action.type !== 'throw-sticker') return;
-    const flightMs = Number.isFinite(action.flightMs) ? Math.max(0, Math.min(700, action.flightMs)) : 0;
-    this._throwSticker(playerId, flightMs);
+    if (action.type === 'throw-sticker') {
+      const flightMs = Number.isFinite(action.flightMs) ? Math.max(0, Math.min(700, action.flightMs)) : 0;
+      this._throwSticker(playerId, flightMs);
+      return;
+    }
+    if (action.type === 'sticker-buy-skin') {
+      this._buySkin(playerId, action.skinId);
+      return;
+    }
+    if (action.type === 'sticker-equip-skin') {
+      this._equipSkin(playerId, action.skinId);
+    }
+  }
+
+  _buySkin(playerId, skinId) {
+    const ps = this.stateByPlayer[playerId];
+    if (!ps || ps.crashed || ps.finished) return;
+    if (typeof skinId !== 'string' || !skinId) return;
+    const skin = GAME_CONFIG.SKINS.find((s) => s.id === skinId);
+    if (!skin) return;
+    if (ps.ownedSkinIds.includes(skinId)) {
+      this.broadcastState();
+      return;
+    }
+    if (ps.apples < skin.cost) return;
+    ps.apples -= skin.cost;
+    ps.ownedSkinIds.push(skinId);
+    this.broadcastState();
+  }
+
+  _equipSkin(playerId, skinId) {
+    const ps = this.stateByPlayer[playerId];
+    if (!ps || ps.crashed || ps.finished) return;
+    if (skinId === null || skinId === undefined || skinId === '') {
+      ps.equippedSkinId = null;
+      this.broadcastState();
+      return;
+    }
+    if (typeof skinId !== 'string') return;
+    if (skinId === 'boss_glow') {
+      if (!ps.bossSkinUnlocked) return;
+      ps.equippedSkinId = 'boss_glow';
+      this.broadcastState();
+      return;
+    }
+    if (!ps.ownedSkinIds.includes(skinId)) return;
+    ps.equippedSkinId = skinId;
+    this.broadcastState();
   }
 
   _throwSticker(playerId, flightMs = 0) {
     const ps = this.stateByPlayer[playerId];
     if (!ps || ps.crashed || ps.finished) return;
 
-    ps.lastFx = null;
-
     const stage = ps.stage;
     const rotation = targetRotationDeg(stage.timeline, Date.now() + flightMs);
     const impactAngle = normalizeDeg(270 - rotation);
 
     if (collidesOccupied(impactAngle, stage.obstacleStickers, stage.stuckStickers)) {
-      ps.lastFx = { type: 'crash', impactAngle };
+      ps.throwFxSeq += 1;
+      ps.throwFx = { type: 'crash', impactAngle, seq: ps.throwFxSeq };
       ps.crashed = true;
       ps.crashedAt = Date.now();
       this.broadcastState();
-      ps.lastFx = null;
       this._resolveMatchIfNeeded(playerId, 'crash');
       return;
     }
@@ -281,9 +331,11 @@ export class GameState {
     });
     stage.stickersRemaining = Math.max(0, stage.stickersRemaining - 1);
 
-    ps.lastFx = { type: 'stick', impactAngle, appleBonus };
+    ps.throwFxSeq += 1;
+    ps.throwFx = { type: 'stick', impactAngle, appleBonus, seq: ps.throwFxSeq };
 
     if (stage.stickersRemaining === 0) {
+      ps.stageBreakSeq += 1;
       const clearedBoss = !!GAME_CONFIG.STAGES[ps.stageIndex]?.isBoss;
       const nextStage = ps.stageIndex + 1;
       if (nextStage >= GAME_CONFIG.STAGES.length) {
@@ -298,7 +350,6 @@ export class GameState {
     }
 
     this.broadcastState();
-    ps.lastFx = null;
     this._resolveMatchIfNeeded(playerId, 'progress');
   }
 
@@ -370,13 +421,18 @@ export class GameState {
       countdownMsRemaining,
       totalStages: GAME_CONFIG.STAGES.length,
       collisionDegrees: GAME_CONFIG.COLLISION_DEGREES,
+      skins: GAME_CONFIG.SKINS,
       you: {
         crashed: me.crashed,
         finished: me.finished,
         stageIndex: me.stageIndex,
         apples: me.apples,
         bossSkinUnlocked: me.bossSkinUnlocked,
-        lastFx: me.lastFx,
+        stageBreakSeq: me.stageBreakSeq,
+        throwFx: me.throwFx,
+        throwFxSeq: me.throwFxSeq,
+        ownedSkinIds: me.ownedSkinIds,
+        equippedSkinId: me.equippedSkinId,
         stage: me.stage,
       },
       opponent: {
@@ -385,11 +441,18 @@ export class GameState {
         stageIndex: opp.stageIndex,
         apples: opp.apples,
         bossSkinUnlocked: opp.bossSkinUnlocked,
+        stageBreakSeq: opp.stageBreakSeq,
+        equippedSkinId: opp.equippedSkinId,
+        /** Ghost board: full angular layout + timeline so client can mirror their disc. */
         stage: {
           stageIndex: opp.stage.stageIndex,
           stickersTotal: opp.stage.stickersTotal,
           stickersRemaining: opp.stage.stickersRemaining,
           isBoss: opp.stage.isBoss,
+          obstacleStickers: opp.stage.obstacleStickers,
+          stuckStickers: opp.stage.stuckStickers,
+          ringApples: opp.stage.ringApples,
+          timeline: opp.stage.timeline,
         },
       },
     };

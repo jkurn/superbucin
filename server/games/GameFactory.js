@@ -115,6 +115,11 @@ export const GameFactory = {
         TICK_MS: sh.TICK_MS,
         COLLISION_DEGREES: sh.COLLISION_DEGREES,
         STAGES: sh.STAGES,
+        SKINS: sh.SKINS,
+        APPLES_MIN: sh.APPLES_MIN,
+        APPLES_MAX: sh.APPLES_MAX,
+        APPLE_HIT_DEGREES: sh.APPLE_HIT_DEGREES,
+        SPIKE_EXTRA_DEGREES: sh.SPIKE_EXTRA_DEGREES,
       };
     }
 

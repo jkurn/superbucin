@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { EventBus } from '../../shared/EventBus.js';
 import { targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
+import { GAME_CONFIG } from './config.js';
 
 const KENNEY_ASSETS = {
   stallBg: '/kenney/shooting-gallery/Stall/bg_wood.png',
@@ -107,6 +108,11 @@ export class StickerHitScene {
     this.storeModalEl = null;
     this.storeCloseEl = null;
     this.storeBackdropEl = null;
+    this.storeListEl = null;
+    this.ghostDiscEl = null;
+    this.equipNoneBtn = null;
+    this.equipBossBtn = null;
+    this._lastGhostSig = '';
     this.stickerPool = [];
     /** @type {null | 'timeout' | 'http' | 'parse' | 'network'} */
     this._stickerManifestError = null;
@@ -128,6 +134,25 @@ export class StickerHitScene {
     this._onCanvasTap = () => this.shoot();
     this._onStoreOpen = () => this._openStoreModal();
     this._onStoreClose = () => this._closeStoreModal();
+    this._onStoreListClick = (e) => {
+      const equipBtn = e.target.closest?.('[data-skin-equip]');
+      if (equipBtn?.getAttribute('data-skin-equip')) {
+        const id = equipBtn.getAttribute('data-skin-equip');
+        this.network.sendGameAction({ type: 'sticker-equip-skin', skinId: id });
+        return;
+      }
+      const buyBtn = e.target.closest?.('[data-skin-buy]');
+      const buyId = buyBtn?.getAttribute('data-skin-buy');
+      if (buyId) {
+        this.network.sendGameAction({ type: 'sticker-buy-skin', skinId: buyId });
+      }
+    };
+    this._onEquipNone = () => {
+      this.network.sendGameAction({ type: 'sticker-equip-skin', skinId: null });
+    };
+    this._onEquipBoss = () => {
+      this.network.sendGameAction({ type: 'sticker-equip-skin', skinId: 'boss_glow' });
+    };
   }
 
   init() {
@@ -158,13 +183,22 @@ export class StickerHitScene {
             <div class="sh-progress-title">Sayang</div>
             <div class="sh-progress-value" id="sh-opp-progress">0/0</div>
           </div>
+          <div class="sh-ghost-wrap">
+            <div class="sh-ghost-title">Sayang disc</div>
+            <div class="sh-ghost-disc" id="sh-ghost-disc" aria-hidden="true"></div>
+          </div>
         </div>
       </div>
       <div class="sh-store-modal" id="sh-store-modal" hidden>
         <div class="sh-store-backdrop" id="sh-store-backdrop"></div>
         <div class="sh-store-card" role="dialog" aria-labelledby="sh-store-title">
           <h3 class="sh-store-title" id="sh-store-title">Sticker skins</h3>
-          <p class="sh-store-copy" id="sh-store-copy">Clear the boss stage to unlock the gold throw glow. Cross-match store spend is not wired yet.</p>
+          <p class="sh-store-copy" id="sh-store-copy"></p>
+          <div class="sh-store-list" id="sh-store-list"></div>
+          <div class="sh-store-equip-row">
+            <button class="btn btn-small" type="button" id="sh-equip-none">Unequip</button>
+            <button class="btn btn-small" type="button" id="sh-equip-boss" disabled>Boss glow</button>
+          </div>
           <button class="btn btn-pink" type="button" id="sh-store-close">Close</button>
         </div>
       </div>
@@ -185,11 +219,18 @@ export class StickerHitScene {
     this.storeModalEl = this.rootEl.querySelector('#sh-store-modal');
     this.storeCloseEl = this.rootEl.querySelector('#sh-store-close');
     this.storeBackdropEl = this.rootEl.querySelector('#sh-store-backdrop');
+    this.storeListEl = this.rootEl.querySelector('#sh-store-list');
+    this.ghostDiscEl = this.rootEl.querySelector('#sh-ghost-disc');
+    this.equipNoneBtn = this.rootEl.querySelector('#sh-equip-none');
+    this.equipBossBtn = this.rootEl.querySelector('#sh-equip-boss');
 
     this.throwBtnEl?.addEventListener('click', this._onShoot);
     this.storeBtnEl?.addEventListener('click', this._onStoreOpen);
     this.storeCloseEl?.addEventListener('click', this._onStoreClose);
     this.storeBackdropEl?.addEventListener('click', this._onStoreClose);
+    this.storeListEl?.addEventListener('click', this._onStoreListClick);
+    this.equipNoneBtn?.addEventListener('click', this._onEquipNone);
+    this.equipBossBtn?.addEventListener('click', this._onEquipBoss);
     window.addEventListener('keydown', this._onKeyDown);
     this.sceneManager.renderer?.domElement.addEventListener('pointerdown', this._onCanvasTap);
     EventBus.on('sticker-hit:state', this._onState);
@@ -359,26 +400,20 @@ export class StickerHitScene {
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(0.95, 0.95, 1);
     sprite.position.set(0, -3.8, 0.8);
-    let bossGlow = !!this.state?.you?.bossSkinUnlocked;
-    if (!bossGlow && typeof localStorage !== 'undefined') {
-      try {
-        bossGlow = localStorage.getItem('sticker-hit-boss-glow') === '1';
-      } catch (_e) {
-        bossGlow = false;
-      }
-    }
+    const eq = this.state?.you?.equippedSkinId;
+    const goldGlow = eq === 'boss_glow' || ((eq === null || eq === undefined) && !!this.state?.you?.bossSkinUnlocked);
     if (sticker?.src) {
       try {
         mat.map = this._loadTexture(sticker.src.replace(backendOrigin(), ''));
         mat.needsUpdate = true;
-        if (bossGlow) {
-          mat.color.setHex(0xffe8a8);
-        }
+        if (eq === 'trail_pink') mat.color.setHex(0xffb6d9);
+        else if (eq === 'sparkle_blue') mat.color.setHex(0xa8d8ff);
+        else if (goldGlow) mat.color.setHex(0xffe8a8);
       } catch (_e) {
-        mat.color.setHex(bossGlow ? 0xffd700 : 0xff9a2e);
+        mat.color.setHex(eq === 'trail_pink' ? 0xff6eb4 : eq === 'sparkle_blue' ? 0x66b3ff : goldGlow ? 0xffd700 : 0xff9a2e);
       }
     } else {
-      mat.color.setHex(bossGlow ? 0xffd700 : 0xff9a2e);
+      mat.color.setHex(eq === 'trail_pink' ? 0xff6eb4 : eq === 'sparkle_blue' ? 0x66b3ff : goldGlow ? 0xffd700 : 0xff9a2e);
     }
     this.scene.add(sprite);
     this.projectiles.push({
@@ -418,7 +453,7 @@ export class StickerHitScene {
 
   _openStoreModal() {
     if (!this.storeModalEl) return;
-    this._updateStoreCopy();
+    this._refreshStoreUI();
     this.storeModalEl.hidden = false;
   }
 
@@ -426,14 +461,50 @@ export class StickerHitScene {
     if (this.storeModalEl) this.storeModalEl.hidden = true;
   }
 
-  _updateStoreCopy() {
-    const el = this.rootEl?.querySelector('#sh-store-copy');
-    if (!el) return;
-    const unlocked = !!this.state?.you?.bossSkinUnlocked;
+  _refreshStoreUI() {
+    const copyEl = this.rootEl?.querySelector('#sh-store-copy');
     const apples = this.state?.you?.apples ?? 0;
-    el.textContent = unlocked
-      ? `Boss glow is unlocked — your throws use a gold tint. Apples this match: ${apples}. Spendable store + cross-match inventory is planned next.`
-      : `Beat the boss stage (stage ${this.state?.totalStages ?? 5}) to unlock the gold throw glow. Apples this match: ${apples}.`;
+    const unlocked = !!this.state?.you?.bossSkinUnlocked;
+    const owned = this.state?.you?.ownedSkinIds || [];
+    const equipped = this.state?.you?.equippedSkinId ?? null;
+    const skins = this.state?.skins || GAME_CONFIG.SKINS || [];
+
+    if (copyEl) {
+      copyEl.textContent = `Apples this match: ${apples}. Boss glow ${unlocked ? 'unlocked' : 'locked (clear boss stage)'}. Purchases are match-only until profile sync exists.`;
+    }
+
+    if (this.equipBossBtn) {
+      this.equipBossBtn.disabled = !unlocked;
+      this.equipBossBtn.dataset.active = equipped === 'boss_glow' ? 'true' : 'false';
+    }
+
+    if (!this.storeListEl) return;
+    this.storeListEl.innerHTML = '';
+    skins.forEach((skin) => {
+      const row = document.createElement('div');
+      row.className = 'sh-store-row';
+      const has = owned.includes(skin.id);
+      const price = document.createElement('span');
+      price.className = 'sh-store-price';
+      price.textContent = has ? 'Owned' : `${skin.cost} 🍎`;
+      const label = document.createElement('span');
+      label.className = 'sh-store-skin-name';
+      label.textContent = skin.label || skin.id;
+      const buy = document.createElement('button');
+      buy.type = 'button';
+      buy.className = 'btn btn-small sh-store-buy';
+      if (has) {
+        buy.setAttribute('data-skin-equip', skin.id);
+        buy.textContent = equipped === skin.id ? 'Equipped' : 'Equip';
+        buy.disabled = equipped === skin.id;
+      } else {
+        buy.setAttribute('data-skin-buy', skin.id);
+        buy.textContent = 'Buy';
+        if (apples < skin.cost) buy.disabled = true;
+      }
+      row.append(label, price, buy);
+      this.storeListEl.appendChild(row);
+    });
   }
 
   _spawnStageShatterFx(previousView) {
@@ -619,13 +690,15 @@ export class StickerHitScene {
   applyState(state) {
     const previous = this.prevState;
 
-    if (previous && state?.you?.stageIndex > (previous.you?.stageIndex ?? 0)) {
+    if (previous && (state?.you?.stageBreakSeq ?? 0) > (previous.you?.stageBreakSeq ?? 0)) {
       this._spawnStageShatterFx(previous);
     }
-    if (state?.you?.lastFx?.type === 'crash') {
-      this._spawnCrashBounceFx(state.you.lastFx.impactAngle);
-    } else if (state?.you?.lastFx?.type === 'stick' && state.you.lastFx.appleBonus) {
-      this._spawnAppleBonusFx(state.you.lastFx.impactAngle);
+
+    const fx = state?.you?.throwFx;
+    const prevFx = previous?.you?.throwFx;
+    if (fx && (!prevFx || fx.seq !== prevFx.seq)) {
+      if (fx.type === 'crash') this._spawnCrashBounceFx(fx.impactAngle);
+      else if (fx.type === 'stick' && fx.appleBonus) this._spawnAppleBonusFx(fx.impactAngle);
     }
 
     this.state = state;
@@ -737,12 +810,44 @@ export class StickerHitScene {
       const left = this.state.you?.stage?.stickersRemaining ?? 0;
       this.statusEl.textContent = `${left} sticker${left === 1 ? '' : 's'} left this stage`;
     }
+
+    this._renderGhostDisc();
+    if (this.storeModalEl && !this.storeModalEl.hidden) {
+      this._refreshStoreUI();
+    }
+  }
+
+  _renderGhostDisc() {
+    if (!this.ghostDiscEl || !this.state?.opponent?.stage) return;
+    const s = this.state.opponent.stage;
+    const obs = (s.obstacleStickers || []).map((x) => `${x.angle}:${x.kind || 'knife'}:${x.stickerSeed}`).join(',');
+    const stuck = (s.stuckStickers || []).map((x) => `${x.angle}:${x.stickerSeed}`).join(',');
+    const apples = (s.ringApples || []).map((a) => `${a.angle}:${a.id}`).join(',');
+    const sig = `${s.stageIndex}|${obs}|${stuck}|${apples}`;
+    if (sig === this._lastGhostSig) return;
+    this._lastGhostSig = sig;
+    this.ghostDiscEl.innerHTML = '';
+    const addDot = (angleDeg, cls) => {
+      const dot = document.createElement('span');
+      dot.className = `sh-ghost-dot ${cls}`;
+      dot.style.setProperty('--a', `${Number(angleDeg)}deg`);
+      this.ghostDiscEl.appendChild(dot);
+    };
+    (s.obstacleStickers || []).forEach((o) => {
+      addDot(o.angle, o.kind === 'spike' ? 'sh-ghost-spike' : 'sh-ghost-knife');
+    });
+    (s.stuckStickers || []).forEach((x) => addDot(x.angle, 'sh-ghost-stuck'));
+    (s.ringApples || []).forEach((a) => addDot(a.angle, 'sh-ghost-apple'));
   }
 
   tick() {
     if (this.state?.you?.stage?.timeline && this.targetGroup) {
       const rot = targetRotationDeg(this.state.you.stage.timeline, Date.now());
       this.targetGroup.rotation.z = THREE.MathUtils.degToRad(rot);
+    }
+    if (this.ghostDiscEl && this.state?.opponent?.stage?.timeline) {
+      const gr = targetRotationDeg(this.state.opponent.stage.timeline, Date.now());
+      this.ghostDiscEl.style.transform = `rotate(${gr}deg)`;
     }
   }
 
@@ -837,6 +942,9 @@ export class StickerHitScene {
     if (this.storeBtnEl) this.storeBtnEl.removeEventListener('click', this._onStoreOpen);
     if (this.storeCloseEl) this.storeCloseEl.removeEventListener('click', this._onStoreClose);
     if (this.storeBackdropEl) this.storeBackdropEl.removeEventListener('click', this._onStoreClose);
+    if (this.storeListEl) this.storeListEl.removeEventListener('click', this._onStoreListClick);
+    if (this.equipNoneBtn) this.equipNoneBtn.removeEventListener('click', this._onEquipNone);
+    if (this.equipBossBtn) this.equipBossBtn.removeEventListener('click', this._onEquipBoss);
     this._closeStoreModal();
     this.sceneManager.onUpdate = null;
     this._disposeThreeResources();

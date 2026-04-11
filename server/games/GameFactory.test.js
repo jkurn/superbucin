@@ -151,6 +151,7 @@ describe('GameFactory', () => {
     const sticker = GameFactory.getConfig('sticker-hit');
     assert.equal(sticker.COLLISION_DEGREES, 14);
     assert.equal(Array.isArray(sticker.STAGES), true);
+    assert.equal(Array.isArray(sticker.SKINS), true);
 
     const doodle = GameFactory.getConfig('doodle-guess');
     assert.equal(typeof doodle.defaultPackId, 'string');

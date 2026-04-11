@@ -385,6 +385,105 @@
   color: #b8d4ec;
 }
 
+.sh-store-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.sh-store-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.sh-store-skin-name {
+  flex: 1;
+  color: #e8f4ff;
+}
+
+.sh-store-price {
+  color: #9fc7ec;
+  font-size: 0.72rem;
+}
+
+.sh-store-equip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.sh-ghost-wrap {
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.35rem;
+  border-radius: 12px;
+  background: rgba(6, 16, 32, 0.55);
+  border: 1px solid rgba(120, 180, 255, 0.15);
+}
+
+.sh-ghost-title {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8fb8e0;
+  text-align: center;
+  margin-bottom: 0.25rem;
+}
+
+.sh-ghost-disc {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, #1f3d5c 0%, #0c1828 72%);
+  border: 2px solid rgba(130, 190, 255, 0.28);
+  transform: rotate(0deg);
+  transform-origin: 50% 50%;
+}
+
+.sh-ghost-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  transform: rotate(var(--a, 0deg)) translateY(-42px);
+  transform-origin: center center;
+}
+
+.sh-ghost-knife {
+  background: #ff8f8f;
+  box-shadow: 0 0 6px rgba(255, 100, 120, 0.45);
+}
+
+.sh-ghost-spike {
+  background: #ff44aa;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+}
+
+.sh-ghost-stuck {
+  background: #9dffd0;
+}
+
+.sh-ghost-apple {
+  background: #66ff99;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+}
+
 .sh-status {
   font-size: 0.74rem;
   color: #d9ecff;

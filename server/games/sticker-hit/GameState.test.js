@@ -277,5 +277,95 @@ describe('Sticker Hit GameState', () => {
     game.handleAction(p1.id, { type: 'throw-sticker' });
     assert.equal(game.stateByPlayer[p1.id].crashed, true);
   });
+
+  it('throwFx persists across repeated broadcastState (tick replay)', () => {
+    const { game, p1, p2 } = createGame();
+    currentGame = game;
+    game.active = true;
+    game.phase = 'playing';
+
+    game.stateByPlayer[p1.id].stage = {
+      stageIndex: 0,
+      isBoss: false,
+      stickersTotal: 2,
+      stickersRemaining: 2,
+      obstacleStickers: [],
+      ringApples: [],
+      stuckStickers: [],
+      timeline: {
+        startedAt: Date.now(),
+        initialAngle: 0,
+        segments: [{ atMs: 0, dps: 0 }],
+      },
+    };
+    game.stateByPlayer[p2.id].stage = {
+      stageIndex: 0,
+      isBoss: false,
+      stickersTotal: 99,
+      stickersRemaining: 99,
+      obstacleStickers: [],
+      ringApples: [],
+      stuckStickers: [],
+      timeline: {
+        startedAt: Date.now(),
+        initialAngle: 0,
+        segments: [{ atMs: 0, dps: 0 }],
+      },
+    };
+
+    game.handleAction(p1.id, { type: 'throw-sticker' });
+    const seq = game.stateByPlayer[p1.id].throwFx?.seq;
+    assert.ok(seq);
+    game.broadcastState();
+    assert.equal(game.stateByPlayer[p1.id].throwFx?.seq, seq);
+    assert.equal(game.stateByPlayer[p1.id].throwFx?.type, 'stick');
+  });
+
+  it('sticker-buy-skin deducts apples; sticker-equip-skin requires ownership', () => {
+    const { game, p1, p2 } = createGame();
+    currentGame = game;
+    game.active = true;
+    game.phase = 'playing';
+
+    game.stateByPlayer[p1.id].apples = 10;
+    game.stateByPlayer[p1.id].stage = {
+      stageIndex: 0,
+      isBoss: false,
+      stickersTotal: 99,
+      stickersRemaining: 99,
+      obstacleStickers: [],
+      ringApples: [],
+      stuckStickers: [],
+      timeline: {
+        startedAt: Date.now(),
+        initialAngle: 0,
+        segments: [{ atMs: 0, dps: 0 }],
+      },
+    };
+    game.stateByPlayer[p2.id].stage = {
+      stageIndex: 0,
+      isBoss: false,
+      stickersTotal: 99,
+      stickersRemaining: 99,
+      obstacleStickers: [],
+      ringApples: [],
+      stuckStickers: [],
+      timeline: {
+        startedAt: Date.now(),
+        initialAngle: 0,
+        segments: [{ atMs: 0, dps: 0 }],
+      },
+    };
+
+    game.handleAction(p1.id, { type: 'sticker-buy-skin', skinId: 'trail_pink' });
+    assert.equal(game.stateByPlayer[p1.id].apples, 7);
+    assert.ok(game.stateByPlayer[p1.id].ownedSkinIds.includes('trail_pink'));
+
+    game.handleAction(p1.id, { type: 'sticker-equip-skin', skinId: 'trail_pink' });
+    assert.equal(game.stateByPlayer[p1.id].equippedSkinId, 'trail_pink');
+
+    game.handleAction(p1.id, { type: 'sticker-equip-skin', skinId: 'sparkle_blue' });
+    assert.equal(game.stateByPlayer[p1.id].equippedSkinId, 'trail_pink');
+  });
 });
 

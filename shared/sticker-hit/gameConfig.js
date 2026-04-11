@@ -16,6 +16,14 @@ export const STICKER_HIT_GAME_CONFIG = {
   APPLE_HIT_DEGREES: 20,
   APPLES_MIN: 1,
   APPLES_MAX: 2,
+  /**
+   * Match-scoped shop: spend apples for cosmetic ids (server deducts + tracks ownedSkinIds).
+   * Boss glow is separate (bossSkinUnlocked); equip id `boss_glow` when unlocked.
+   */
+  SKINS: [
+    { id: 'trail_pink', cost: 3, label: 'Pink trail' },
+    { id: 'sparkle_blue', cost: 5, label: 'Blue sparkle' },
+  ],
   /** Every 5th stage is boss (1-based); last configured stage is the boss run. */
   STAGES: [
     { stickersToLand: 6, obstacles: 1, spikes: 0, minDps: 55, maxDps: 115, isBoss: false },
