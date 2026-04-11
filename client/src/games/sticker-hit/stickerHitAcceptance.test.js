@@ -1,0 +1,173 @@
+/**
+ * Sticker Hit — acceptance criteria (client HUD / scene).
+ *
+ * Passing tests document current UI contracts for partial requirements.
+ * Skipped describes are backlog acceptance tests.
+ */
+
+import { describe, it, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+import { JSDOM } from 'jsdom';
+import { EventBus } from '../../shared/EventBus.js';
+import { StickerHitScene } from './StickerHitScene.js';
+
+const nodePerformance = globalThis.performance;
+
+function installDom() {
+  const dom = new JSDOM('<!DOCTYPE html><html><body><div id="ui-overlay"></div></body></html>', {
+    url: 'http://localhost:5173/',
+  });
+  globalThis.window = dom.window;
+  globalThis.document = dom.window.document;
+  globalThis.localStorage = dom.window.localStorage;
+  globalThis.performance = { now: () => Date.now() };
+  globalThis.requestAnimationFrame = () => 0;
+  globalThis.cancelAnimationFrame = () => {};
+}
+
+function makeSceneManager() {
+  const canvas = document.createElement('canvas');
+  return {
+    renderer: { domElement: canvas },
+    setScene: () => {},
+    onUpdate: null,
+  };
+}
+
+function baseState(overrides = {}) {
+  return {
+    gameType: 'sticker-hit',
+    phase: 'playing',
+    serverNow: Date.now(),
+    totalStages: 5,
+    skins: [{ id: 'trail_pink', cost: 3, label: 'Pink' }],
+    you: {
+      crashed: false,
+      finished: false,
+      stageIndex: 0,
+      apples: 0,
+      bossSkinUnlocked: false,
+      stageBreakSeq: 0,
+      throwFx: null,
+      throwFxSeq: 0,
+      ownedSkinIds: [],
+      equippedSkinId: null,
+      stage: {
+        stageIndex: 0,
+        isBoss: false,
+        stickersTotal: 6,
+        stickersRemaining: 6,
+        obstacleStickers: [],
+        ringApples: [],
+        stuckStickers: [],
+        timeline: { startedAt: Date.now(), initialAngle: 0, segments: [{ atMs: 0, dps: 0 }] },
+      },
+    },
+    opponent: {
+      crashed: false,
+      finished: false,
+      stageIndex: 0,
+      apples: 0,
+      bossSkinUnlocked: false,
+      stageBreakSeq: 0,
+      equippedSkinId: null,
+      stage: {
+        stageIndex: 0,
+        stickersTotal: 6,
+        stickersRemaining: 6,
+        isBoss: false,
+        obstacleStickers: [],
+        stuckStickers: [],
+        ringApples: [],
+        timeline: { startedAt: Date.now(), initialAngle: 0, segments: [{ atMs: 0, dps: 0 }] },
+      },
+    },
+    ...overrides,
+  };
+}
+
+describe('Sticker Hit acceptance — HUD (partial / Done)', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    installDom();
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({ stickers: [{ src: '/stickers/t.webp', durationMs: 400 }] }),
+    });
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    EventBus.clear();
+    delete globalThis.window;
+    delete globalThis.document;
+    delete globalThis.localStorage;
+    globalThis.performance = nodePerformance;
+    delete globalThis.requestAnimationFrame;
+    delete globalThis.cancelAnimationFrame;
+  });
+
+  it('AC US06 (partial): ammo rail renders one dot per stickersTotal; spent dots match throws used', async () => {
+    const scene = new StickerHitScene(makeSceneManager(), { sendGameAction: () => {} }, null, {});
+    scene.init();
+    scene.applyState(baseState({
+      you: {
+        ...baseState().you,
+        stage: {
+          ...baseState().you.stage,
+          stickersTotal: 8,
+          stickersRemaining: 5,
+        },
+      },
+    }));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const dots = scene.rootEl.querySelectorAll('#sh-ammo .sh-ammo-dot');
+    assert.equal(dots.length, 8);
+    let spent = 0;
+    dots.forEach((d) => {
+      if (d.dataset.spent === 'true') spent += 1;
+    });
+    assert.equal(spent, 3);
+    scene.destroy();
+  });
+
+  it('AC US07 (partial): stage pip count matches totalStages from state', async () => {
+    const scene = new StickerHitScene(makeSceneManager(), { sendGameAction: () => {} }, null, {});
+    scene.init();
+    scene.applyState(baseState({ totalStages: 5 }));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const pips = scene.rootEl.querySelectorAll('#sh-stage-pips .sh-stage-pip');
+    assert.equal(pips.length, 5);
+    scene.destroy();
+  });
+
+  it('AC US07: boss label when current stage is boss', async () => {
+    const scene = new StickerHitScene(makeSceneManager(), { sendGameAction: () => {} }, null, {});
+    scene.init();
+    scene.applyState(baseState({
+      you: {
+        ...baseState().you,
+        stageIndex: 4,
+        stage: {
+          ...baseState().you.stage,
+          stageIndex: 4,
+          isBoss: true,
+        },
+      },
+    }));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const label = document.getElementById('sh-stage-label');
+    assert.ok(label.textContent.includes('BOSS'));
+    scene.destroy();
+  });
+});
+
+describe.skip('BACKLOG — AC: US01 client arc matches server impact within tolerance (Missing)', () => {
+  it('asserts max angular delta between predicted rim impact and next server stick line', () => {
+    assert.fail('Unskip when adding golden-frame or replay harness.');
+  });
+});
