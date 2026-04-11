@@ -9,6 +9,9 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { EventBus } from '../../shared/EventBus.js';
+import { resolveThrowAgainstDisc } from '../../../../shared/sticker-hit/throwResolve.js';
+import { STICKER_HIT_GAME_CONFIG } from '../../../../shared/sticker-hit/gameConfig.js';
+import { normalizeDeg, targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
 import { StickerHitScene } from './StickerHitScene.js';
 
 const nodePerformance = globalThis.performance;
@@ -166,8 +169,28 @@ describe('Sticker Hit acceptance — HUD (partial / Done)', () => {
   });
 });
 
-describe.skip('BACKLOG — AC: US01 client arc matches server impact within tolerance (Missing)', () => {
-  it('asserts max angular delta between predicted rim impact and next server stick line', () => {
-    assert.fail('Unskip when adding golden-frame or replay harness.');
+describe('Sticker Hit acceptance — US01 client/server resolver parity (Done)', () => {
+  it('client throw preview uses same multi-sample resolver as server (not final-only)', () => {
+    const nowMs = 3000;
+    const timeline = {
+      startedAt: nowMs,
+      initialAngle: 0,
+      segments: [{ atMs: 0, dps: 360 }],
+    };
+    const flightMs = 1000;
+    const legacyFinal = normalizeDeg(270 - targetRotationDeg(timeline, nowMs + flightMs));
+    const resolved = resolveThrowAgainstDisc({
+      timeline,
+      nowMs,
+      flightMs,
+      obstacleStickers: [{ angle: 180, kind: 'knife' }],
+      stuckStickers: [],
+      ringApples: [],
+      cfg: STICKER_HIT_GAME_CONFIG,
+      sampleCount: STICKER_HIT_GAME_CONFIG.THROW_PATH_SAMPLES,
+    });
+    assert.equal(legacyFinal, 270);
+    assert.equal(resolved.crash, true);
+    assert.equal(resolved.impactAngle, 180);
   });
 });

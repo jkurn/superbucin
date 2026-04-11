@@ -1,13 +1,15 @@
 /**
  * Sticker Hit — acceptance criteria & backlog (server).
  *
- * "Passing" blocks lock current product definitions.
- * `describe.skip` blocks are executable specs for partial/missing work — unskip when implementing.
+ * "Passing" blocks lock current product definitions; backlog items graduate here when implemented.
  */
 
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { STICKER_HIT_GAME_CONFIG as CFG } from '../../../shared/sticker-hit/gameConfig.js';
+import { buildExpandedStageDefinitions } from '../../../shared/sticker-hit/marathonStages.js';
+import { resolveThrowAgainstDisc } from '../../../shared/sticker-hit/throwResolve.js';
+import { normalizeDeg, targetRotationDeg } from '../../../shared/sticker-hit/timeline.js';
 import { GameState } from './GameState.js';
 
 function createGame() {
@@ -84,7 +86,7 @@ describe('Sticker Hit acceptance — runtime invariants after start (Done)', () 
     currentGame = game;
     startPlaying(game);
     const stage = game.stateByPlayer[p1.id].stage;
-    const cfg = CFG.STAGES[stage.stageIndex];
+    const cfg = game.stageDefinitions[stage.stageIndex];
     const wantKnife = cfg.obstacles || 0;
     const wantSpike = cfg.spikes || 0;
     const knives = stage.obstacleStickers.filter((o) => o.kind === 'knife').length;
@@ -94,20 +96,74 @@ describe('Sticker Hit acceptance — runtime invariants after start (Done)', () 
   });
 });
 
-describe.skip('BACKLOG — AC: US01 server-simulated ballistic flight (Missing)', () => {
-  it('resolves stick/crash only after sampling occupied arc along projectile path (multi-step)', () => {
-    assert.fail('Unskip when server simulates flight path; assert segment hits or continuous sweep.');
+describe('Sticker Hit acceptance — US01 multi-sample flight (Done)', () => {
+  it('mid-arc occupied sample is a crash even when final rim angle is clear', () => {
+    const nowMs = 2000;
+    const timeline = {
+      startedAt: nowMs,
+      initialAngle: 0,
+      segments: [{ atMs: 0, dps: 360 }],
+    };
+    const flightMs = 1000;
+    const finalOnlyClear = normalizeDeg(270 - targetRotationDeg(timeline, nowMs + flightMs));
+    const resolved = resolveThrowAgainstDisc({
+      timeline,
+      nowMs,
+      flightMs,
+      obstacleStickers: [{ angle: 180, kind: 'knife' }],
+      stuckStickers: [],
+      ringApples: [],
+      cfg: CFG,
+      sampleCount: 4,
+    });
+    assert.equal(resolved.crash, true);
+    assert.equal(resolved.impactAngle, 180);
+    assert.equal(finalOnlyClear, 270);
   });
 });
 
-describe.skip('BACKLOG — AC: US04 server-authoritative rebound knife (Missing)', () => {
-  it('emits rebound trajectory or rest state so client is not sole source of bounce truth', () => {
-    assert.fail('Unskip when server models bounce; assert throwFx or state includes rebound payload.');
+describe('Sticker Hit acceptance — US04 crash payload (Done)', () => {
+  let currentGame;
+
+  afterEach(() => {
+    if (currentGame) currentGame.stop();
+    currentGame = null;
+  });
+
+  it('throwFx crash includes reboundTangentDeg for client debris alignment', () => {
+    const { game, p1 } = createGame();
+    currentGame = game;
+    startPlaying(game);
+    const ps = game.stateByPlayer[p1.id];
+    ps.stage = {
+      stageIndex: 0,
+      isBoss: false,
+      stickersTotal: 2,
+      stickersRemaining: 2,
+      obstacleStickers: [{ angle: 270, stickerSeed: 1, kind: 'knife' }],
+      ringApples: [],
+      stuckStickers: [],
+      timeline: {
+        startedAt: Date.now(),
+        initialAngle: 0,
+        segments: [{ atMs: 0, dps: 0 }],
+      },
+    };
+    game.handleAction(p1.id, { type: 'throw-sticker' });
+    const fx = ps.throwFx;
+    assert.equal(fx?.type, 'crash');
+    assert.equal(typeof fx?.impactAngle, 'number');
+    assert.equal(fx?.reboundTangentDeg, normalizeDeg(fx.impactAngle + 90));
   });
 });
 
-describe.skip('BACKLOG — AC: US09 infinite marathon boss cadence (Missing)', () => {
-  it('every fifth stage index (0-based: 4,9,14,…) is boss tier with scaled difficulty', () => {
-    assert.fail('Unskip when STAGES becomes infinite or generated; assert boss predicate on indices.');
+describe('Sticker Hit acceptance — US09 marathon ladder (Done)', () => {
+  it('expanded ladder marks boss every fifth index and scales with rounds', () => {
+    const twoRounds = buildExpandedStageDefinitions({ ...CFG, MARATHON_ROUNDS: 2 });
+    assert.equal(twoRounds.length, CFG.STAGES.length * 2);
+    for (let i = 0; i < twoRounds.length; i += 1) {
+      assert.equal(twoRounds[i].isBoss, i % 5 === 4);
+    }
+    assert.ok(twoRounds[5].stickersToLand >= CFG.STAGES[0].stickersToLand);
   });
 });

@@ -39,6 +39,13 @@ export const STICKER_HIT_GAME_CONFIG = {
   THROW_FLIGHT_MS: 420,
   /** Upper bound for `throw-sticker` flightMs from clients (anti-spam / sanity). */
   THROW_FLIGHT_MAX_MS: 700,
+  /**
+   * How many full copies of STAGES to chain (1 = five-stage match).
+   * Boss appears every 5th stage index (4, 9, 14, …) across the chain.
+   */
+  MARATHON_ROUNDS: 1,
+  /** Collision samples along flightMs (server + client must match). */
+  THROW_PATH_SAMPLES: 12,
   /** Subtle lateral screen wobble on projectile (world units); keep low for “straight” throw read. */
   THROW_WOBBLE_X: 0.14,
   THROW_WOBBLE_Y: 0.32,

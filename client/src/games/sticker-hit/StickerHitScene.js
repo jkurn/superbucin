@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { EventBus } from '../../shared/EventBus.js';
-import { normalizeDeg, targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
+import { resolveThrowAgainstDisc } from '../../../../shared/sticker-hit/throwResolve.js';
+import { targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
 import { GAME_CONFIG } from './config.js';
 import {
   DEFAULT_STICKER_MANIFEST_TIMEOUT_MS,
@@ -411,11 +412,22 @@ export class StickerHitScene {
     }
     this.scene.add(sprite);
 
-    const timeline = this.state?.you?.stage?.timeline;
+    const stage = this.state?.you?.stage;
+    const timeline = stage?.timeline;
     let impactAngleDeg = null;
     if (timeline) {
-      const rotAtImpact = targetRotationDeg(timeline, this._approxServerNow() + flightMs);
-      impactAngleDeg = normalizeDeg(270 - rotAtImpact);
+      const nowMs = this._approxServerNow();
+      const resolved = resolveThrowAgainstDisc({
+        timeline,
+        nowMs,
+        flightMs,
+        obstacleStickers: stage.obstacleStickers || [],
+        stuckStickers: stage.stuckStickers || [],
+        ringApples: stage.ringApples || [],
+        cfg: GAME_CONFIG,
+        sampleCount: GAME_CONFIG.THROW_PATH_SAMPLES ?? 12,
+      });
+      impactAngleDeg = resolved.impactAngle;
     }
 
     this.projectiles.push({

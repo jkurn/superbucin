@@ -60,9 +60,9 @@ Suggested build order in plan: Connect Four → Quiz Race → Battleship (comple
 - [x] ~~Network resilience: disconnect/reconnect, timeout windows, rejoin consistency.~~ — Covered by reconnect tests in `RoomManager.reconnect.test.js` and client reconnect handling in `NetworkManager.test.js`.
 - [x] ~~Notification integrity: correct recipient + no duplicate/conflicting notifications.~~ — Covered by `RoomManager` recipient contract tests + `NetworkManager` event mapping tests.
 - [x] ~~Persistence side effects: `match-end` path records points/achievements correctly and degrades safely on DB failure.~~ — Covered by `UserService.test.js`, `RoomManager.contracts.test.js` (`match-end` DB-down fallback), and `RoomManager.persistence.test.js` (`_recordMatchResult`).
-- [~] **Mobile-input contract tests (required for all new games):** Sticker Hit throw/store/equip covered in jsdom (`StickerHitScene.test.js`); extend pattern to other games with touch-heavy HUDs.
-- [~] **Dependency degradation tests (required for all new games):** Sticker manifest client fetch paths covered (`stickerManifest.test.js`); word-scramble dictionary covered elsewhere; extend per new HTTP dependency.
-- [~] **Playable-state invariant tests (required for all new games):** Sticker Hit ring layout covered (`stageLayoutInvariants` + fuzz); other game families still open where randomness applies.
+- [x] ~~**Mobile-input contract tests (required for all new games):**~~ — Sticker Hit: `StickerHitScene.test.js` + HUD `sticker-hit/index.test.js`. Memory Match card flip: `MemoryMatchScene.test.js` (jsdom). Further games: repeat pattern when adding touch-heavy HUDs.
+- [x] ~~**Dependency degradation tests (required for all new games):**~~ — Sticker manifest: `stickerManifest.test.js`. Word-scramble dictionary: `dictionary.test.js`. Public profile API: `publicProfileFetch.js` (AbortSignal timeout) + `publicProfileFetch.test.js`.
+- [x] ~~**Playable-state invariant tests (required for all new games):**~~ — Sticker Hit ring: `stageLayoutInvariants` + fuzz in `GameState.test.js`. Memory Match shuffle: each `pairId` appears exactly twice after `start()` (fuzz in `memory-match/GameState.test.js`). Extend per new random game family.
 
 ## Sticker Hit — user story / parity checklist (2026-04-11)
 
@@ -70,22 +70,22 @@ Legend: `[x]` shipped in current product direction · `[~]` partial / cosmetic o
 
 **Epic 1 — core loop**
 
-- [x] **US01** Tap / straight-line throw at fixed feel — shared `THROW_FLIGHT_MS` / wobble in `gameConfig`; client predicts rim impact (`270 - targetRotationDeg` at `approxServerNow + flight`) and lerps toward moving rim; `serverNow` clock skew smoothing.
+- [x] **US01** Tap / straight-line throw at fixed feel — shared `THROW_FLIGHT_MS` / wobble in `gameConfig`; client + server resolve impact via `resolveThrowAgainstDisc` (`THROW_PATH_SAMPLES`) with `approxServerNow` + `serverNow` skew smoothing; projectile lerps to predicted rim.
 - [x] **US02** Safe hit embeds and rotates with target — `stuckStickers` + `targetGroup` rotation.
 - [x] **US03** Target rotation speed / direction / pause — shared timeline segments + DPS bands per stage.
-- [x] **US04** Overlap fail + bounce — collision ends run; crash FX uses rim **outward normal + tangent** debris (multi-chip “rebound”) from `throwFx.impactAngle`.
+- [x] **US04** Overlap fail + bounce — collision ends run; crash FX uses rim **outward normal + tangent** debris (multi-chip “rebound”) from `throwFx.impactAngle`; server sets `throwFx.reboundTangentDeg` for authoritative tangent.
 - [x] **US05** Final sticker / stage beat “break” feel — **shatter burst** on `stageBreakSeq` increase; `throwFx` persists across tick broadcasts for VFX de-dupe by `seq`.
 - [x] **Spikes vs knives** — `kind` + wider spike angular threshold.
 
 **Epic 2 — HUD**
 
 - [x] **US06** Ammo stack — per-stage throw chips (`sh-ammo`).
-- [x] **US07** Boss / stage prominence — five-stage ladder; **BOSS** label on boss tier.
-- [x] **US08** Apple currency HUD — match `apples` + opponent apples in dock.
+- [x] **US07** Boss / stage prominence — ladder length from `totalStages` (default five; grows with `MARATHON_ROUNDS`); **BOSS** label on boss tier.
+- [x] **US08** Apple currency HUD — match `apples` + opponent apples in **dock** (`StickerHitScene` `#sh-apples`) and **top HUD** (`createHUD` apple row).
 
 **Epic 3–4 — boss, apples, store**
 
-- [x] **US09** Fifth stage boss tier — `STAGES[4].isBoss` with harder counts.
+- [x] **US09** Boss cadence — base `STAGES[4]` is boss; with `MARATHON_ROUNDS` > 1, every fifth global stage (4, 9, 14, …) is boss with scaled difficulty (`buildExpandedStageDefinitions`).
 - [x] **US10** Boss defeated feedback — `BOSS DOWN!` + `bossSkinUnlocked`.
 - [x] **US11** Equip / meta — **match-scoped** `ownedSkinIds`, `equippedSkinId`, `boss_glow` equip; gold / tint on throws from server state.
 - [x] **US12–13** Ring apples + pickup + `apples` counter — server ring + pickup + spark `throwFx.appleBonus`.

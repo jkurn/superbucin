@@ -1,6 +1,13 @@
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateStickerHitStageLayout } from '../../../shared/sticker-hit/stageLayoutInvariants.js';
+import { normalizeDeg } from '../../../shared/sticker-hit/timeline.js';
+import {
+  STICKER_HIT_STATE_VIEW_OPPONENT_KEYS,
+  STICKER_HIT_STATE_VIEW_STAGE_KEYS,
+  STICKER_HIT_STATE_VIEW_TOP_KEYS,
+  STICKER_HIT_STATE_VIEW_YOU_KEYS,
+} from '../../../shared/sticker-hit/stickerHitStateViewKeys.js';
 import { GameState, GAME_CONFIG } from './GameState.js';
 
 function createGame() {
@@ -117,6 +124,9 @@ describe('Sticker Hit GameState', () => {
     assert.equal(end.winnerId, p2.id);
     assert.equal(game.stateByPlayer[p1.id].crashed, true);
     assert.equal(game.phase, 'finished');
+    const fx = game.stateByPlayer[p1.id].throwFx;
+    assert.equal(fx?.type, 'crash');
+    assert.equal(fx?.reboundTangentDeg, normalizeDeg((fx?.impactAngle ?? 0) + 90));
   });
 
   it('clearing stage advances to next stage', () => {
@@ -158,7 +168,7 @@ describe('Sticker Hit GameState', () => {
     game.handleAction(p1.id, { type: 'throw-sticker' });
     assert.equal(game.stateByPlayer[p1.id].finished, false);
     assert.equal(game.stateByPlayer[p1.id].stageIndex, 1);
-    assert.equal(game.stateByPlayer[p1.id].stage.stickersTotal, GAME_CONFIG.STAGES[1].stickersToLand);
+    assert.equal(game.stateByPlayer[p1.id].stage.stickersTotal, game.stageDefinitions[1].stickersToLand);
   });
 
   it('finishing final stage emits winner', () => {
@@ -167,11 +177,11 @@ describe('Sticker Hit GameState', () => {
     game.active = true;
     game.phase = 'playing';
 
-    const last = GAME_CONFIG.STAGES.length - 1;
+    const last = game.stageDefinitions.length - 1;
     game.stateByPlayer[p1.id].stageIndex = last;
     game.stateByPlayer[p1.id].stage = {
       stageIndex: last,
-      isBoss: !!GAME_CONFIG.STAGES[last]?.isBoss,
+      isBoss: !!game.stageDefinitions[last]?.isBoss,
       stickersTotal: 1,
       stickersRemaining: 1,
       obstacleStickers: [],
@@ -408,13 +418,39 @@ describe('Sticker Hit GameState', () => {
     assert.equal(end.data.stickerHitPersist.a2.apples, 0);
   });
 
+  it('_buildView keys match sticker-hit public wire contract', () => {
+    const { game, p1, p2 } = createGame();
+    currentGame = game;
+    game.active = true;
+    game.phase = 'playing';
+    const timeline = { startedAt: Date.now(), initialAngle: 0, segments: [{ atMs: 0, dps: 0 }] };
+    const stage = {
+      stageIndex: 0,
+      isBoss: false,
+      stickersTotal: 2,
+      stickersRemaining: 2,
+      obstacleStickers: [],
+      ringApples: [],
+      stuckStickers: [],
+      timeline,
+    };
+    game.stateByPlayer[p1.id].stage = stage;
+    game.stateByPlayer[p2.id].stage = { ...stage };
+    const view = game._buildView(p1.id);
+    assert.deepEqual(new Set(Object.keys(view)), new Set(STICKER_HIT_STATE_VIEW_TOP_KEYS));
+    assert.deepEqual(new Set(Object.keys(view.you)), new Set(STICKER_HIT_STATE_VIEW_YOU_KEYS));
+    assert.deepEqual(new Set(Object.keys(view.opponent)), new Set(STICKER_HIT_STATE_VIEW_OPPONENT_KEYS));
+    assert.deepEqual(new Set(Object.keys(view.you.stage)), new Set(STICKER_HIT_STATE_VIEW_STAGE_KEYS));
+    assert.deepEqual(new Set(Object.keys(view.opponent.stage)), new Set(STICKER_HIT_STATE_VIEW_STAGE_KEYS));
+  });
+
   it('fuzz: _createStage layouts satisfy ring + obstacle angular invariants', () => {
     const { game } = createGame();
     currentGame = game;
     const createStage = game._createStage.bind(game);
     const iterations = 400;
     for (let n = 0; n < iterations; n += 1) {
-      for (let stageIndex = 0; stageIndex < GAME_CONFIG.STAGES.length; stageIndex += 1) {
+      for (let stageIndex = 0; stageIndex < game.stageDefinitions.length; stageIndex += 1) {
         const stage = createStage(stageIndex);
         const violations = validateStickerHitStageLayout(stage, GAME_CONFIG);
         assert.deepEqual(
@@ -424,6 +460,18 @@ describe('Sticker Hit GameState', () => {
         );
       }
     }
+  });
+
+  it('migrateReconnectSocket moves stateByPlayer entry to new socket id', () => {
+    const { game, p1 } = createGame();
+    currentGame = game;
+    const oldId = p1.id;
+    const newId = 'sock_after_rejoin';
+    game.stateByPlayer[oldId].apples = 42;
+    p1.id = newId;
+    game.migrateReconnectSocket(oldId, newId);
+    assert.equal(game.stateByPlayer[newId].apples, 42);
+    assert.equal(game.stateByPlayer[oldId], undefined);
   });
 });
 

@@ -5,8 +5,10 @@ import {
   obstacleCenterMinGap,
   ringAppleMinSeparation,
 } from '../../../shared/sticker-hit/stageLayoutInvariants.js';
+import { buildExpandedStageDefinitions } from '../../../shared/sticker-hit/marathonStages.js';
 import { stickerHitPersistShapeFromPlayerState } from '../../../shared/sticker-hit/stickerHitProgress.js';
-import { normalizeDeg, targetRotationDeg } from '../../../shared/sticker-hit/timeline.js';
+import { resolveThrowAgainstDisc } from '../../../shared/sticker-hit/throwResolve.js';
+import { normalizeDeg } from '../../../shared/sticker-hit/timeline.js';
 
 export const GAME_CONFIG = STICKER_HIT_GAME_CONFIG;
 
@@ -63,28 +65,6 @@ function placeRingApples(wantCount, obstacleAngles) {
   return out;
 }
 
-function collidesOccupied(impactAngle, obstacleStickers, stuckStickers) {
-  for (const o of obstacleStickers) {
-    const th = o.kind === 'spike'
-      ? GAME_CONFIG.COLLISION_DEGREES + GAME_CONFIG.SPIKE_EXTRA_DEGREES
-      : GAME_CONFIG.COLLISION_DEGREES;
-    if (angularDistanceDeg(o.angle, impactAngle) < th) return true;
-  }
-  for (const s of stuckStickers) {
-    if (angularDistanceDeg(s.angle, impactAngle) < GAME_CONFIG.COLLISION_DEGREES) return true;
-  }
-  return false;
-}
-
-function findAppleHitIndex(ringApples, impactAngle) {
-  for (let i = 0; i < ringApples.length; i += 1) {
-    if (angularDistanceDeg(ringApples[i].angle, impactAngle) < GAME_CONFIG.APPLE_HIT_DEGREES) {
-      return i;
-    }
-  }
-  return -1;
-}
-
 function buildTimeline(stageCfg) {
   const segments = [];
   let t = 0;
@@ -117,6 +97,9 @@ export class GameState {
     this.pausedAt = 0;
     this.endedAt = 0;
 
+    /** @type {typeof GAME_CONFIG.STAGES} */
+    this.stageDefinitions = buildExpandedStageDefinitions(GAME_CONFIG);
+
     this.stateByPlayer = {
       [player1.id]: this._buildInitialPlayerState(player1.id),
       [player2.id]: this._buildInitialPlayerState(player2.id),
@@ -145,7 +128,10 @@ export class GameState {
   }
 
   _createStage(stageIndex) {
-    const stageCfg = GAME_CONFIG.STAGES[stageIndex];
+    const stageCfg = this.stageDefinitions[stageIndex];
+    if (!stageCfg) {
+      throw new Error(`Sticker Hit: invalid stageIndex ${stageIndex} (len ${this.stageDefinitions.length})`);
+    }
     const minGap = obstacleCenterMinGap(GAME_CONFIG);
     const slots = (stageCfg.obstacles || 0) + (stageCfg.spikes || 0);
     const obstacleAngles = randomAngles(slots, minGap);
@@ -194,6 +180,18 @@ export class GameState {
       this.countdownRemainingMs = Math.max(0, this.countdownRemainingMs - elapsed);
     }
     this._clearTimers();
+  }
+
+  /**
+   * Re-key per-socket state after RoomManager assigns a new socket id on reconnect.
+   * (p1/p2 player objects are the same references with updated `.id`.)
+   */
+  migrateReconnectSocket(oldId, newId) {
+    if (!oldId || !newId || oldId === newId) return;
+    const ps = this.stateByPlayer[oldId];
+    if (!ps) return;
+    this.stateByPlayer[newId] = ps;
+    delete this.stateByPlayer[oldId];
   }
 
   resume() {
@@ -310,12 +308,26 @@ export class GameState {
     if (!ps || ps.crashed || ps.finished) return;
 
     const stage = ps.stage;
-    const rotation = targetRotationDeg(stage.timeline, Date.now() + flightMs);
-    const impactAngle = normalizeDeg(270 - rotation);
+    const nowMs = Date.now();
+    const resolved = resolveThrowAgainstDisc({
+      timeline: stage.timeline,
+      nowMs,
+      flightMs,
+      obstacleStickers: stage.obstacleStickers,
+      stuckStickers: stage.stuckStickers,
+      ringApples: stage.ringApples || [],
+      cfg: GAME_CONFIG,
+      sampleCount: GAME_CONFIG.THROW_PATH_SAMPLES,
+    });
 
-    if (collidesOccupied(impactAngle, stage.obstacleStickers, stage.stuckStickers)) {
+    if (resolved.crash) {
       ps.throwFxSeq += 1;
-      ps.throwFx = { type: 'crash', impactAngle, seq: ps.throwFxSeq };
+      ps.throwFx = {
+        type: 'crash',
+        impactAngle: resolved.impactAngle,
+        seq: ps.throwFxSeq,
+        reboundTangentDeg: normalizeDeg(resolved.impactAngle + 90),
+      };
       ps.crashed = true;
       ps.crashedAt = Date.now();
       this.broadcastState();
@@ -323,8 +335,9 @@ export class GameState {
       return;
     }
 
+    const { impactAngle, appleIdx } = resolved;
+
     let appleBonus = false;
-    const appleIdx = findAppleHitIndex(stage.ringApples || [], impactAngle);
     if (appleIdx >= 0) {
       stage.ringApples.splice(appleIdx, 1);
       ps.apples += 1;
@@ -342,9 +355,9 @@ export class GameState {
 
     if (stage.stickersRemaining === 0) {
       ps.stageBreakSeq += 1;
-      const clearedBoss = !!GAME_CONFIG.STAGES[ps.stageIndex]?.isBoss;
+      const clearedBoss = !!ps.stage.isBoss;
       const nextStage = ps.stageIndex + 1;
-      if (nextStage >= GAME_CONFIG.STAGES.length) {
+      if (nextStage >= this.stageDefinitions.length) {
         ps.finished = true;
         ps.finishedAt = Date.now();
         if (clearedBoss) ps.bossSkinUnlocked = true;
@@ -429,7 +442,7 @@ export class GameState {
       phase: this.phase,
       serverNow: Date.now(),
       countdownMsRemaining,
-      totalStages: GAME_CONFIG.STAGES.length,
+      totalStages: this.stageDefinitions.length,
       collisionDegrees: GAME_CONFIG.COLLISION_DEGREES,
       skins: GAME_CONFIG.SKINS,
       you: {
