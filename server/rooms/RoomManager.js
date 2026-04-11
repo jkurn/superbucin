@@ -654,6 +654,10 @@ export class RoomManager {
       }
     }
 
+    if (room.game && room.gameType === 'sticker-hit' && typeof room.game.migrateReconnectSocket === 'function') {
+      room.game.migrateReconnectSocket(oldId, socket.id);
+    }
+
     const otherPlayer = room.players.find((p) => p.id !== socket.id);
     if (otherPlayer) {
       otherPlayer.socket.emit('opponent-reconnected');

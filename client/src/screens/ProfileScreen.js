@@ -74,14 +74,36 @@ const GAME_NAMES = {
   'connect-four': '\ud83d\udfe1 Connect Four',
   'quiz-race': '\ud83e\udde0\u26a1 Blitz Trivia',
   'battleship-mini': '\ud83d\udea2 Sink Squad',
+  'sticker-hit': '\ud83c\udff7\ufe0f\ud83c\udfaf Sticker Hit',
 };
+
+function formatStickerEquippedSkin(id) {
+  if (!id) return 'Default';
+  if (id === 'boss_glow') return 'Boss glow';
+  return id.replace(/_/g, ' ');
+}
+
+function renderStickerHitProgressCard(stickerHit) {
+  const skins = Array.isArray(stickerHit.ownedSkinIds) ? stickerHit.ownedSkinIds.length : 0;
+  return `
+    <div class="stat-card stat-card-sticker-hit">
+      <div class="stat-card-title">Sticker Hit — your account</div>
+      <div class="stat-card-row"><span>Banked apples</span><strong>${stickerHit.apples}</strong></div>
+      <div class="stat-card-row"><span>Skins owned</span><strong>${skins}</strong></div>
+      <div class="stat-card-row"><span>Equipped</span><strong>${formatStickerEquippedSkin(stickerHit.equippedSkinId)}</strong></div>
+      <div class="stat-card-row"><span>Boss skin</span><strong>${stickerHit.bossSkinUnlocked ? 'Unlocked' : 'Locked'}</strong></div>
+    </div>
+  `;
+}
 
 async function showStatsSection(userManager) {
   const container = document.getElementById('profile-content');
   container.innerHTML = '<div class="profile-loading">Loading stats...</div>';
 
   const stats = await userManager.fetchStats();
-  if (!stats.length) {
+  const stickerHit = !userManager.isGuest ? userManager.profile?.stickerHit : null;
+
+  if (!stats.length && !stickerHit) {
     container.innerHTML = '<div class="profile-empty">No games played yet! Go play some games \ud83c\udfae</div>';
     return;
   }
@@ -90,13 +112,12 @@ async function showStatsSection(userManager) {
   const totalGames = stats.reduce((s, x) => s + x.games_played, 0);
   const winRate = totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0;
 
-  container.innerHTML = `
-    <div class="stats-summary">
-      <div class="stat-big"><span class="stat-big-num">${totalGames}</span><span class="stat-big-label">Games</span></div>
-      <div class="stat-big"><span class="stat-big-num">${totalWins}</span><span class="stat-big-label">Wins</span></div>
-      <div class="stat-big"><span class="stat-big-num">${winRate}%</span><span class="stat-big-label">Win Rate</span></div>
-    </div>
-    <div class="stats-grid">
+  const stickerBlock = stickerHit
+    ? `<div class="profile-sticker-hit-wrap">${renderStickerHitProgressCard(stickerHit)}</div>`
+    : '';
+
+  const statsGrid = stats.length
+    ? `<div class="stats-grid">
       ${stats.map((s) => `
         <div class="stat-card">
           <div class="stat-card-title">${GAME_NAMES[s.game_type] || s.game_type}</div>
@@ -106,7 +127,17 @@ async function showStatsSection(userManager) {
           <div class="stat-card-row"><span>Points</span><strong>${s.total_points}</strong></div>
         </div>
       `).join('')}
+    </div>`
+    : '<div class="profile-empty profile-sticker-stats-hint">No Supabase per-game rows yet — Sticker Hit progress above updates after matches.</div>';
+
+  container.innerHTML = `
+    <div class="stats-summary">
+      <div class="stat-big"><span class="stat-big-num">${totalGames}</span><span class="stat-big-label">Games</span></div>
+      <div class="stat-big"><span class="stat-big-num">${totalWins}</span><span class="stat-big-label">Wins</span></div>
+      <div class="stat-big"><span class="stat-big-num">${winRate}%</span><span class="stat-big-label">Win Rate</span></div>
     </div>
+    ${stickerBlock}
+    ${statsGrid}
   `;
 }
 

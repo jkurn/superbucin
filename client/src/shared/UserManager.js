@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient.js';
 import { AVATARS } from './ui/constants.js';
 import { captureEvent, resetAnalyticsIdentity } from './analytics.js';
+import { sanitizeStickerHitProgress } from '../../../shared/sticker-hit/stickerHitProgress.js';
 
 const ADJECTIVES = [
   'Sleepy', 'Spicy', 'Fluffy', 'Sneaky', 'Wobbly', 'Turbo', 'Cosmic',
@@ -132,6 +133,7 @@ export class UserManager {
         avatarUrl: data.avatar_url,
         bio: data.bio || '',
         points: data.points || 0,
+        stickerHit: sanitizeStickerHitProgress(data.sticker_hit),
       };
     } else {
       this.profile = {
@@ -141,6 +143,7 @@ export class UserManager {
         avatarUrl: authUser.user_metadata?.avatar_url || generateGuestAvatar(),
         bio: '',
         points: 0,
+        stickerHit: sanitizeStickerHitProgress({}),
       };
     }
     this._notify();
@@ -232,6 +235,7 @@ export class UserManager {
       .single();
     if (data) {
       this.profile.points = data.points || 0;
+      this.profile.stickerHit = sanitizeStickerHitProgress(data.sticker_hit);
       this._notify();
     }
   }

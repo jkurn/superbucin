@@ -1152,6 +1152,19 @@
     }
     .stat-card-row strong { color: white; }
 
+    .profile-sticker-hit-wrap {
+      margin-bottom: 0.55rem;
+    }
+    .stat-card-sticker-hit {
+      border-color: rgba(155, 192, 223, 0.22);
+    }
+    .profile-sticker-stats-hint {
+      padding: 0.75rem 0 0;
+      font-size: 0.78rem;
+      color: #8a8ab0;
+      text-align: center;
+    }
+
     /* Achievements */
     .achievements-grid {
       display: flex;

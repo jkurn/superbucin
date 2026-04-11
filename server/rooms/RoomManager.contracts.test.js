@@ -6,6 +6,60 @@ import {
   assertRequiredKeys,
   assertAllowedKeysOnly,
 } from '../test-helpers/payloadShape.js';
+import {
+  STICKER_HIT_STATE_VIEW_OPPONENT_KEYS,
+  STICKER_HIT_STATE_VIEW_STAGE_KEYS,
+  STICKER_HIT_STATE_VIEW_TOP_KEYS,
+  STICKER_HIT_STATE_VIEW_YOU_KEYS,
+} from '../../shared/sticker-hit/stickerHitStateViewKeys.js';
+
+function mkStickerHitStageSlice(stageIndex) {
+  return {
+    stageIndex,
+    isBoss: false,
+    stickersTotal: 2,
+    stickersRemaining: 2,
+    obstacleStickers: [],
+    stuckStickers: [],
+    ringApples: [],
+    timeline: { startedAt: 0, initialAngle: 0, segments: [{ atMs: 0, dps: 0 }] },
+  };
+}
+
+function mkStickerHitWireSlice({ myStage, oppStage, myApples, oppApples }) {
+  return {
+    gameType: 'sticker-hit',
+    phase: 'playing',
+    serverNow: 1000,
+    countdownMsRemaining: 0,
+    totalStages: 5,
+    collisionDegrees: 10,
+    skins: [],
+    you: {
+      crashed: false,
+      finished: false,
+      stageIndex: myStage,
+      apples: myApples,
+      bossSkinUnlocked: false,
+      stageBreakSeq: 0,
+      throwFx: null,
+      throwFxSeq: 0,
+      ownedSkinIds: [],
+      equippedSkinId: null,
+      stage: mkStickerHitStageSlice(myStage),
+    },
+    opponent: {
+      crashed: false,
+      finished: false,
+      stageIndex: oppStage,
+      apples: oppApples,
+      bossSkinUnlocked: false,
+      stageBreakSeq: 0,
+      equippedSkinId: null,
+      stage: mkStickerHitStageSlice(oppStage),
+    },
+  };
+}
 
 describe('RoomManager — handleGameEvent contracts', () => {
   let rm, io;
@@ -232,17 +286,37 @@ describe('RoomManager — handleGameEvent contracts', () => {
       rm.joinRoom(joiner, code);
       const room = rm.rooms.get(code);
 
+      const hostSlice = mkStickerHitWireSlice({
+        myStage: 2, oppStage: 1, myApples: 3, oppApples: 0,
+      });
+      const joinerSlice = mkStickerHitWireSlice({
+        myStage: 1, oppStage: 2, myApples: 0, oppApples: 3,
+      });
+
       await rm.handleGameEvent(room, 'sticker-hit-state', {
         byPlayer: {
-          host: { stage: 2, remain: 3 },
-          joiner: { stage: 1, remain: 7 },
+          host: hostSlice,
+          joiner: joinerSlice,
         },
       });
 
-      assert.deepEqual(host.lastEmit('sticker-hit-state'), { stage: 2, remain: 3 });
-      assert.deepEqual(joiner.lastEmit('sticker-hit-state'), { stage: 1, remain: 7 });
-      assertAllowedKeysOnly(host.lastEmit('sticker-hit-state'), ['stage', 'remain'], 'host sticker-hit-state');
-      assertAllowedKeysOnly(joiner.lastEmit('sticker-hit-state'), ['stage', 'remain'], 'joiner sticker-hit-state');
+      assert.deepEqual(host.lastEmit('sticker-hit-state'), hostSlice);
+      assert.deepEqual(joiner.lastEmit('sticker-hit-state'), joinerSlice);
+
+      const assertStickerHitSliceShape = (slice, label) => {
+        assertRequiredKeys(slice, STICKER_HIT_STATE_VIEW_TOP_KEYS, label);
+        assertAllowedKeysOnly(slice, STICKER_HIT_STATE_VIEW_TOP_KEYS, label);
+        assertRequiredKeys(slice.you, STICKER_HIT_STATE_VIEW_YOU_KEYS, `${label}.you`);
+        assertAllowedKeysOnly(slice.you, STICKER_HIT_STATE_VIEW_YOU_KEYS, `${label}.you`);
+        assertRequiredKeys(slice.opponent, STICKER_HIT_STATE_VIEW_OPPONENT_KEYS, `${label}.opponent`);
+        assertAllowedKeysOnly(slice.opponent, STICKER_HIT_STATE_VIEW_OPPONENT_KEYS, `${label}.opponent`);
+        assertRequiredKeys(slice.you.stage, STICKER_HIT_STATE_VIEW_STAGE_KEYS, `${label}.you.stage`);
+        assertAllowedKeysOnly(slice.you.stage, STICKER_HIT_STATE_VIEW_STAGE_KEYS, `${label}.you.stage`);
+        assertRequiredKeys(slice.opponent.stage, STICKER_HIT_STATE_VIEW_STAGE_KEYS, `${label}.opponent.stage`);
+        assertAllowedKeysOnly(slice.opponent.stage, STICKER_HIT_STATE_VIEW_STAGE_KEYS, `${label}.opponent.stage`);
+      };
+      assertStickerHitSliceShape(host.lastEmit('sticker-hit-state'), 'host sticker-hit-state');
+      assertStickerHitSliceShape(joiner.lastEmit('sticker-hit-state'), 'joiner sticker-hit-state');
     });
 
     it('match-end still emits with zero points when persistence fails', async () => {

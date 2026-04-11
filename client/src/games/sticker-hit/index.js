@@ -39,6 +39,10 @@ export const stickerHitGame = {
         <span class="sh-pill">You: <strong id="sh-hud-you">0/0</strong></span>
         <span class="sh-pill">Sayang: <strong id="sh-hud-opp">0/0</strong></span>
       </div>
+      <div class="sh-hud-row sh-hud-apples">
+        <span class="sh-pill">🍎 You: <strong id="sh-hud-apple-you">0</strong></span>
+        <span class="sh-pill">🍎 Sayang: <strong id="sh-hud-apple-opp">0</strong></span>
+      </div>
       <div class="sh-hud-race">Race mode: first to clear all stages. Crash = instant loss.</div>
       <div class="sh-hud-status" id="sh-hud-status">Tap to throw sticker!</div>
     `;
@@ -55,9 +59,15 @@ export const stickerHitGame = {
 
       const myEl = document.getElementById('sh-hud-you');
       const oppEl = document.getElementById('sh-hud-opp');
+      const myAppleEl = document.getElementById('sh-hud-apple-you');
+      const oppAppleEl = document.getElementById('sh-hud-apple-opp');
       const statusEl = document.getElementById('sh-hud-status');
       if (myEl) myEl.textContent = `${Math.min(myStage, total)}/${total}`;
       if (oppEl) oppEl.textContent = `${Math.min(oppStage, total)}/${total}`;
+      const myApples = Number(state.you?.apples);
+      const oppApples = Number(state.opponent?.apples);
+      if (myAppleEl) myAppleEl.textContent = String(Number.isFinite(myApples) ? myApples : 0);
+      if (oppAppleEl) oppAppleEl.textContent = String(Number.isFinite(oppApples) ? oppApples : 0);
 
       if (!statusEl) return;
       if (state.phase === 'countdown') {

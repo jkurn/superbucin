@@ -1,3 +1,5 @@
+import { fetchPublicProfile } from './publicProfileFetch.js';
+
 export async function render(overlay, deps, username) {
   const { userManager, showScreen } = deps;
 
@@ -17,8 +19,8 @@ export async function render(overlay, deps, username) {
   `;
 
   try {
-    const res = await fetch(`/api/profile/${encodeURIComponent(username)}`);
-    if (!res.ok) {
+    const result = await fetchPublicProfile(username);
+    if (!result.ok && result.kind === 'http') {
       overlay.innerHTML = `
         <div class="lobby-ui profile-screen">
           <div class="profile-header">
@@ -34,7 +36,23 @@ export async function render(overlay, deps, username) {
       return;
     }
 
-    const data = await res.json();
+    if (!result.ok) {
+      overlay.innerHTML = `
+        <div class="lobby-ui profile-screen">
+          <div class="profile-header">
+            <div class="profile-name">Error</div>
+            <div class="profile-bio">Could not load profile. Try again later.</div>
+          </div>
+          <div class="profile-actions">
+            <button class="btn btn-blue btn-small" id="btn-back-lobby-pub">\u2190 Back to Lobby</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('btn-back-lobby-pub').addEventListener('click', () => showScreen('lobby'));
+      return;
+    }
+
+    const data = result.data;
     const p = data.profile;
     const stats = data.stats || [];
     const achievements = data.achievements || [];
@@ -44,6 +62,7 @@ export async function render(overlay, deps, username) {
       'word-scramble-race': '\ud83d\udcdd Word Scramble',
       'doodle-guess': '\ud83c\udfa8 Doodle Guess',
       'memory-match': '\ud83e\udde0 Memory Match',
+      'sticker-hit': '\ud83c\udff7\ufe0f\ud83c\udfaf Sticker Hit',
     };
 
     const totalWins = stats.reduce((s, x) => s + (x.wins || 0), 0);

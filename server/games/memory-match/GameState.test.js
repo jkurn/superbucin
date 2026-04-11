@@ -109,6 +109,32 @@ describe('Memory Match GameState', () => {
     }
   });
 
+  it('fuzz: each started board has every pairId exactly twice (playable invariant)', () => {
+    const iterations = 50;
+    for (let n = 0; n < iterations; n += 1) {
+      for (const gridSize of [4, 6]) {
+        const { game } = createGame({ gridSize });
+        currentGame = game;
+        try {
+          game.start();
+          const expected = gridSize * gridSize;
+          assert.equal(game.slots.length, expected, `iter ${n} grid ${gridSize}`);
+          const counts = {};
+          for (const slot of game.slots) {
+            assert.ok(Object.prototype.hasOwnProperty.call(slot, 'pairId'), `pairId set iter ${n}`);
+            counts[slot.pairId] = (counts[slot.pairId] || 0) + 1;
+          }
+          for (const c of Object.values(counts)) {
+            assert.equal(c, 2, `pair multiplicity iter ${n} grid ${gridSize}`);
+          }
+        } finally {
+          game.stop();
+          currentGame = null;
+        }
+      }
+    }
+  });
+
   it('pause and resume manage speed mode timer safely', () => {
     const { game } = createGame({ speedMode: true });
     currentGame = game;
