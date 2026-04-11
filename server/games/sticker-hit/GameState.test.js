@@ -1,5 +1,6 @@
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { validateStickerHitStageLayout } from '../../../shared/sticker-hit/stageLayoutInvariants.js';
 import { GameState, GAME_CONFIG } from './GameState.js';
 
 function createGame() {
@@ -366,6 +367,24 @@ describe('Sticker Hit GameState', () => {
 
     game.handleAction(p1.id, { type: 'sticker-equip-skin', skinId: 'sparkle_blue' });
     assert.equal(game.stateByPlayer[p1.id].equippedSkinId, 'trail_pink');
+  });
+
+  it('fuzz: _createStage layouts satisfy ring + obstacle angular invariants', () => {
+    const { game } = createGame();
+    currentGame = game;
+    const createStage = game._createStage.bind(game);
+    const iterations = 400;
+    for (let n = 0; n < iterations; n += 1) {
+      for (let stageIndex = 0; stageIndex < GAME_CONFIG.STAGES.length; stageIndex += 1) {
+        const stage = createStage(stageIndex);
+        const violations = validateStickerHitStageLayout(stage, GAME_CONFIG);
+        assert.deepEqual(
+          violations,
+          [],
+          `iteration ${n} stage ${stageIndex}: ${violations.join('; ')}`,
+        );
+      }
+    }
   });
 });
 

@@ -1,13 +1,13 @@
 import { randomInt } from 'crypto';
 import { STICKER_HIT_GAME_CONFIG } from '../../../shared/sticker-hit/gameConfig.js';
+import {
+  angularDistanceDeg,
+  obstacleCenterMinGap,
+  ringAppleMinSeparation,
+} from '../../../shared/sticker-hit/stageLayoutInvariants.js';
 import { normalizeDeg, targetRotationDeg } from '../../../shared/sticker-hit/timeline.js';
 
 export const GAME_CONFIG = STICKER_HIT_GAME_CONFIG;
-
-function angularDistance(a, b) {
-  const diff = Math.abs(normalizeDeg(a) - normalizeDeg(b));
-  return Math.min(diff, 360 - diff);
-}
 
 function secureRandomIntInclusive(min, max) {
   return randomInt(min, max + 1);
@@ -39,7 +39,7 @@ function randomAngles(count, minGap) {
   while (out.length < count && guard < 5000) {
     guard += 1;
     const cand = secureRandomAngle();
-    if (out.every((a) => angularDistance(a, cand) >= minGap)) {
+    if (out.every((a) => angularDistanceDeg(a, cand) >= minGap)) {
       out.push(cand);
     }
   }
@@ -47,17 +47,14 @@ function randomAngles(count, minGap) {
 }
 
 function placeRingApples(wantCount, obstacleAngles) {
-  const minSep = Math.max(
-    GAME_CONFIG.COLLISION_DEGREES + GAME_CONFIG.SPIKE_EXTRA_DEGREES + 8,
-    GAME_CONFIG.APPLE_HIT_DEGREES + 8,
-  );
+  const minSep = ringAppleMinSeparation(GAME_CONFIG);
   const blocked = [...obstacleAngles];
   const out = [];
   let guard = 0;
   while (out.length < wantCount && guard < 8000) {
     guard += 1;
     const cand = secureRandomAngle();
-    if (blocked.every((a) => angularDistance(a, cand) >= minSep)) {
+    if (blocked.every((a) => angularDistanceDeg(a, cand) >= minSep)) {
       out.push({ id: secureRandomSeed(), angle: cand });
       blocked.push(cand);
     }
@@ -70,17 +67,17 @@ function collidesOccupied(impactAngle, obstacleStickers, stuckStickers) {
     const th = o.kind === 'spike'
       ? GAME_CONFIG.COLLISION_DEGREES + GAME_CONFIG.SPIKE_EXTRA_DEGREES
       : GAME_CONFIG.COLLISION_DEGREES;
-    if (angularDistance(o.angle, impactAngle) < th) return true;
+    if (angularDistanceDeg(o.angle, impactAngle) < th) return true;
   }
   for (const s of stuckStickers) {
-    if (angularDistance(s.angle, impactAngle) < GAME_CONFIG.COLLISION_DEGREES) return true;
+    if (angularDistanceDeg(s.angle, impactAngle) < GAME_CONFIG.COLLISION_DEGREES) return true;
   }
   return false;
 }
 
 function findAppleHitIndex(ringApples, impactAngle) {
   for (let i = 0; i < ringApples.length; i += 1) {
-    if (angularDistance(ringApples[i].angle, impactAngle) < GAME_CONFIG.APPLE_HIT_DEGREES) {
+    if (angularDistanceDeg(ringApples[i].angle, impactAngle) < GAME_CONFIG.APPLE_HIT_DEGREES) {
       return i;
     }
   }
@@ -145,7 +142,7 @@ export class GameState {
 
   _createStage(stageIndex) {
     const stageCfg = GAME_CONFIG.STAGES[stageIndex];
-    const minGap = GAME_CONFIG.COLLISION_DEGREES + GAME_CONFIG.SPIKE_EXTRA_DEGREES + 4;
+    const minGap = obstacleCenterMinGap(GAME_CONFIG);
     const slots = (stageCfg.obstacles || 0) + (stageCfg.spikes || 0);
     const obstacleAngles = randomAngles(slots, minGap);
     const obstacleStickers = obstacleAngles.map((angle, i) => ({

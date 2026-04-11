@@ -100,7 +100,7 @@ Legend: `[x]` shipped in current product direction · `[~]` partial / cosmetic o
 
 - [ ] Mobile-input contract tests (throw, store, equip buttons) in jsdom or browser harness.
 - [~] Sticker manifest degradation — runtime timeout + errors; add **automated** tests (see global gate above).
-- [ ] Fuzz / invariant tests for ring placement (apple vs obstacle angular separation) under worst random draws.
+- [x] ~~Fuzz / invariant tests for ring placement (apple vs obstacle angular separation) under worst random draws.~~ — Done: `shared/sticker-hit/stageLayoutInvariants.js` + `stageLayoutInvariants.test.js` + fuzz in `server/games/sticker-hit/GameState.test.js`.
 
 ## Engineering scorecard (run weekly)
 
