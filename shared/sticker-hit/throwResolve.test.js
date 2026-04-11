@@ -11,6 +11,23 @@ describe('throwResolve', () => {
     assert.equal(reboundHeadingDegFromImpact(270), 270);
   });
 
+  it('reboundHeadingDegFromImpact (cos,sin) equals legacy tangent vector (-cos θ, sin θ)', () => {
+    const legacyTangent = (deg) => {
+      const ir = (deg * Math.PI) / 180;
+      return { x: -Math.cos(ir), y: Math.sin(ir) };
+    };
+    const fromHeading = (headingDeg) => {
+      const r = (normalizeDeg(headingDeg) * Math.PI) / 180;
+      return { x: Math.cos(r), y: Math.sin(r) };
+    };
+    for (const deg of [0, 33, 90, 137, 180, 270, 359]) {
+      const h = reboundHeadingDegFromImpact(deg);
+      const a = legacyTangent(deg);
+      const b = fromHeading(h);
+      assert.ok(Math.abs(a.x - b.x) < 1e-10 && Math.abs(a.y - b.y) < 1e-10, `deg=${deg} h=${h}`);
+    }
+  });
+
   it('detects mid-flight crash that final-only sampling would miss', () => {
     const nowMs = 1000;
     const timeline = {

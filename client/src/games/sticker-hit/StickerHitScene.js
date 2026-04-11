@@ -575,7 +575,8 @@ export class StickerHitScene {
    */
   _spawnCrashBounceFx(throwFx) {
     if (!this.scene || !this.targetGroup) return;
-    const impactAngleDeg = Number(throwFx?.impactAngle);
+    if (!throwFx || throwFx.type !== 'crash') return;
+    const impactAngleDeg = Number(throwFx.impactAngle);
     const rad = (Number.isFinite(impactAngleDeg) ? impactAngleDeg : 0) * (Math.PI / 180);
     const localHit = new THREE.Vector3(
       Math.sin(rad) * TARGET_RADIUS * 0.98,
@@ -585,7 +586,7 @@ export class StickerHitScene {
     const worldHit = localHit.clone().applyMatrix4(this.targetGroup.matrixWorld);
 
     const nLocal = new THREE.Vector3(Math.sin(rad), Math.cos(rad), 0).normalize();
-    const tanDeg = Number.isFinite(Number(throwFx?.reboundTangentDeg))
+    const tanDeg = Number.isFinite(Number(throwFx.reboundTangentDeg))
       ? Number(throwFx.reboundTangentDeg)
       : reboundHeadingDegFromImpact(impactAngleDeg);
     const tanRad = (normalizeDeg(tanDeg) * Math.PI) / 180;
