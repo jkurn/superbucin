@@ -12,6 +12,7 @@ import { EventBus } from '../../shared/EventBus.js';
 import { resolveThrowAgainstDisc } from '../../../../shared/sticker-hit/throwResolve.js';
 import { STICKER_HIT_GAME_CONFIG } from '../../../../shared/sticker-hit/gameConfig.js';
 import { normalizeDeg, targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
+import { stickerHitGame } from './index.js';
 import { StickerHitScene } from './StickerHitScene.js';
 
 const nodePerformance = globalThis.performance;
@@ -165,6 +166,36 @@ describe('Sticker Hit acceptance — HUD (partial / Done)', () => {
 
     const label = document.getElementById('sh-stage-label');
     assert.ok(label.textContent.includes('BOSS'));
+    scene.destroy();
+  });
+
+  it('createHUD: lobby column updates stage and apple pills from sticker-hit:state', async () => {
+    const overlay = document.getElementById('ui-overlay');
+    const hud = stickerHitGame.createHUD(overlay, {}, {});
+    EventBus.emit('sticker-hit:state', {
+      totalStages: 5,
+      phase: 'playing',
+      you: { stageIndex: 1, apples: 7, crashed: false, finished: false },
+      opponent: { stageIndex: 0, apples: 2, crashed: false, finished: false },
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(document.getElementById('sh-hud-you').textContent, '2/5');
+    assert.equal(document.getElementById('sh-hud-opp').textContent, '1/5');
+    assert.equal(document.getElementById('sh-hud-apple-you').textContent, '7');
+    assert.equal(document.getElementById('sh-hud-apple-opp').textContent, '2');
+    hud.destroy();
+  });
+
+  it('AC US07: marathon-length ladder marks boss pips on indices 4 and 9 (0-based)', async () => {
+    const scene = new StickerHitScene(makeSceneManager(), { sendGameAction: () => {} }, null, {});
+    scene.init();
+    scene.applyState(baseState({ totalStages: 10, you: { ...baseState().you, stageIndex: 3 } }));
+    await new Promise((r) => setTimeout(r, 0));
+    const pips = scene.rootEl.querySelectorAll('#sh-stage-pips .sh-stage-pip');
+    assert.equal(pips.length, 10);
+    assert.equal(pips[4].dataset.boss, 'true');
+    assert.equal(pips[9].dataset.boss, 'true');
+    assert.equal(pips[0].dataset.boss, 'false');
     scene.destroy();
   });
 });

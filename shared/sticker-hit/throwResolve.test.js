@@ -2,9 +2,15 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { STICKER_HIT_GAME_CONFIG as CFG } from './gameConfig.js';
 import { normalizeDeg, targetRotationDeg } from './timeline.js';
-import { findRingAppleHitIndex, resolveThrowAgainstDisc } from './throwResolve.js';
+import { findRingAppleHitIndex, reboundHeadingDegFromImpact, resolveThrowAgainstDisc } from './throwResolve.js';
 
 describe('throwResolve', () => {
+  it('reboundHeadingDegFromImpact matches client rim tangent (-cos θ, sin θ)', () => {
+    assert.equal(reboundHeadingDegFromImpact(0), 180);
+    assert.ok(Math.abs(reboundHeadingDegFromImpact(90) - 90) < 1e-9);
+    assert.equal(reboundHeadingDegFromImpact(270), 270);
+  });
+
   it('detects mid-flight crash that final-only sampling would miss', () => {
     const nowMs = 1000;
     const timeline = {

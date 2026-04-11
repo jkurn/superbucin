@@ -2,6 +2,16 @@ import { angularDistanceDeg } from './stageLayoutInvariants.js';
 import { normalizeDeg, targetRotationDeg } from './timeline.js';
 
 /**
+ * Heading in degrees (0 = +X …) of the rim tangent vector used by the client bounce VFX:
+ * `(-cos θ, sin θ)` in disc-local XY when the impact sits at angle θ° on the rim.
+ */
+export function reboundHeadingDegFromImpact(impactAngleDeg) {
+  const ir = ((Number(impactAngleDeg) || 0) * Math.PI) / 180;
+  const rad = Math.atan2(Math.sin(ir), -Math.cos(ir));
+  return normalizeDeg((rad * 180) / Math.PI);
+}
+
+/**
  * Collision against rim obstacles + stuck stickers (shared server/client rules).
  * @param {number} impactAngleDeg
  * @param {{ angle: number, kind?: string }[]} obstacleStickers

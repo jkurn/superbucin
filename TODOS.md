@@ -73,14 +73,14 @@ Legend: `[x]` shipped in current product direction · `[~]` partial / cosmetic o
 - [x] **US01** Tap / straight-line throw at fixed feel — shared `THROW_FLIGHT_MS` / wobble in `gameConfig`; client + server resolve impact via `resolveThrowAgainstDisc` (`THROW_PATH_SAMPLES`) with `approxServerNow` + `serverNow` skew smoothing; projectile lerps to predicted rim.
 - [x] **US02** Safe hit embeds and rotates with target — `stuckStickers` + `targetGroup` rotation.
 - [x] **US03** Target rotation speed / direction / pause — shared timeline segments + DPS bands per stage.
-- [x] **US04** Overlap fail + bounce — collision ends run; crash FX uses rim **outward normal + tangent** debris (multi-chip “rebound”) from `throwFx.impactAngle`; server sets `throwFx.reboundTangentDeg` for authoritative tangent.
+- [x] **US04** Overlap fail + bounce — collision ends run; crash FX uses rim **outward normal + tangent** debris (multi-chip “rebound”); server sets `throwFx.reboundTangentDeg` via `reboundHeadingDegFromImpact` (shared with client VFX basis).
 - [x] **US05** Final sticker / stage beat “break” feel — **shatter burst** on `stageBreakSeq` increase; `throwFx` persists across tick broadcasts for VFX de-dupe by `seq`.
 - [x] **Spikes vs knives** — `kind` + wider spike angular threshold.
 
 **Epic 2 — HUD**
 
 - [x] **US06** Ammo stack — per-stage throw chips (`sh-ammo`).
-- [x] **US07** Boss / stage prominence — ladder length from `totalStages` (default five; grows with `MARATHON_ROUNDS`); **BOSS** label on boss tier.
+- [x] **US07** Boss / stage prominence — ladder length from `totalStages` (default five; grows with `MARATHON_ROUNDS`); **BOSS** label on boss tier; stage pips `data-boss` on indices 4, 9, … (same cadence as `buildExpandedStageDefinitions`).
 - [x] **US08** Apple currency HUD — match `apples` + opponent apples in **dock** (`StickerHitScene` `#sh-apples`) and **top HUD** (`createHUD` apple row).
 
 **Epic 3–4 — boss, apples, store**

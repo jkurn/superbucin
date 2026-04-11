@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { EventBus } from '../../shared/EventBus.js';
-import { resolveThrowAgainstDisc } from '../../../../shared/sticker-hit/throwResolve.js';
-import { targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
+import { reboundHeadingDegFromImpact, resolveThrowAgainstDisc } from '../../../../shared/sticker-hit/throwResolve.js';
+import { normalizeDeg, targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
 import { GAME_CONFIG } from './config.js';
 import {
   DEFAULT_STICKER_MANIFEST_TIMEOUT_MS,
@@ -570,9 +570,13 @@ export class StickerHitScene {
     step();
   }
 
-  _spawnCrashBounceFx(impactAngleDeg) {
+  /**
+   * @param {{ type: 'crash', impactAngle: number, reboundTangentDeg?: number }} throwFx
+   */
+  _spawnCrashBounceFx(throwFx) {
     if (!this.scene || !this.targetGroup) return;
-    const rad = (Number(impactAngleDeg) * Math.PI) / 180;
+    const impactAngleDeg = Number(throwFx?.impactAngle);
+    const rad = (Number.isFinite(impactAngleDeg) ? impactAngleDeg : 0) * (Math.PI / 180);
     const localHit = new THREE.Vector3(
       Math.sin(rad) * TARGET_RADIUS * 0.98,
       Math.cos(rad) * TARGET_RADIUS * 0.98,
@@ -581,7 +585,11 @@ export class StickerHitScene {
     const worldHit = localHit.clone().applyMatrix4(this.targetGroup.matrixWorld);
 
     const nLocal = new THREE.Vector3(Math.sin(rad), Math.cos(rad), 0).normalize();
-    const tLocal = new THREE.Vector3(-Math.cos(rad), Math.sin(rad), 0).normalize();
+    const tanDeg = Number.isFinite(Number(throwFx?.reboundTangentDeg))
+      ? Number(throwFx.reboundTangentDeg)
+      : reboundHeadingDegFromImpact(impactAngleDeg);
+    const tanRad = (normalizeDeg(tanDeg) * Math.PI) / 180;
+    const tLocal = new THREE.Vector3(Math.cos(tanRad), Math.sin(tanRad), 0).normalize();
     const worldN = nLocal.clone().transformDirection(this.targetGroup.matrixWorld).normalize();
     const worldT = tLocal.clone().transformDirection(this.targetGroup.matrixWorld).normalize();
 
@@ -740,7 +748,7 @@ export class StickerHitScene {
     const fx = state?.you?.throwFx;
     const prevFx = previous?.you?.throwFx;
     if (fx && (!prevFx || fx.seq !== prevFx.seq)) {
-      if (fx.type === 'crash') this._spawnCrashBounceFx(fx.impactAngle);
+      if (fx.type === 'crash') this._spawnCrashBounceFx(fx);
       else if (fx.type === 'stick' && fx.appleBonus) this._spawnAppleBonusFx(fx.impactAngle);
     }
 
@@ -811,6 +819,8 @@ export class StickerHitScene {
         const pip = document.createElement('span');
         pip.className = 'sh-stage-pip';
         pip.dataset.active = i < active ? 'true' : 'false';
+        /** Matches server `buildExpandedStageDefinitions`: boss every fifth global stage index (4, 9, …). */
+        pip.dataset.boss = i % 5 === 4 ? 'true' : 'false';
         pip.style.backgroundImage = `url("${toBackendAssetUrl(i < active ? KENNEY_ASSETS.pipOn : KENNEY_ASSETS.pipOff)}")`;
         this.stagePipsEl.appendChild(pip);
       }

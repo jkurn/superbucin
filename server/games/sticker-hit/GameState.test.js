@@ -1,7 +1,7 @@
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateStickerHitStageLayout } from '../../../shared/sticker-hit/stageLayoutInvariants.js';
-import { normalizeDeg } from '../../../shared/sticker-hit/timeline.js';
+import { reboundHeadingDegFromImpact } from '../../../shared/sticker-hit/throwResolve.js';
 import {
   STICKER_HIT_STATE_VIEW_OPPONENT_KEYS,
   STICKER_HIT_STATE_VIEW_STAGE_KEYS,
@@ -126,7 +126,7 @@ describe('Sticker Hit GameState', () => {
     assert.equal(game.phase, 'finished');
     const fx = game.stateByPlayer[p1.id].throwFx;
     assert.equal(fx?.type, 'crash');
-    assert.equal(fx?.reboundTangentDeg, normalizeDeg((fx?.impactAngle ?? 0) + 90));
+    assert.equal(fx?.reboundTangentDeg, reboundHeadingDegFromImpact(fx?.impactAngle ?? 0));
   });
 
   it('clearing stage advances to next stage', () => {

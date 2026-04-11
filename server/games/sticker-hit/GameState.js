@@ -7,8 +7,7 @@ import {
 } from '../../../shared/sticker-hit/stageLayoutInvariants.js';
 import { buildExpandedStageDefinitions } from '../../../shared/sticker-hit/marathonStages.js';
 import { stickerHitPersistShapeFromPlayerState } from '../../../shared/sticker-hit/stickerHitProgress.js';
-import { resolveThrowAgainstDisc } from '../../../shared/sticker-hit/throwResolve.js';
-import { normalizeDeg } from '../../../shared/sticker-hit/timeline.js';
+import { reboundHeadingDegFromImpact, resolveThrowAgainstDisc } from '../../../shared/sticker-hit/throwResolve.js';
 
 export const GAME_CONFIG = STICKER_HIT_GAME_CONFIG;
 
@@ -326,7 +325,7 @@ export class GameState {
         type: 'crash',
         impactAngle: resolved.impactAngle,
         seq: ps.throwFxSeq,
-        reboundTangentDeg: normalizeDeg(resolved.impactAngle + 90),
+        reboundTangentDeg: reboundHeadingDegFromImpact(resolved.impactAngle),
       };
       ps.crashed = true;
       ps.crashedAt = Date.now();

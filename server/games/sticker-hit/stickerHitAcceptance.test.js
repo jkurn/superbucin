@@ -8,7 +8,7 @@ import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { STICKER_HIT_GAME_CONFIG as CFG } from '../../../shared/sticker-hit/gameConfig.js';
 import { buildExpandedStageDefinitions } from '../../../shared/sticker-hit/marathonStages.js';
-import { resolveThrowAgainstDisc } from '../../../shared/sticker-hit/throwResolve.js';
+import { reboundHeadingDegFromImpact, resolveThrowAgainstDisc } from '../../../shared/sticker-hit/throwResolve.js';
 import { normalizeDeg, targetRotationDeg } from '../../../shared/sticker-hit/timeline.js';
 import { GameState } from './GameState.js';
 
@@ -153,7 +153,7 @@ describe('Sticker Hit acceptance — US04 crash payload (Done)', () => {
     const fx = ps.throwFx;
     assert.equal(fx?.type, 'crash');
     assert.equal(typeof fx?.impactAngle, 'number');
-    assert.equal(fx?.reboundTangentDeg, normalizeDeg(fx.impactAngle + 90));
+    assert.equal(fx?.reboundTangentDeg, reboundHeadingDegFromImpact(fx.impactAngle));
   });
 });
 
