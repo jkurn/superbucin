@@ -13,6 +13,8 @@ function envSource() {
 let initialized = false;
 let identifiedId = null;
 let missingKeyWarned = false;
+/** True after we warn that `posthog-js` has no `init` (e.g. Node test runner vs browser bundle). */
+let sdkSurfaceUnavailableWarned = false;
 
 function hasBrowser() {
   return typeof window !== 'undefined';
@@ -56,6 +58,14 @@ export function initAnalytics() {
     console.warn('[analytics] VITE_POSTHOG_KEY missing; using built-in fallback key.');
   }
 
+  if (typeof posthog.init !== 'function') {
+    if (!sdkSurfaceUnavailableWarned) {
+      sdkSurfaceUnavailableWarned = true;
+      console.warn('[analytics] PostHog SDK init is unavailable in this environment; analytics disabled.');
+    }
+    return false;
+  }
+
   posthog.init(cfg.key, {
     api_host: cfg.host,
     defaults: cfg.defaults,
@@ -80,11 +90,13 @@ function analyticsReady() {
 
 export function captureEvent(eventName, properties = {}) {
   if (!analyticsReady()) return;
+  if (typeof posthog.capture !== 'function') return;
   posthog.capture(eventName, properties);
 }
 
 export function capturePageView(path) {
   if (!analyticsReady() || !hasBrowser()) return;
+  if (typeof posthog.capture !== 'function') return;
   posthog.capture('$pageview', {
     path,
     url: window.location.href,
@@ -107,6 +119,7 @@ export function syncUserIdentity(userManager) {
   if (identifiedId === distinctId) return;
 
   identifiedId = distinctId;
+  if (typeof posthog.identify !== 'function') return;
   posthog.identify(distinctId, {
     displayName: profile.displayName || null,
     username: profile.username || null,
@@ -118,6 +131,7 @@ export function syncUserIdentity(userManager) {
 export function resetAnalyticsIdentity() {
   if (!analyticsReady()) return;
   identifiedId = null;
+  if (typeof posthog.reset !== 'function') return;
   posthog.reset();
 }
 
@@ -125,4 +139,5 @@ export function __resetAnalyticsForTests() {
   initialized = false;
   identifiedId = null;
   missingKeyWarned = false;
+  sdkSurfaceUnavailableWarned = false;
 }

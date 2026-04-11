@@ -8,6 +8,7 @@ import {
   DEFAULT_DOODLE_PACK_ID,
 } from './doodle-guess/prompts.js';
 import { getClientConfig as getVendingClientConfig } from './vending-machine/config.js';
+import { STICKER_HIT_GAME_CONFIG } from '../../shared/sticker-hit/gameConfig.js';
 
 const games = new Map();
 
@@ -108,11 +109,12 @@ export const GameFactory = {
     }
 
     if (gameType === 'sticker-hit') {
+      const sh = STICKER_HIT_GAME_CONFIG;
       return {
-        COUNTDOWN_MS: config.COUNTDOWN_MS,
-        TICK_MS: config.TICK_MS,
-        COLLISION_DEGREES: config.COLLISION_DEGREES,
-        STAGES: config.STAGES,
+        COUNTDOWN_MS: sh.COUNTDOWN_MS,
+        TICK_MS: sh.TICK_MS,
+        COLLISION_DEGREES: sh.COLLISION_DEGREES,
+        STAGES: sh.STAGES,
       };
     }
 

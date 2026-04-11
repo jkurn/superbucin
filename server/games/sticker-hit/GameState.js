@@ -1,24 +1,8 @@
 import { randomInt } from 'crypto';
+import { STICKER_HIT_GAME_CONFIG } from '../../../shared/sticker-hit/gameConfig.js';
+import { normalizeDeg, targetRotationDeg } from '../../../shared/sticker-hit/timeline.js';
 
-export const GAME_CONFIG = {
-  SKIP_SIDE_SELECT: true,
-  COUNTDOWN_MS: 2500,
-  TICK_MS: 100,
-  COLLISION_DEGREES: 14,
-  STAGES: [
-    { stickersToLand: 6, obstacles: 1, minDps: 60, maxDps: 120 },
-    { stickersToLand: 7, obstacles: 2, minDps: 70, maxDps: 150 },
-    { stickersToLand: 8, obstacles: 3, minDps: 85, maxDps: 180 },
-  ],
-  MIN_SEGMENT_MS: 550,
-  MAX_SEGMENT_MS: 1400,
-  TIMELINE_WINDOW_MS: 60_000,
-};
-
-function normalizeDeg(v) {
-  const n = v % 360;
-  return n < 0 ? n + 360 : n;
-}
+export const GAME_CONFIG = STICKER_HIT_GAME_CONFIG;
 
 function angularDistance(a, b) {
   const diff = Math.abs(normalizeDeg(a) - normalizeDeg(b));
@@ -76,22 +60,6 @@ function buildTimeline(stageCfg) {
     initialAngle: secureRandomAngle(),
     segments,
   };
-}
-
-function targetRotationDeg(timeline, now = Date.now()) {
-  const elapsed = Math.max(0, now - timeline.startedAt);
-  let angle = timeline.initialAngle;
-  for (let i = 0; i < timeline.segments.length; i += 1) {
-    const seg = timeline.segments[i];
-    const segStart = seg.atMs;
-    if (elapsed <= segStart) break;
-    const nextStart = timeline.segments[i + 1]?.atMs ?? elapsed;
-    const segEnd = Math.min(elapsed, nextStart);
-    const segElapsed = Math.max(0, segEnd - segStart);
-    angle += (seg.dps * segElapsed) / 1000;
-    if (segEnd >= elapsed) break;
-  }
-  return normalizeDeg(angle);
 }
 
 export class GameState {

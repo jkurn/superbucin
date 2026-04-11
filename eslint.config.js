@@ -38,6 +38,28 @@ export default [
     },
   },
 
+  // Shared pure modules — no DOM / no Node (imported by both)
+  {
+    files: ['shared/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      eqeqeq: ['error', 'always'],
+      'no-console': 'off',
+      'no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_',
+      }],
+    },
+  },
+
   // Server code — Node.js globals
   {
     files: ['server/**/*.js'],

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { EventBus } from '../../shared/EventBus.js';
+import { targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
 
 const KENNEY_ASSETS = {
   stallBg: '/kenney/shooting-gallery/Stall/bg_wood.png',
@@ -14,6 +15,7 @@ const KENNEY_ASSETS = {
 
 const THROW_FLIGHT_MS = 420;
 const TARGET_RADIUS = 2.05;
+const MANIFEST_TIMEOUT_MS = 8000;
 
 function backendOrigin() {
   if (window.location.hostname === 'localhost') return 'http://localhost:3000';
@@ -23,29 +25,6 @@ function backendOrigin() {
 function toBackendAssetUrl(pathname) {
   if (!pathname) return '';
   return `${backendOrigin()}${pathname}`;
-}
-
-function normalizeDeg(v) {
-  const n = v % 360;
-  return n < 0 ? n + 360 : n;
-}
-
-function targetRotationDeg(timeline, now = Date.now()) {
-  if (!timeline) return 0;
-  const elapsed = Math.max(0, now - timeline.startedAt);
-  let angle = timeline.initialAngle;
-  const segments = timeline.segments || [];
-  for (let i = 0; i < segments.length; i += 1) {
-    const seg = segments[i];
-    const segStart = seg.atMs;
-    if (elapsed <= segStart) break;
-    const nextStart = segments[i + 1]?.atMs ?? elapsed;
-    const segEnd = Math.min(elapsed, nextStart);
-    const segElapsed = Math.max(0, segEnd - segStart);
-    angle += (seg.dps * segElapsed) / 1000;
-    if (segEnd >= elapsed) break;
-  }
-  return normalizeDeg(angle);
 }
 
 function secureRandomIndex(maxExclusive) {
@@ -64,20 +43,36 @@ function secureRandomIndex(maxExclusive) {
   return Math.floor(Math.random() * maxExclusive);
 }
 
+/**
+ * @returns {Promise<{ stickers: { src: string, durationMs: number }[], error: null | 'timeout' | 'http' | 'parse' | 'network' }>}
+ */
 async function loadStickerPool() {
+  const url = `${backendOrigin()}/api/sticker-hit/sticker-manifest`;
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), MANIFEST_TIMEOUT_MS);
   try {
-    const res = await fetch(`${backendOrigin()}/api/sticker-hit/sticker-manifest`, { cache: 'no-store' });
-    if (!res.ok) return [];
+    const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+    clearTimeout(tid);
+    if (!res.ok) {
+      return { stickers: [], error: 'http' };
+    }
     const data = await res.json();
-    if (!Array.isArray(data?.stickers)) return [];
-    return data.stickers
+    if (!Array.isArray(data?.stickers)) {
+      return { stickers: [], error: 'parse' };
+    }
+    const stickers = data.stickers
       .filter((x) => x && typeof x.src === 'string' && x.src.length > 0)
       .map((x) => ({
         src: toBackendAssetUrl(x.src),
         durationMs: Number.isFinite(x.durationMs) ? Math.max(200, Number(x.durationMs)) : 1200,
       }));
-  } catch {
-    return [];
+    return { stickers, error: null };
+  } catch (e) {
+    clearTimeout(tid);
+    if (e?.name === 'AbortError') {
+      return { stickers: [], error: 'timeout' };
+    }
+    return { stickers: [], error: 'network' };
   }
 }
 
@@ -106,9 +101,9 @@ export class StickerHitScene {
     this.progressOppEl = null;
     this.stagePipsEl = null;
     this.throwBtnEl = null;
-    this.shooterStickerEl = null;
     this.stickerPool = [];
-    this.imageLoopTimers = new Map();
+    /** @type {null | 'timeout' | 'http' | 'parse' | 'network'} */
+    this._stickerManifestError = null;
     this.throwCooldownUntil = 0;
     this.lastStageSignature = '';
     this.timeMs = 0;
@@ -280,9 +275,12 @@ export class StickerHitScene {
   }
 
   async _hydrateStickerPool() {
-    this.stickerPool = await loadStickerPool();
+    const { stickers, error } = await loadStickerPool();
+    this.stickerPool = stickers;
+    this._stickerManifestError = error;
     this._updateShooterSticker();
     this._syncMarkers();
+    this._renderText();
   }
 
   _stickerForSeed(seed) {
@@ -294,55 +292,6 @@ export class StickerHitScene {
   _pickRandomSticker() {
     if (!this.stickerPool.length) return null;
     return this.stickerPool[secureRandomIndex(this.stickerPool.length)];
-  }
-
-  _clearImageLoop(img) {
-    const timer = this.imageLoopTimers.get(img);
-    if (timer) {
-      clearTimeout(timer);
-      this.imageLoopTimers.delete(img);
-    }
-  }
-
-  _scheduleImageLoop(img, durationMs) {
-    this._clearImageLoop(img);
-    const delay = Math.max(200, Number(durationMs) || 1200);
-    const timer = setTimeout(() => {
-      if (!img.isConnected || !this.rootEl) {
-        this._clearImageLoop(img);
-        return;
-      }
-      const baseSrc = img.dataset.baseSrc;
-      if (!baseSrc) {
-        this._clearImageLoop(img);
-        return;
-      }
-      const loopSrc = `${baseSrc}${baseSrc.includes('?') ? '&' : '?'}loop=${Date.now()}`;
-      img.src = loopSrc;
-      this._scheduleImageLoop(img, delay);
-    }, delay);
-    this.imageLoopTimers.set(img, timer);
-  }
-
-  _setLoopingImage(img, sticker) {
-    if (!img || !sticker?.src) return;
-    img.dataset.baseSrc = sticker.src;
-    img.src = sticker.src;
-    img.onerror = () => {
-      const fallback = this._pickRandomSticker();
-      if (!fallback?.src) return;
-      img.dataset.baseSrc = fallback.src;
-      img.src = fallback.src;
-      this._scheduleImageLoop(img, fallback.durationMs);
-    };
-    this._scheduleImageLoop(img, sticker.durationMs);
-  }
-
-  _clearAllImageLoops() {
-    for (const timer of this.imageLoopTimers.values()) {
-      clearTimeout(timer);
-    }
-    this.imageLoopTimers.clear();
   }
 
   _updateShooterSticker() {
@@ -513,7 +462,11 @@ export class StickerHitScene {
     if (this.progressOppEl) this.progressOppEl.textContent = `${Math.min(oppStage, total)}/${total}`;
     if (this.targetStageLabelEl) this.targetStageLabelEl.textContent = `Stage ${Math.min(myStage, total)} / ${total}`;
     if (this.guideEl) {
-      this.guideEl.textContent = `Race: You ${Math.min(myStage, total)}/${total} vs Opp ${Math.min(oppStage, total)}/${total} | Throw -> gap, sticker hit = crash`;
+      const base = `Race: You ${Math.min(myStage, total)}/${total} vs Opp ${Math.min(oppStage, total)}/${total} | Throw -> gap, sticker hit = crash`;
+      const errLine = this._stickerManifestError
+        ? ` Sticker art: unavailable (${this._stickerManifestError}).`
+        : '';
+      this.guideEl.textContent = base + errLine;
     }
     if (this.stagePipsEl) {
       const active = Math.max(0, Math.min(total, myStage));
@@ -594,17 +547,63 @@ export class StickerHitScene {
     });
   }
 
+  _disposeThreeResources() {
+    this.projectiles.forEach((p) => {
+      p.sprite.removeFromParent();
+      const m = p.sprite.material;
+      if (m) {
+        m.map = null;
+        m.dispose();
+      }
+    });
+    this.projectiles = [];
+
+    this.markerSprites.forEach((s) => {
+      this.targetGroup?.remove(s);
+      const m = s.material;
+      if (m) {
+        m.map = null;
+        m.dispose();
+      }
+    });
+    this.markerSprites = [];
+
+    for (const tex of this.textureCache.values()) {
+      tex.dispose();
+    }
+    this.textureCache.clear();
+
+    if (this.scene) {
+      this.scene.traverse((obj) => {
+        if (obj.geometry) obj.geometry.dispose();
+        const mats = obj.material ? (Array.isArray(obj.material) ? obj.material : [obj.material]) : [];
+        for (const mat of mats) {
+          mat.map = null;
+          mat.dispose();
+        }
+      });
+    }
+
+    this.scene = null;
+    this.camera = null;
+    this.targetGroup = null;
+    this.targetMesh = null;
+    this.targetOverlayMesh = null;
+  }
+
   destroy() {
     EventBus.off('sticker-hit:state', this._onState);
     window.removeEventListener('keydown', this._onKeyDown);
     this.sceneManager.renderer?.domElement.removeEventListener('pointerdown', this._onCanvasTap);
-    this._clearAllImageLoops();
     if (this.throwBtnEl) this.throwBtnEl.removeEventListener('click', this._onShoot);
     this.sceneManager.onUpdate = null;
-    this.markerSprites.forEach((s) => this.targetGroup?.remove(s));
-    this.markerSprites = [];
-    this.projectiles.forEach((p) => this.scene?.remove(p.sprite));
-    this.projectiles = [];
+    this._disposeThreeResources();
+    const aspect = window.innerWidth / Math.max(1, window.innerHeight);
+    const placeholder = new THREE.Scene();
+    placeholder.background = new THREE.Color(0x1a1a2e);
+    const cam = new THREE.PerspectiveCamera(42, aspect, 0.1, 100);
+    cam.position.set(0, 0, 5);
+    this.sceneManager.setScene(placeholder, cam);
     this.rootEl?.remove();
     this.rootEl = null;
   }

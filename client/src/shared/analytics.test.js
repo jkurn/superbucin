@@ -82,6 +82,17 @@ describe('analytics', () => {
     assert.equal(calls.init.length, 0);
   });
 
+  it('initAnalytics returns false when posthog-js has no init (Node / non-browser bundle)', () => {
+    setBrowserWindow('localhost');
+    globalThis.__SUPERBUCIN_ANALYTICS_ENV__ = { VITE_POSTHOG_KEY: 'ph-key' };
+    posthog.init = undefined;
+    __resetAnalyticsForTests();
+    const ok = initAnalytics();
+    assert.equal(ok, false);
+    assert.equal(calls.init.length, 0);
+    assert.ok(warnMessages.some((m) => m.includes('SDK init is unavailable')));
+  });
+
   it('initAnalytics initializes once with env override and browser window', () => {
     setBrowserWindow('localhost');
     globalThis.__SUPERBUCIN_ANALYTICS_ENV__ = {
