@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
+import { GAME_CONFIG } from './config.js';
 import { StickerHitScene } from './StickerHitScene.js';
 
 const nodePerformance = globalThis.performance;
@@ -110,7 +111,7 @@ describe('StickerHitScene input contracts', () => {
     btn.click();
     assert.equal(actions.length, 1);
     assert.equal(actions[0].type, 'throw-sticker');
-    assert.equal(typeof actions[0].flightMs, 'number');
+    assert.equal(actions[0].flightMs, GAME_CONFIG.THROW_FLIGHT_MS);
     scene.destroy();
   });
 

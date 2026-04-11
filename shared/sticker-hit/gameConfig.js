@@ -35,4 +35,11 @@ export const STICKER_HIT_GAME_CONFIG = {
   MIN_SEGMENT_MS: 550,
   MAX_SEGMENT_MS: 1400,
   TIMELINE_WINDOW_MS: 60_000,
+  /** Client + server agree on throw duration; server resolves impact at `now + flightMs`. */
+  THROW_FLIGHT_MS: 420,
+  /** Upper bound for `throw-sticker` flightMs from clients (anti-spam / sanity). */
+  THROW_FLIGHT_MAX_MS: 700,
+  /** Subtle lateral screen wobble on projectile (world units); keep low for “straight” throw read. */
+  THROW_WOBBLE_X: 0.14,
+  THROW_WOBBLE_Y: 0.32,
 };

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { EventBus } from '../../shared/EventBus.js';
-import { targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
+import { normalizeDeg, targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
 import { GAME_CONFIG } from './config.js';
 import {
   DEFAULT_STICKER_MANIFEST_TIMEOUT_MS,
@@ -19,7 +19,6 @@ const KENNEY_ASSETS = {
   pipOn: '/kenney/boardgame/Pieces%20(Yellow)/pieceYellow_multi00.png',
 };
 
-const THROW_FLIGHT_MS = 420;
 const TARGET_RADIUS = 2.05;
 
 function backendOrigin() {
@@ -92,6 +91,9 @@ export class StickerHitScene {
     this.cameraShakeUntil = 0;
     this.targetPulseUntil = 0;
     this.pendingThrows = 0;
+    /** Smoothed `serverNow - Date.now()` so predicted impact matches server `_throwSticker`. */
+    this._serverTimeOffsetMs = 0;
+    this._serverClockSynced = false;
 
     this._onState = (s) => this.applyState(s);
     this._onShoot = () => this.shoot();
@@ -338,6 +340,24 @@ export class StickerHitScene {
     return this.stickerPool[secureRandomIndex(this.stickerPool.length)];
   }
 
+  _approxServerNow() {
+    return Date.now() + (Number.isFinite(this._serverTimeOffsetMs) ? this._serverTimeOffsetMs : 0);
+  }
+
+  /** World-space rim point for disc-local impact angle (degrees), follows rotating `targetGroup`. */
+  _rimWorldAtAngle(impactAngleDeg) {
+    if (!this.targetGroup) {
+      return new THREE.Vector3(0, 0.6 + TARGET_RADIUS * 0.96, 0.52);
+    }
+    const rad = (Number(impactAngleDeg) * Math.PI) / 180;
+    const local = new THREE.Vector3(
+      Math.sin(rad) * TARGET_RADIUS * 0.96,
+      Math.cos(rad) * TARGET_RADIUS * 0.96,
+      0.52,
+    );
+    return local.applyMatrix4(this.targetGroup.matrixWorld);
+  }
+
   _updateShooterSticker() {
     // Shooter uses projectile texture in 3D scene; nothing to update in DOM.
     const sticker = this._pickRandomSticker();
@@ -352,8 +372,9 @@ export class StickerHitScene {
 
     this.throwCooldownUntil = Date.now() + 160;
     this.pendingThrows += 1;
-    this.network.sendGameAction({ type: 'throw-sticker', flightMs: THROW_FLIGHT_MS });
-    this._playThrowAnim();
+    const flightMs = GAME_CONFIG.THROW_FLIGHT_MS ?? 420;
+    this.network.sendGameAction({ type: 'throw-sticker', flightMs });
+    this._playThrowAnim(flightMs);
     this._showFeedback('THROW!', 'throw');
     this._updateShooterSticker();
   }
@@ -367,7 +388,7 @@ export class StickerHitScene {
     this.feedbackEl.classList.add('show');
   }
 
-  _playThrowAnim() {
+  _playThrowAnim(flightMs) {
     const sticker = this._pickRandomSticker() || this._lastShooterSticker || null;
     const mat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true });
     const sprite = new THREE.Sprite(mat);
@@ -389,12 +410,20 @@ export class StickerHitScene {
       mat.color.setHex(eq === 'trail_pink' ? 0xff6eb4 : eq === 'sparkle_blue' ? 0x66b3ff : goldGlow ? 0xffd700 : 0xff9a2e);
     }
     this.scene.add(sprite);
+
+    const timeline = this.state?.you?.stage?.timeline;
+    let impactAngleDeg = null;
+    if (timeline) {
+      const rotAtImpact = targetRotationDeg(timeline, this._approxServerNow() + flightMs);
+      impactAngleDeg = normalizeDeg(270 - rotAtImpact);
+    }
+
     this.projectiles.push({
       sprite,
       startedAt: performance.now(),
-      durationMs: THROW_FLIGHT_MS,
+      durationMs: flightMs,
       start: new THREE.Vector3(0, -3.8, 0.8),
-      end: new THREE.Vector3(0, 0.6 + TARGET_RADIUS, 0.6),
+      impactAngleDeg,
     });
   }
 
@@ -532,33 +561,52 @@ export class StickerHitScene {
   _spawnCrashBounceFx(impactAngleDeg) {
     if (!this.scene || !this.targetGroup) return;
     const rad = (Number(impactAngleDeg) * Math.PI) / 180;
-    const local = new THREE.Vector3(
+    const localHit = new THREE.Vector3(
       Math.sin(rad) * TARGET_RADIUS * 0.98,
       Math.cos(rad) * TARGET_RADIUS * 0.98,
       0.55,
     );
-    const world = local.clone();
-    this.targetGroup.localToWorld(world);
-    const geom = new THREE.SphereGeometry(0.14, 10, 10);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffb3b3, transparent: true, opacity: 1 });
-    const mesh = new THREE.Mesh(geom, mat);
-    mesh.position.copy(world);
-    this.scene.add(mesh);
-    const vel = new THREE.Vector3(0, -2.8, 1.2);
-    const start = performance.now();
-    const tick = () => {
-      const t = performance.now() - start;
-      mesh.position.addScaledVector(vel, 0.018);
-      vel.y -= 0.09;
-      mat.opacity = Math.max(0, 1 - t / 480);
-      if (t < 480) requestAnimationFrame(tick);
-      else {
-        this.scene.remove(mesh);
-        geom.dispose();
-        mat.dispose();
-      }
+    const worldHit = localHit.clone().applyMatrix4(this.targetGroup.matrixWorld);
+
+    const nLocal = new THREE.Vector3(Math.sin(rad), Math.cos(rad), 0).normalize();
+    const tLocal = new THREE.Vector3(-Math.cos(rad), Math.sin(rad), 0).normalize();
+    const worldN = nLocal.clone().transformDirection(this.targetGroup.matrixWorld).normalize();
+    const worldT = tLocal.clone().transformDirection(this.targetGroup.matrixWorld).normalize();
+
+    const spawnChip = (size, color, vel) => {
+      const geom = new THREE.SphereGeometry(size, 8, 8);
+      const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.copy(worldHit);
+      this.scene.add(mesh);
+      const v = vel.clone();
+      const start = performance.now();
+      const step = () => {
+        const t = performance.now() - start;
+        mesh.position.addScaledVector(v, 0.018);
+        v.y -= 0.085;
+        v.addScaledVector(worldN, 0.012);
+        mat.opacity = Math.max(0, 1 - t / 520);
+        if (t < 520) requestAnimationFrame(step);
+        else {
+          this.scene.remove(mesh);
+          geom.dispose();
+          mat.dispose();
+        }
+      };
+      step();
     };
-    tick();
+
+    const bounceMain = worldN.clone().multiplyScalar(2.85)
+      .add(worldT.clone().multiplyScalar((Math.random() - 0.5) * 2.2))
+      .add(new THREE.Vector3(0, 0.55, 1.05));
+    spawnChip(0.15, 0xff8c9e, bounceMain);
+
+    for (let i = 0; i < 7; i += 1) {
+      const spread = worldT.clone().multiplyScalar((Math.random() - 0.5) * 3.2)
+        .add(worldN.clone().multiplyScalar(1.4 + Math.random() * 1.8));
+      spawnChip(0.05 + Math.random() * 0.05, 0xffb3c6, spread);
+    }
   }
 
   _spawnAppleBonusFx(impactAngleDeg) {
@@ -662,6 +710,16 @@ export class StickerHitScene {
 
   applyState(state) {
     const previous = this.prevState;
+
+    if (typeof state?.serverNow === 'number' && Number.isFinite(state.serverNow)) {
+      const sample = state.serverNow - Date.now();
+      if (!this._serverClockSynced) {
+        this._serverTimeOffsetMs = sample;
+        this._serverClockSynced = true;
+      } else {
+        this._serverTimeOffsetMs = this._serverTimeOffsetMs * 0.88 + sample * 0.12;
+      }
+    }
 
     if (previous && (state?.you?.stageBreakSeq ?? 0) > (previous.you?.stageBreakSeq ?? 0)) {
       this._spawnStageShatterFx(previous);
@@ -814,12 +872,13 @@ export class StickerHitScene {
   }
 
   tick() {
+    const nowRef = this._approxServerNow();
     if (this.state?.you?.stage?.timeline && this.targetGroup) {
-      const rot = targetRotationDeg(this.state.you.stage.timeline, Date.now());
+      const rot = targetRotationDeg(this.state.you.stage.timeline, nowRef);
       this.targetGroup.rotation.z = THREE.MathUtils.degToRad(rot);
     }
     if (this.ghostDiscEl && this.state?.opponent?.stage?.timeline) {
-      const gr = targetRotationDeg(this.state.opponent.stage.timeline, Date.now());
+      const gr = targetRotationDeg(this.state.opponent.stage.timeline, nowRef);
       this.ghostDiscEl.style.transform = `rotate(${gr}deg)`;
     }
   }
@@ -846,12 +905,20 @@ export class StickerHitScene {
       this.camera.position.x += (0 - this.camera.position.x) * Math.min(1, dt * 8);
     }
 
+    const wx = GAME_CONFIG.THROW_WOBBLE_X ?? 0.14;
+    const wy = GAME_CONFIG.THROW_WOBBLE_Y ?? 0.32;
+
+    if (this.targetGroup) this.targetGroup.updateMatrixWorld(true);
+
     this.projectiles = this.projectiles.filter((p) => {
       const t = Math.min(1, (now - p.startedAt) / p.durationMs);
       const eased = 1 - ((1 - t) ** 3);
-      p.sprite.position.lerpVectors(p.start, p.end, eased);
-      p.sprite.position.x += Math.sin(t * Math.PI) * 0.42;
-      p.sprite.position.y += Math.sin(t * Math.PI) * 0.9;
+      const endWorld = p.impactAngleDeg !== null && p.impactAngleDeg !== undefined
+        ? this._rimWorldAtAngle(p.impactAngleDeg)
+        : new THREE.Vector3(0, 0.6 + TARGET_RADIUS, 0.6);
+      p.sprite.position.lerpVectors(p.start, endWorld, eased);
+      p.sprite.position.x += Math.sin(t * Math.PI) * wx;
+      p.sprite.position.y += Math.sin(t * Math.PI) * wy;
       p.sprite.scale.setScalar(0.95 + (Math.sin(t * Math.PI) * 0.24));
       p.sprite.material.rotation += dt * 16;
       if (t >= 1) {

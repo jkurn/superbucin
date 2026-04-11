@@ -70,10 +70,10 @@ Legend: `[x]` shipped in current product direction · `[~]` partial / cosmetic o
 
 **Epic 1 — core loop**
 
-- [~] **US01** Tap / straight-line throw at fixed feel — server resolves impact at `now + flightMs`; client arc only (no full ballistic sim).
+- [x] **US01** Tap / straight-line throw at fixed feel — shared `THROW_FLIGHT_MS` / wobble in `gameConfig`; client predicts rim impact (`270 - targetRotationDeg` at `approxServerNow + flight`) and lerps toward moving rim; `serverNow` clock skew smoothing.
 - [x] **US02** Safe hit embeds and rotates with target — `stuckStickers` + `targetGroup` rotation.
 - [x] **US03** Target rotation speed / direction / pause — shared timeline segments + DPS bands per stage.
-- [~] **US04** Overlap fail + bounce — collision ends run; **client bounce mesh** from `throwFx` impact angle (not true rebound physics).
+- [x] **US04** Overlap fail + bounce — collision ends run; crash FX uses rim **outward normal + tangent** debris (multi-chip “rebound”) from `throwFx.impactAngle`.
 - [x] **US05** Final sticker / stage beat “break” feel — **shatter burst** on `stageBreakSeq` increase; `throwFx` persists across tick broadcasts for VFX de-dupe by `seq`.
 - [x] **Spikes vs knives** — `kind` + wider spike angular threshold.
 

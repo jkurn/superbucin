@@ -152,6 +152,8 @@ describe('GameFactory', () => {
     assert.equal(sticker.COLLISION_DEGREES, 14);
     assert.equal(Array.isArray(sticker.STAGES), true);
     assert.equal(Array.isArray(sticker.SKINS), true);
+    assert.equal(sticker.THROW_FLIGHT_MS, 420);
+    assert.equal(sticker.THROW_FLIGHT_MAX_MS, 700);
 
     const doodle = GameFactory.getConfig('doodle-guess');
     assert.equal(typeof doodle.defaultPackId, 'string');
