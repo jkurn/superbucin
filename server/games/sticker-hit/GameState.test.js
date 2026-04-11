@@ -369,6 +369,45 @@ describe('Sticker Hit GameState', () => {
     assert.equal(game.stateByPlayer[p1.id].equippedSkinId, 'trail_pink');
   });
 
+  it('hydrates apples/skins from stickerHitHydration room option', () => {
+    const p1 = { id: 'sock1', side: 'p1' };
+    const p2 = { id: 'sock2', side: 'p2' };
+    const hydro = {
+      sock1: {
+        apples: 11,
+        ownedSkinIds: ['trail_pink'],
+        equippedSkinId: 'trail_pink',
+        bossSkinUnlocked: true,
+      },
+    };
+    const game = new GameState(p1, p2, () => {}, { stickerHitHydration: hydro });
+    currentGame = game;
+    assert.equal(game.stateByPlayer.sock1.apples, 11);
+    assert.deepEqual(game.stateByPlayer.sock1.ownedSkinIds, ['trail_pink']);
+    assert.equal(game.stateByPlayer.sock1.equippedSkinId, 'trail_pink');
+    assert.equal(game.stateByPlayer.sock1.bossSkinUnlocked, true);
+    assert.equal(game.stateByPlayer.sock2.apples, 0);
+  });
+
+  it('match-end payload includes stickerHitPersist for both players', () => {
+    const events = [];
+    const p1 = { id: 'a1', side: 'p1' };
+    const p2 = { id: 'a2', side: 'p2' };
+    const game = new GameState(p1, p2, (event, data) => events.push({ event, data }), {});
+    currentGame = game;
+    game.active = true;
+    game.stateByPlayer.a1.apples = 4;
+    game.stateByPlayer.a1.ownedSkinIds = ['sparkle_blue'];
+    game.stateByPlayer.a1.equippedSkinId = 'sparkle_blue';
+    game.stateByPlayer.a1.bossSkinUnlocked = false;
+    game._finishMatch(p2.id, false);
+    const end = events.find((e) => e.event === 'match-end');
+    assert.ok(end?.data?.stickerHitPersist);
+    assert.equal(end.data.stickerHitPersist.a1.apples, 4);
+    assert.ok(end.data.stickerHitPersist.a1.ownedSkinIds.includes('sparkle_blue'));
+    assert.equal(end.data.stickerHitPersist.a2.apples, 0);
+  });
+
   it('fuzz: _createStage layouts satisfy ring + obstacle angular invariants', () => {
     const { game } = createGame();
     currentGame = game;

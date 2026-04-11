@@ -1,4 +1,6 @@
 import { supabase } from '../supabaseAdmin.js';
+import { STICKER_HIT_GAME_CONFIG } from '../../shared/sticker-hit/gameConfig.js';
+import { sanitizeStickerHitProgress } from '../../shared/sticker-hit/stickerHitProgress.js';
 
 const POINTS_FOR_WIN = 100;
 const POINTS_FOR_LOSS = 25;
@@ -186,5 +188,46 @@ export class UserService {
       .eq('id', userId)
       .single();
     return data;
+  }
+
+  /** Loads and sanitizes `profiles.sticker_hit` for match hydration. */
+  static async getStickerHitProgressForUser(userId) {
+    const client = this._getClient();
+    if (!client || !userId) {
+      return sanitizeStickerHitProgress({}, STICKER_HIT_GAME_CONFIG);
+    }
+    const { data, error } = await client
+      .from('profiles')
+      .select('sticker_hit')
+      .eq('id', userId)
+      .single();
+
+    if (error || !data) {
+      return sanitizeStickerHitProgress({}, STICKER_HIT_GAME_CONFIG);
+    }
+    return sanitizeStickerHitProgress(data.sticker_hit, STICKER_HIT_GAME_CONFIG);
+  }
+
+  static async saveStickerHitProgress(userId, rawProgress) {
+    const client = this._getClient();
+    if (!client || !userId) return;
+    const clean = sanitizeStickerHitProgress(rawProgress, STICKER_HIT_GAME_CONFIG);
+    await client.from('profiles').update({ sticker_hit: clean }).eq('id', userId);
+  }
+
+  /**
+   * Persists end-of-match Sticker Hit cosmetics + apple bank for signed-in players.
+   * @param {{ id: string, identity?: { userId?: string, isGuest?: boolean } }[]} players
+   * @param {Record<string, { apples?: number, ownedSkinIds?: string[], equippedSkinId?: string | null, bossSkinUnlocked?: boolean }>} bySocketId
+   */
+  static async persistStickerHitAfterMatch(players, bySocketId) {
+    if (!bySocketId || !players?.length) return;
+    await Promise.all(players.map(async (p) => {
+      const uid = p.identity?.userId;
+      if (!uid || p.identity?.isGuest) return;
+      const blob = bySocketId[p.id];
+      if (!blob) return;
+      await this.saveStickerHitProgress(uid, blob);
+    }));
   }
 }

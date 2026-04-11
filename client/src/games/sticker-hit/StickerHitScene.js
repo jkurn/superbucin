@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import { EventBus } from '../../shared/EventBus.js';
 import { targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
 import { GAME_CONFIG } from './config.js';
+import {
+  DEFAULT_STICKER_MANIFEST_TIMEOUT_MS,
+  fetchStickerManifest,
+  toBackendAssetUrl as stickerManifestAssetUrl,
+} from './stickerManifest.js';
 
 const KENNEY_ASSETS = {
   stallBg: '/kenney/shooting-gallery/Stall/bg_wood.png',
@@ -16,7 +21,6 @@ const KENNEY_ASSETS = {
 
 const THROW_FLIGHT_MS = 420;
 const TARGET_RADIUS = 2.05;
-const MANIFEST_TIMEOUT_MS = 8000;
 
 function backendOrigin() {
   if (window.location.hostname === 'localhost') return 'http://localhost:3000';
@@ -24,8 +28,7 @@ function backendOrigin() {
 }
 
 function toBackendAssetUrl(pathname) {
-  if (!pathname) return '';
-  return `${backendOrigin()}${pathname}`;
+  return stickerManifestAssetUrl(pathname, backendOrigin());
 }
 
 function secureRandomIndex(maxExclusive) {
@@ -42,39 +45,6 @@ function secureRandomIndex(maxExclusive) {
     }
   }
   return Math.floor(Math.random() * maxExclusive);
-}
-
-/**
- * @returns {Promise<{ stickers: { src: string, durationMs: number }[], error: null | 'timeout' | 'http' | 'parse' | 'network' }>}
- */
-async function loadStickerPool() {
-  const url = `${backendOrigin()}/api/sticker-hit/sticker-manifest`;
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(), MANIFEST_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
-    clearTimeout(tid);
-    if (!res.ok) {
-      return { stickers: [], error: 'http' };
-    }
-    const data = await res.json();
-    if (!Array.isArray(data?.stickers)) {
-      return { stickers: [], error: 'parse' };
-    }
-    const stickers = data.stickers
-      .filter((x) => x && typeof x.src === 'string' && x.src.length > 0)
-      .map((x) => ({
-        src: toBackendAssetUrl(x.src),
-        durationMs: Number.isFinite(x.durationMs) ? Math.max(200, Number(x.durationMs)) : 1200,
-      }));
-    return { stickers, error: null };
-  } catch (e) {
-    clearTimeout(tid);
-    if (e?.name === 'AbortError') {
-      return { stickers: [], error: 'timeout' };
-    }
-    return { stickers: [], error: 'network' };
-  }
 }
 
 export class StickerHitScene {
@@ -346,7 +316,10 @@ export class StickerHitScene {
   }
 
   async _hydrateStickerPool() {
-    const { stickers, error } = await loadStickerPool();
+    const { stickers, error } = await fetchStickerManifest({
+      backendOrigin: backendOrigin(),
+      timeoutMs: DEFAULT_STICKER_MANIFEST_TIMEOUT_MS,
+    });
     this.stickerPool = stickers;
     this._stickerManifestError = error;
     this._updateShooterSticker();
@@ -470,7 +443,7 @@ export class StickerHitScene {
     const skins = this.state?.skins || GAME_CONFIG.SKINS || [];
 
     if (copyEl) {
-      copyEl.textContent = `Apples this match: ${apples}. Boss glow ${unlocked ? 'unlocked' : 'locked (clear boss stage)'}. Purchases are match-only until profile sync exists.`;
+      copyEl.textContent = `Apples (banked across matches when signed in): ${apples}. Boss glow ${unlocked ? 'unlocked' : 'locked (clear boss stage)'}. Skins you own stay on your profile.`;
     }
 
     if (this.equipBossBtn) {

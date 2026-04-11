@@ -385,3 +385,71 @@ describe('UserService helpers', () => {
     assert.deepEqual(data, { id: 'u1', display_name: 'Jonathan' });
   });
 });
+
+describe('UserService Sticker Hit profile', () => {
+  const originalClient = UserService._getClient();
+
+  afterEach(() => {
+    UserService._setClientForTests(originalClient);
+  });
+
+  it('getStickerHitProgressForUser returns defaults when client missing', async () => {
+    UserService._setClientForTests(null);
+    const p = await UserService.getStickerHitProgressForUser('u1');
+    assert.equal(p.apples, 0);
+    assert.deepEqual(p.ownedSkinIds, []);
+  });
+
+  it('getStickerHitProgressForUser reads sticker_hit column', async () => {
+    const fakeClient = makeFakeClient({
+      singleDataByTable: {
+        profiles: {
+          sticker_hit: {
+            apples: 7,
+            ownedSkinIds: ['trail_pink'],
+            equippedSkinId: 'trail_pink',
+            bossSkinUnlocked: false,
+          },
+        },
+      },
+    });
+    UserService._setClientForTests(fakeClient);
+    const p = await UserService.getStickerHitProgressForUser('uuid-1');
+    assert.equal(p.apples, 7);
+    assert.ok(p.ownedSkinIds.includes('trail_pink'));
+  });
+
+  it('saveStickerHitProgress writes sanitized json', async () => {
+    const fakeClient = makeFakeClient();
+    UserService._setClientForTests(fakeClient);
+    await UserService.saveStickerHitProgress('uuid-2', {
+      apples: 9,
+      ownedSkinIds: ['nope'],
+      equippedSkinId: 'boss_glow',
+      bossSkinUnlocked: false,
+    });
+    const upd = fakeClient.ops.find((o) => o.op === 'update' && o.table === 'profiles');
+    assert.ok(upd?.payload?.sticker_hit);
+    assert.equal(upd.payload.sticker_hit.apples, 9);
+    assert.deepEqual(upd.payload.sticker_hit.ownedSkinIds, []);
+    assert.equal(upd.payload.sticker_hit.equippedSkinId, null);
+  });
+
+  it('persistStickerHitAfterMatch skips guests', async () => {
+    const fakeClient = makeFakeClient();
+    UserService._setClientForTests(fakeClient);
+    await UserService.persistStickerHitAfterMatch(
+      [
+        { id: 's1', identity: { isGuest: true, userId: 'x' } },
+        { id: 's2', identity: { userId: 'u-real', isGuest: false } },
+      ],
+      {
+        s1: { apples: 99, ownedSkinIds: [], equippedSkinId: null, bossSkinUnlocked: false },
+        s2: { apples: 3, ownedSkinIds: [], equippedSkinId: null, bossSkinUnlocked: false },
+      },
+    );
+    const profileUpdates = fakeClient.ops.filter((o) => o.op === 'update' && o.table === 'profiles');
+    assert.equal(profileUpdates.length, 1);
+    assert.equal(profileUpdates[0].payload.sticker_hit.apples, 3);
+  });
+});

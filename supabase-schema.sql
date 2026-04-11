@@ -10,6 +10,8 @@ create table if not exists public.profiles (
   display_name text not null,
   avatar_url text not null default '/avatars/panda.png',
   bio text default '',
+  /** Sticker Hit banked apples + owned/equipped skins (server-written; sanitized in app). */
+  sticker_hit jsonb not null default '{}'::jsonb,
   points integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -168,3 +170,10 @@ create trigger profiles_updated_at before update on public.profiles
 
 create trigger user_stats_updated_at before update on public.user_stats
   for each row execute function public.update_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- Incremental migrations (safe to re-run on existing Supabase projects)
+-- ---------------------------------------------------------------------------
+
+alter table public.profiles
+  add column if not exists sticker_hit jsonb not null default '{}'::jsonb;

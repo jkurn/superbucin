@@ -60,9 +60,9 @@ Suggested build order in plan: Connect Four → Quiz Race → Battleship (comple
 - [x] ~~Network resilience: disconnect/reconnect, timeout windows, rejoin consistency.~~ — Covered by reconnect tests in `RoomManager.reconnect.test.js` and client reconnect handling in `NetworkManager.test.js`.
 - [x] ~~Notification integrity: correct recipient + no duplicate/conflicting notifications.~~ — Covered by `RoomManager` recipient contract tests + `NetworkManager` event mapping tests.
 - [x] ~~Persistence side effects: `match-end` path records points/achievements correctly and degrades safely on DB failure.~~ — Covered by `UserService.test.js`, `RoomManager.contracts.test.js` (`match-end` DB-down fallback), and `RoomManager.persistence.test.js` (`_recordMatchResult`).
-- [ ] **Mobile-input contract tests (required for all new games):** verify core touch interactions on real mobile behavior (tap/drag/swipe as applicable), not only desktop click paths.
-- [ ] **Dependency degradation tests (required for all new games):** if game logic depends on external APIs/services, enforce explicit fallback behavior under timeout/network/5xx and test it.
-- [ ] **Playable-state invariant tests (required for all new games):** random generation must satisfy minimum playability constraints (e.g., guaranteed legal moves/words/targets) across supported board sizes/configs.
+- [~] **Mobile-input contract tests (required for all new games):** Sticker Hit throw/store/equip covered in jsdom (`StickerHitScene.test.js`); extend pattern to other games with touch-heavy HUDs.
+- [~] **Dependency degradation tests (required for all new games):** Sticker manifest client fetch paths covered (`stickerManifest.test.js`); word-scramble dictionary covered elsewhere; extend per new HTTP dependency.
+- [~] **Playable-state invariant tests (required for all new games):** Sticker Hit ring layout covered (`stageLayoutInvariants` + fuzz); other game families still open where randomness applies.
 
 ## Sticker Hit — user story / parity checklist (2026-04-11)
 
@@ -89,17 +89,17 @@ Legend: `[x]` shipped in current product direction · `[~]` partial / cosmetic o
 - [x] **US10** Boss defeated feedback — `BOSS DOWN!` + `bossSkinUnlocked`.
 - [x] **US11** Equip / meta — **match-scoped** `ownedSkinIds`, `equippedSkinId`, `boss_glow` equip; gold / tint on throws from server state.
 - [x] **US12–13** Ring apples + pickup + `apples` counter — server ring + pickup + spark `throwFx.appleBonus`.
-- [x] **US14** Spend apples on skins — **`sticker-buy-skin`** / **`sticker-equip-skin`**; prices from `GAME_CONFIG.SKINS`; **no cross-match persistence** (modal copy + TODOS below).
+- [x] **US14** Spend apples on skins — **`sticker-buy-skin`** / **`sticker-equip-skin`**; prices from `GAME_CONFIG.SKINS`; **cross-match persistence** via `profiles.sticker_hit` + match-end sync (guests unchanged).
 
 **PvP / presence**
 
 - [x] **Ghost opponent disc** — `opponent.stage` includes obstacles, stuck, apples, **timeline**; mini disc + rotation in lobby column.
-- [ ] **Cross-match cosmetics + apples** — needs profile/Supabase (or agreed persistence layer).
+- [x] ~~**Cross-match cosmetics + apples**~~ — `profiles.sticker_hit` jsonb + `UserService` load/save + `RoomManager` async `startGame` hydration + `match-end.stickerHitPersist`.
 
 **Sticker Hit — quality gates (still open)**
 
-- [ ] Mobile-input contract tests (throw, store, equip buttons) in jsdom or browser harness.
-- [~] Sticker manifest degradation — runtime timeout + errors; add **automated** tests (see global gate above).
+- [x] ~~Mobile-input contract tests (throw, store, equip buttons) in jsdom or browser harness.~~ — Done: `client/src/games/sticker-hit/StickerHitScene.test.js`.
+- [x] ~~Sticker manifest degradation — runtime timeout + errors; add **automated** tests (see global gate above).~~ — Done: `client/src/games/sticker-hit/stickerManifest.js` + `stickerManifest.test.js`.
 - [x] ~~Fuzz / invariant tests for ring placement (apple vs obstacle angular separation) under worst random draws.~~ — Done: `shared/sticker-hit/stageLayoutInvariants.js` + `stageLayoutInvariants.test.js` + fuzz in `server/games/sticker-hit/GameState.test.js`.
 
 ## Engineering scorecard (run weekly)

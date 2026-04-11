@@ -140,7 +140,7 @@ export class RoomManager {
         skipSideSelect: true,
         opponentIdentity: joinerIdentity,
       });
-      this.startGame(room);
+      void this.startGame(room).catch((err) => console.error('startGame failed', err));
     } else {
       room.state = 'side-select';
       socket.emit('room-joined', {
@@ -198,7 +198,7 @@ export class RoomManager {
     socket.emit('side-selected', { message: `You picked ${side}!` });
 
     if (room.players.length === 2 && room.players.every((p) => p.ready)) {
-      this.startGame(room);
+      void this.startGame(room).catch((err) => console.error('startGame failed', err));
     } else if (otherPlayer) {
       otherPlayer.socket.emit('side-selected', {
         message: `Opponent picked ${side}! Your turn~`,
@@ -207,7 +207,7 @@ export class RoomManager {
     }
   }
 
-  startGame(room) {
+  async startGame(room) {
     room.state = 'playing';
 
     const p1 = room.players[0];
@@ -217,6 +217,15 @@ export class RoomManager {
       customPrompts: room.customPrompts || [],
       ...(room.gameOptions || {}),
     };
+
+    if (room.gameType === 'sticker-hit') {
+      try {
+        createOpts.stickerHitHydration = await this._loadStickerHitHydration(room);
+      } catch (err) {
+        console.error('Sticker Hit profile hydration failed:', err);
+        createOpts.stickerHitHydration = {};
+      }
+    }
 
     room.game = GameFactory.create(
       room.gameType,
@@ -265,6 +274,16 @@ export class RoomManager {
 
     room.game.start();
     console.log(`Game started in room ${room.code} [${room.gameType}]: ${p1Name} (${p1.side}) vs ${p2Name} (${p2.side})`);
+  }
+
+  async _loadStickerHitHydration(room) {
+    const out = {};
+    for (const p of room.players) {
+      const uid = p.identity?.userId;
+      if (!uid || p.identity?.isGuest) continue;
+      out[p.id] = await UserService.getStickerHitProgressForUser(uid);
+    }
+    return out;
   }
 
   spawnUnit(socket, tier, lane) {
@@ -506,6 +525,14 @@ export class RoomManager {
       isTie: !!data.tie,
     });
 
+    if (room.gameType === 'sticker-hit' && data.stickerHitPersist) {
+      try {
+        await UserService.persistStickerHitAfterMatch(room.players, data.stickerHitPersist);
+      } catch (err) {
+        console.error('Sticker Hit progress persist failed:', err);
+      }
+    }
+
     for (const [playerId, achievements] of Object.entries(newAchievements)) {
       const player = room.players.find((p) => p.id === playerId);
       if (player && !player.disconnected) {
@@ -532,7 +559,7 @@ export class RoomManager {
       room.players[0].ready = true;
       room.players[1].side = 'p2';
       room.players[1].ready = true;
-      this.startGame(room);
+      void this.startGame(room).catch((err) => console.error('startGame failed', err));
       return;
     }
 

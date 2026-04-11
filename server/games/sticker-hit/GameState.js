@@ -5,6 +5,7 @@ import {
   obstacleCenterMinGap,
   ringAppleMinSeparation,
 } from '../../../shared/sticker-hit/stageLayoutInvariants.js';
+import { stickerHitPersistShapeFromPlayerState } from '../../../shared/sticker-hit/stickerHitProgress.js';
 import { normalizeDeg, targetRotationDeg } from '../../../shared/sticker-hit/timeline.js';
 
 export const GAME_CONFIG = STICKER_HIT_GAME_CONFIG;
@@ -101,10 +102,12 @@ function buildTimeline(stageCfg) {
 }
 
 export class GameState {
-  constructor(player1, player2, emitCallback, _roomOptions = {}) {
+  constructor(player1, player2, emitCallback, roomOptions = {}) {
     this.p1 = player1;
     this.p2 = player2;
     this.emit = emitCallback;
+    /** @type {Record<string, { apples: number, ownedSkinIds: string[], equippedSkinId: string | null, bossSkinUnlocked: boolean }> | null} */
+    this.stickerHitHydration = roomOptions.stickerHitHydration || null;
     this.active = false;
     this.phase = 'countdown'; // countdown | playing | finished
     this.countdownTimer = null;
@@ -115,27 +118,28 @@ export class GameState {
     this.endedAt = 0;
 
     this.stateByPlayer = {
-      [player1.id]: this._buildInitialPlayerState(),
-      [player2.id]: this._buildInitialPlayerState(),
+      [player1.id]: this._buildInitialPlayerState(player1.id),
+      [player2.id]: this._buildInitialPlayerState(player2.id),
     };
   }
 
-  _buildInitialPlayerState() {
+  _buildInitialPlayerState(playerId) {
+    const h = playerId && this.stickerHitHydration ? this.stickerHitHydration[playerId] : null;
     return {
       crashed: false,
       finished: false,
       finishedAt: 0,
       crashedAt: 0,
       stageIndex: 0,
-      apples: 0,
-      bossSkinUnlocked: false,
+      apples: h ? h.apples : 0,
+      bossSkinUnlocked: h ? !!h.bossSkinUnlocked : false,
       /** Monotonic; client plays shatter when this increases (survives tick-only broadcasts). */
       stageBreakSeq: 0,
       /** Last throw outcome for VFX; persists across TICK broadcasts until the next throw overwrites. */
       throwFx: null,
       throwFxSeq: 0,
-      ownedSkinIds: [],
-      equippedSkinId: null,
+      ownedSkinIds: h ? [...h.ownedSkinIds] : [],
+      equippedSkinId: h ? h.equippedSkinId : null,
       stage: this._createStage(0),
     };
   }
@@ -170,8 +174,8 @@ export class GameState {
     this.endedAt = 0;
     this.pausedAt = 0;
     this.countdownRemainingMs = GAME_CONFIG.COUNTDOWN_MS;
-    this.stateByPlayer[this.p1.id] = this._buildInitialPlayerState();
-    this.stateByPlayer[this.p2.id] = this._buildInitialPlayerState();
+    this.stateByPlayer[this.p1.id] = this._buildInitialPlayerState(this.p1.id);
+    this.stateByPlayer[this.p2.id] = this._buildInitialPlayerState(this.p2.id);
     this._clearTimers();
     this._startCountdown();
     this.broadcastState();
@@ -400,6 +404,10 @@ export class GameState {
       winnerId,
       tie: !!tie,
       scores: [this._scoreFor(this.p1.id), this._scoreFor(this.p2.id)],
+      stickerHitPersist: {
+        [this.p1.id]: stickerHitPersistShapeFromPlayerState(this.stateByPlayer[this.p1.id]),
+        [this.p2.id]: stickerHitPersistShapeFromPlayerState(this.stateByPlayer[this.p2.id]),
+      },
     });
   }
 
