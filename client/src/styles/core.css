@@ -266,6 +266,25 @@ canvas { display: block; width: 100%; height: 100%; }
   max-width: none;
   min-width: 0;
 }
+/* Icon-only share actions (e.g. WhatsApp) — no truncated label */
+.btn-share-action.btn-share-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
+  letter-spacing: 0;
+  color: #fff;
+}
+.btn-share-action.btn-share-icon svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+  flex-shrink: 0;
+}
+.btn-share-action.btn-share-icon path {
+  fill: #25d366;
+}
 .btn-share-action:disabled {
   opacity: 0.55;
   cursor: not-allowed;
