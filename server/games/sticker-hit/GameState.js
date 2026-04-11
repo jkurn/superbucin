@@ -46,6 +46,47 @@ function randomAngles(count, minGap) {
   return out;
 }
 
+function placeRingApples(wantCount, obstacleAngles) {
+  const minSep = Math.max(
+    GAME_CONFIG.COLLISION_DEGREES + GAME_CONFIG.SPIKE_EXTRA_DEGREES + 8,
+    GAME_CONFIG.APPLE_HIT_DEGREES + 8,
+  );
+  const blocked = [...obstacleAngles];
+  const out = [];
+  let guard = 0;
+  while (out.length < wantCount && guard < 8000) {
+    guard += 1;
+    const cand = secureRandomAngle();
+    if (blocked.every((a) => angularDistance(a, cand) >= minSep)) {
+      out.push({ id: secureRandomSeed(), angle: cand });
+      blocked.push(cand);
+    }
+  }
+  return out;
+}
+
+function collidesOccupied(impactAngle, obstacleStickers, stuckStickers) {
+  for (const o of obstacleStickers) {
+    const th = o.kind === 'spike'
+      ? GAME_CONFIG.COLLISION_DEGREES + GAME_CONFIG.SPIKE_EXTRA_DEGREES
+      : GAME_CONFIG.COLLISION_DEGREES;
+    if (angularDistance(o.angle, impactAngle) < th) return true;
+  }
+  for (const s of stuckStickers) {
+    if (angularDistance(s.angle, impactAngle) < GAME_CONFIG.COLLISION_DEGREES) return true;
+  }
+  return false;
+}
+
+function findAppleHitIndex(ringApples, impactAngle) {
+  for (let i = 0; i < ringApples.length; i += 1) {
+    if (angularDistance(ringApples[i].angle, impactAngle) < GAME_CONFIG.APPLE_HIT_DEGREES) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 function buildTimeline(stageCfg) {
   const segments = [];
   let t = 0;
@@ -89,22 +130,31 @@ export class GameState {
       finishedAt: 0,
       crashedAt: 0,
       stageIndex: 0,
+      apples: 0,
+      bossSkinUnlocked: false,
       stage: this._createStage(0),
     };
   }
 
   _createStage(stageIndex) {
     const stageCfg = GAME_CONFIG.STAGES[stageIndex];
-    const minGap = GAME_CONFIG.COLLISION_DEGREES + 4;
-    const obstacleAngles = randomAngles(stageCfg.obstacles, minGap);
+    const minGap = GAME_CONFIG.COLLISION_DEGREES + GAME_CONFIG.SPIKE_EXTRA_DEGREES + 4;
+    const slots = (stageCfg.obstacles || 0) + (stageCfg.spikes || 0);
+    const obstacleAngles = randomAngles(slots, minGap);
+    const obstacleStickers = obstacleAngles.map((angle, i) => ({
+      angle,
+      stickerSeed: secureRandomSeed(),
+      kind: i < (stageCfg.obstacles || 0) ? 'knife' : 'spike',
+    }));
+    const appleCount = secureRandomIntInclusive(GAME_CONFIG.APPLES_MIN, GAME_CONFIG.APPLES_MAX);
+    const ringApples = placeRingApples(appleCount, obstacleAngles);
     return {
       stageIndex,
+      isBoss: !!stageCfg.isBoss,
       stickersTotal: stageCfg.stickersToLand,
       stickersRemaining: stageCfg.stickersToLand,
-      obstacleStickers: obstacleAngles.map((angle) => ({
-        angle,
-        stickerSeed: secureRandomSeed(),
-      })),
+      obstacleStickers,
+      ringApples,
       stuckStickers: [],
       timeline: buildTimeline(stageCfg),
     };
@@ -201,21 +251,28 @@ export class GameState {
     const ps = this.stateByPlayer[playerId];
     if (!ps || ps.crashed || ps.finished) return;
 
+    ps.lastFx = null;
+
     const stage = ps.stage;
     const rotation = targetRotationDeg(stage.timeline, Date.now() + flightMs);
     const impactAngle = normalizeDeg(270 - rotation);
-    const occupied = [
-      ...stage.obstacleStickers.map((x) => x.angle),
-      ...stage.stuckStickers.map((x) => x.angle),
-    ];
-    const collides = occupied.some((a) => angularDistance(a, impactAngle) < GAME_CONFIG.COLLISION_DEGREES);
 
-    if (collides) {
+    if (collidesOccupied(impactAngle, stage.obstacleStickers, stage.stuckStickers)) {
+      ps.lastFx = { type: 'crash', impactAngle };
       ps.crashed = true;
       ps.crashedAt = Date.now();
       this.broadcastState();
+      ps.lastFx = null;
       this._resolveMatchIfNeeded(playerId, 'crash');
       return;
+    }
+
+    let appleBonus = false;
+    const appleIdx = findAppleHitIndex(stage.ringApples || [], impactAngle);
+    if (appleIdx >= 0) {
+      stage.ringApples.splice(appleIdx, 1);
+      ps.apples += 1;
+      appleBonus = true;
     }
 
     stage.stuckStickers.push({
@@ -224,18 +281,24 @@ export class GameState {
     });
     stage.stickersRemaining = Math.max(0, stage.stickersRemaining - 1);
 
+    ps.lastFx = { type: 'stick', impactAngle, appleBonus };
+
     if (stage.stickersRemaining === 0) {
+      const clearedBoss = !!GAME_CONFIG.STAGES[ps.stageIndex]?.isBoss;
       const nextStage = ps.stageIndex + 1;
       if (nextStage >= GAME_CONFIG.STAGES.length) {
         ps.finished = true;
         ps.finishedAt = Date.now();
+        if (clearedBoss) ps.bossSkinUnlocked = true;
       } else {
+        if (clearedBoss) ps.bossSkinUnlocked = true;
         ps.stageIndex = nextStage;
         ps.stage = this._createStage(nextStage);
       }
     }
 
     this.broadcastState();
+    ps.lastFx = null;
     this._resolveMatchIfNeeded(playerId, 'progress');
   }
 
@@ -275,7 +338,8 @@ export class GameState {
     const base = ps.stageIndex * 100 + stageProgress * 10;
     const finishBonus = ps.finished ? 250 : 0;
     const crashPenalty = ps.crashed ? 15 : 0;
-    return Math.max(0, base + finishBonus - crashPenalty);
+    const appleBonus = (ps.apples || 0) * 3;
+    return Math.max(0, base + finishBonus + appleBonus - crashPenalty);
   }
 
   _finishMatch(winnerId, tie) {
@@ -310,16 +374,22 @@ export class GameState {
         crashed: me.crashed,
         finished: me.finished,
         stageIndex: me.stageIndex,
+        apples: me.apples,
+        bossSkinUnlocked: me.bossSkinUnlocked,
+        lastFx: me.lastFx,
         stage: me.stage,
       },
       opponent: {
         crashed: opp.crashed,
         finished: opp.finished,
         stageIndex: opp.stageIndex,
+        apples: opp.apples,
+        bossSkinUnlocked: opp.bossSkinUnlocked,
         stage: {
           stageIndex: opp.stage.stageIndex,
           stickersTotal: opp.stage.stickersTotal,
           stickersRemaining: opp.stage.stickersRemaining,
+          isBoss: opp.stage.isBoss,
         },
       },
     };

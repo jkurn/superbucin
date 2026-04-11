@@ -101,6 +101,12 @@ export class StickerHitScene {
     this.progressOppEl = null;
     this.stagePipsEl = null;
     this.throwBtnEl = null;
+    this.ammoEl = null;
+    this.applesEl = null;
+    this.storeBtnEl = null;
+    this.storeModalEl = null;
+    this.storeCloseEl = null;
+    this.storeBackdropEl = null;
     this.stickerPool = [];
     /** @type {null | 'timeout' | 'http' | 'parse' | 'network'} */
     this._stickerManifestError = null;
@@ -120,6 +126,8 @@ export class StickerHitScene {
       }
     };
     this._onCanvasTap = () => this.shoot();
+    this._onStoreOpen = () => this._openStoreModal();
+    this._onStoreClose = () => this._closeStoreModal();
   }
 
   init() {
@@ -129,11 +137,16 @@ export class StickerHitScene {
     this.rootEl.innerHTML = `
       <div class="sh-wrap">
         <div class="sh-board-wrap">
+          <div class="sh-dock-top">
+            <div class="sh-apples" id="sh-apples" title="Apples this match">🍎 0</div>
+            <button class="btn btn-small sh-store-btn" id="sh-store-btn" type="button">Skins</button>
+          </div>
           <div class="sh-stage-label" id="sh-stage-label">Stage 1</div>
           <div class="sh-stage-pips" id="sh-stage-pips"></div>
           <div class="sh-guide" id="sh-guide">Throw -> land on empty gap. Hit sticker = crash. First to finish all stages wins.</div>
           <div class="sh-status" id="sh-scene-status">Throw sticker to empty spaces. First to clear all stages wins.</div>
           <div class="sh-feedback" id="sh-feedback"></div>
+          <div class="sh-ammo" id="sh-ammo" aria-label="Throws remaining this stage"></div>
           <button class="btn btn-pink sh-throw-btn" id="sh-throw-btn" type="button">Throw Sticker</button>
         </div>
         <div class="sh-side">
@@ -147,6 +160,14 @@ export class StickerHitScene {
           </div>
         </div>
       </div>
+      <div class="sh-store-modal" id="sh-store-modal" hidden>
+        <div class="sh-store-backdrop" id="sh-store-backdrop"></div>
+        <div class="sh-store-card" role="dialog" aria-labelledby="sh-store-title">
+          <h3 class="sh-store-title" id="sh-store-title">Sticker skins</h3>
+          <p class="sh-store-copy" id="sh-store-copy">Clear the boss stage to unlock the gold throw glow. Cross-match store spend is not wired yet.</p>
+          <button class="btn btn-pink" type="button" id="sh-store-close">Close</button>
+        </div>
+      </div>
     `;
 
     document.getElementById('ui-overlay')?.appendChild(this.rootEl);
@@ -158,8 +179,17 @@ export class StickerHitScene {
     this.progressOppEl = this.rootEl.querySelector('#sh-opp-progress');
     this.stagePipsEl = this.rootEl.querySelector('#sh-stage-pips');
     this.throwBtnEl = this.rootEl.querySelector('#sh-throw-btn');
+    this.ammoEl = this.rootEl.querySelector('#sh-ammo');
+    this.applesEl = this.rootEl.querySelector('#sh-apples');
+    this.storeBtnEl = this.rootEl.querySelector('#sh-store-btn');
+    this.storeModalEl = this.rootEl.querySelector('#sh-store-modal');
+    this.storeCloseEl = this.rootEl.querySelector('#sh-store-close');
+    this.storeBackdropEl = this.rootEl.querySelector('#sh-store-backdrop');
 
     this.throwBtnEl?.addEventListener('click', this._onShoot);
+    this.storeBtnEl?.addEventListener('click', this._onStoreOpen);
+    this.storeCloseEl?.addEventListener('click', this._onStoreClose);
+    this.storeBackdropEl?.addEventListener('click', this._onStoreClose);
     window.addEventListener('keydown', this._onKeyDown);
     this.sceneManager.renderer?.domElement.addEventListener('pointerdown', this._onCanvasTap);
     EventBus.on('sticker-hit:state', this._onState);
@@ -329,15 +359,26 @@ export class StickerHitScene {
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(0.95, 0.95, 1);
     sprite.position.set(0, -3.8, 0.8);
+    let bossGlow = !!this.state?.you?.bossSkinUnlocked;
+    if (!bossGlow && typeof localStorage !== 'undefined') {
+      try {
+        bossGlow = localStorage.getItem('sticker-hit-boss-glow') === '1';
+      } catch (_e) {
+        bossGlow = false;
+      }
+    }
     if (sticker?.src) {
       try {
         mat.map = this._loadTexture(sticker.src.replace(backendOrigin(), ''));
         mat.needsUpdate = true;
+        if (bossGlow) {
+          mat.color.setHex(0xffe8a8);
+        }
       } catch (_e) {
-        mat.color.setHex(0xff9a2e);
+        mat.color.setHex(bossGlow ? 0xffd700 : 0xff9a2e);
       }
     } else {
-      mat.color.setHex(0xff9a2e);
+      mat.color.setHex(bossGlow ? 0xffd700 : 0xff9a2e);
     }
     this.scene.add(sprite);
     this.projectiles.push({
@@ -375,16 +416,153 @@ export class StickerHitScene {
     this.cameraShakeUntil = performance.now() + 320;
   }
 
+  _openStoreModal() {
+    if (!this.storeModalEl) return;
+    this._updateStoreCopy();
+    this.storeModalEl.hidden = false;
+  }
+
+  _closeStoreModal() {
+    if (this.storeModalEl) this.storeModalEl.hidden = true;
+  }
+
+  _updateStoreCopy() {
+    const el = this.rootEl?.querySelector('#sh-store-copy');
+    if (!el) return;
+    const unlocked = !!this.state?.you?.bossSkinUnlocked;
+    const apples = this.state?.you?.apples ?? 0;
+    el.textContent = unlocked
+      ? `Boss glow is unlocked — your throws use a gold tint. Apples this match: ${apples}. Spendable store + cross-match inventory is planned next.`
+      : `Beat the boss stage (stage ${this.state?.totalStages ?? 5}) to unlock the gold throw glow. Apples this match: ${apples}.`;
+  }
+
+  _spawnStageShatterFx(previousView) {
+    if (!this.scene || !this.targetGroup || !previousView?.you?.stage) return;
+    const stage = previousView.you.stage;
+    const seeds = [
+      ...(stage.obstacleStickers || []),
+      ...(stage.stuckStickers || []),
+    ];
+    const count = Math.max(28, seeds.length * 6);
+    const origin = new THREE.Vector3(0, 0.6, 0.52);
+    this.targetGroup.localToWorld(origin);
+    const pieces = [];
+    for (let i = 0; i < count; i += 1) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.07 + Math.random() * 0.06, 0.1 + Math.random() * 0.08, 0.04),
+        new THREE.MeshBasicMaterial({
+          color: new THREE.Color().setHSL(0.08 + Math.random() * 0.08, 0.85, 0.55),
+          transparent: true,
+          opacity: 1,
+        }),
+      );
+      mesh.position.copy(origin);
+      const dir = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.2, Math.random() * 0.4).normalize();
+      this.scene.add(mesh);
+      pieces.push({ mesh, vel: dir.multiplyScalar(1.8 + Math.random() * 3.2), life: 0 });
+    }
+    const start = performance.now();
+    const step = () => {
+      const t = performance.now() - start;
+      const dt = 0.016;
+      pieces.forEach((p) => {
+        p.mesh.position.addScaledVector(p.vel, dt);
+        p.vel.y -= 2.2 * dt;
+        p.mesh.rotation.x += dt * 8;
+        p.mesh.rotation.z += dt * 6;
+        p.mesh.material.opacity = Math.max(0, 1 - t / 520);
+      });
+      if (t < 520) {
+        requestAnimationFrame(step);
+      } else {
+        pieces.forEach((p) => {
+          this.scene.remove(p.mesh);
+          p.mesh.geometry.dispose();
+          p.mesh.material.dispose();
+        });
+      }
+    };
+    step();
+  }
+
+  _spawnCrashBounceFx(impactAngleDeg) {
+    if (!this.scene || !this.targetGroup) return;
+    const rad = (Number(impactAngleDeg) * Math.PI) / 180;
+    const local = new THREE.Vector3(
+      Math.sin(rad) * TARGET_RADIUS * 0.98,
+      Math.cos(rad) * TARGET_RADIUS * 0.98,
+      0.55,
+    );
+    const world = local.clone();
+    this.targetGroup.localToWorld(world);
+    const geom = new THREE.SphereGeometry(0.14, 10, 10);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffb3b3, transparent: true, opacity: 1 });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.copy(world);
+    this.scene.add(mesh);
+    const vel = new THREE.Vector3(0, -2.8, 1.2);
+    const start = performance.now();
+    const tick = () => {
+      const t = performance.now() - start;
+      mesh.position.addScaledVector(vel, 0.018);
+      vel.y -= 0.09;
+      mat.opacity = Math.max(0, 1 - t / 480);
+      if (t < 480) requestAnimationFrame(tick);
+      else {
+        this.scene.remove(mesh);
+        geom.dispose();
+        mat.dispose();
+      }
+    };
+    tick();
+  }
+
+  _spawnAppleBonusFx(impactAngleDeg) {
+    if (!this.scene || !this.targetGroup) return;
+    const rad = (Number(impactAngleDeg) * Math.PI) / 180;
+    const local = new THREE.Vector3(
+      Math.sin(rad) * TARGET_RADIUS * 1.02,
+      Math.cos(rad) * TARGET_RADIUS * 1.02,
+      0.62,
+    );
+    const world = local.clone();
+    this.targetGroup.localToWorld(world);
+    for (let i = 0; i < 10; i += 1) {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.05, 6, 6),
+        new THREE.MeshBasicMaterial({ color: 0x88ffcc, transparent: true, opacity: 0.95 }),
+      );
+      mesh.position.copy(world);
+      this.scene.add(mesh);
+      const dir = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.5, Math.random()).normalize();
+      const vel = dir.multiplyScalar(1.2 + Math.random() * 1.8);
+      const start = performance.now();
+      const tick = () => {
+        const t = performance.now() - start;
+        mesh.position.addScaledVector(vel, 0.02);
+        mesh.material.opacity = Math.max(0, 0.95 - t / 280);
+        if (t < 280) requestAnimationFrame(tick);
+        else {
+          this.scene.remove(mesh);
+          mesh.geometry.dispose();
+          mesh.material.dispose();
+        }
+      };
+      tick();
+    }
+  }
+
   _syncMarkers() {
     if (!this.targetGroup || !this.state?.you?.stage) return;
     const stage = this.state.you.stage;
     const obstacleSig = (stage.obstacleStickers || [])
-      .map((x) => `${x.angle}:${x.stickerSeed}`)
+      .map((x) => `${x.angle}:${x.stickerSeed}:${x.kind || 'knife'}`)
       .join(',');
     const stuckSig = (stage.stuckStickers || [])
       .map((x) => `${x.angle}:${x.stickerSeed}`)
       .join(',');
-    const sig = `${stage.stageIndex}|${obstacleSig}|${stuckSig}|${this.stickerPool.length}`;
+    const appleSig = (stage.ringApples || []).map((a) => `${a.id}:${a.angle}`).join(',');
+    const sig = `${stage.stageIndex}|${appleSig}|${obstacleSig}|${stuckSig}|${this.stickerPool.length}`;
     if (sig === this.lastStageSignature) return;
     this.lastStageSignature = sig;
 
@@ -408,9 +586,20 @@ export class StickerHitScene {
       return sprite;
     };
 
+    const makeAppleSprite = (angleDeg) => {
+      const mat = new THREE.SpriteMaterial({ color: 0x66ff99, transparent: true, opacity: 0.95 });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(0.38, 0.38, 1);
+      const rad = (angleDeg * Math.PI) / 180;
+      sprite.position.set(Math.sin(rad) * TARGET_RADIUS * 1.02, Math.cos(rad) * TARGET_RADIUS * 1.02, 0.58);
+      return sprite;
+    };
+
     (stage.obstacleStickers || []).forEach((item) => {
       const sticker = this._stickerForSeed(item.stickerSeed);
-      const sprite = makeStickerSprite(sticker, item.angle, 0xff8f8f);
+      const isSpike = item.kind === 'spike';
+      const sprite = makeStickerSprite(sticker, item.angle, isSpike ? 0xff44aa : 0xff8f8f);
+      if (isSpike) sprite.scale.set(0.52, 0.52, 1);
       this.targetGroup.add(sprite);
       this.markerSprites.push(sprite);
     });
@@ -420,10 +609,25 @@ export class StickerHitScene {
       this.targetGroup.add(sprite);
       this.markerSprites.push(sprite);
     });
+    (stage.ringApples || []).forEach((a) => {
+      const sprite = makeAppleSprite(a.angle);
+      this.targetGroup.add(sprite);
+      this.markerSprites.push(sprite);
+    });
   }
 
   applyState(state) {
     const previous = this.prevState;
+
+    if (previous && state?.you?.stageIndex > (previous.you?.stageIndex ?? 0)) {
+      this._spawnStageShatterFx(previous);
+    }
+    if (state?.you?.lastFx?.type === 'crash') {
+      this._spawnCrashBounceFx(state.you.lastFx.impactAngle);
+    } else if (state?.you?.lastFx?.type === 'stick' && state.you.lastFx.appleBonus) {
+      this._spawnAppleBonusFx(state.you.lastFx.impactAngle);
+    }
+
     this.state = state;
     this._syncMarkers();
     this._renderText();
@@ -447,7 +651,18 @@ export class StickerHitScene {
     const prevStage = previous?.you?.stageIndex ?? 0;
     const nextStage = state?.you?.stageIndex ?? 0;
     if (nextStage > prevStage) {
-      this._showFeedback('STAGE CLEAR!', 'stage');
+      if (previous?.you?.stage?.isBoss) {
+        this._showFeedback('BOSS DOWN!', 'stage');
+      } else {
+        this._showFeedback('STAGE CLEAR!', 'stage');
+      }
+    }
+    if (state?.you?.bossSkinUnlocked) {
+      try {
+        localStorage.setItem('sticker-hit-boss-glow', '1');
+      } catch (_e) {
+        /* ignore quota / private mode */
+      }
     }
     this.prevState = state;
   }
@@ -460,7 +675,12 @@ export class StickerHitScene {
 
     if (this.progressYouEl) this.progressYouEl.textContent = `${Math.min(myStage, total)}/${total}`;
     if (this.progressOppEl) this.progressOppEl.textContent = `${Math.min(oppStage, total)}/${total}`;
-    if (this.targetStageLabelEl) this.targetStageLabelEl.textContent = `Stage ${Math.min(myStage, total)} / ${total}`;
+    if (this.targetStageLabelEl) {
+      const boss = !!this.state.you?.stage?.isBoss;
+      this.targetStageLabelEl.textContent = boss
+        ? `BOSS — Stage ${Math.min(myStage, total)} / ${total}`
+        : `Stage ${Math.min(myStage, total)} / ${total}`;
+    }
     if (this.guideEl) {
       const base = `Race: You ${Math.min(myStage, total)}/${total} vs Opp ${Math.min(oppStage, total)}/${total} | Throw -> gap, sticker hit = crash`;
       const errLine = this._stickerManifestError
@@ -484,6 +704,24 @@ export class StickerHitScene {
       this.throwBtnEl.disabled = this.state.phase !== 'playing' || !!this.state.you?.crashed || !!this.state.you?.finished;
     }
 
+    const totalThrows = this.state.you?.stage?.stickersTotal ?? 0;
+    const rem = this.state.you?.stage?.stickersRemaining ?? 0;
+    const usedThrows = Math.max(0, totalThrows - rem);
+    if (this.ammoEl) {
+      this.ammoEl.innerHTML = '';
+      for (let i = 0; i < totalThrows; i += 1) {
+        const dot = document.createElement('span');
+        dot.className = 'sh-ammo-dot';
+        dot.dataset.spent = i < usedThrows ? 'true' : 'false';
+        this.ammoEl.appendChild(dot);
+      }
+    }
+    if (this.applesEl) {
+      const y = this.state.you?.apples ?? 0;
+      const oy = this.state.opponent?.apples ?? 0;
+      this.applesEl.textContent = `🍎 ${y} · opp ${oy}`;
+    }
+
     if (!this.statusEl) return;
     if (this.state.phase === 'countdown') {
       this.statusEl.textContent = 'Get ready...';
@@ -496,8 +734,8 @@ export class StickerHitScene {
     } else if (this.state.opponent?.finished) {
       this.statusEl.textContent = 'Opponent cleared all stages.';
     } else {
-      const rem = this.state.you?.stage?.stickersRemaining ?? 0;
-      this.statusEl.textContent = `${rem} sticker${rem === 1 ? '' : 's'} left this stage`;
+      const left = this.state.you?.stage?.stickersRemaining ?? 0;
+      this.statusEl.textContent = `${left} sticker${left === 1 ? '' : 's'} left this stage`;
     }
   }
 
@@ -596,6 +834,10 @@ export class StickerHitScene {
     window.removeEventListener('keydown', this._onKeyDown);
     this.sceneManager.renderer?.domElement.removeEventListener('pointerdown', this._onCanvasTap);
     if (this.throwBtnEl) this.throwBtnEl.removeEventListener('click', this._onShoot);
+    if (this.storeBtnEl) this.storeBtnEl.removeEventListener('click', this._onStoreOpen);
+    if (this.storeCloseEl) this.storeCloseEl.removeEventListener('click', this._onStoreClose);
+    if (this.storeBackdropEl) this.storeBackdropEl.removeEventListener('click', this._onStoreClose);
+    this._closeStoreModal();
     this.sceneManager.onUpdate = null;
     this._disposeThreeResources();
     const aspect = window.innerWidth / Math.max(1, window.innerHeight);

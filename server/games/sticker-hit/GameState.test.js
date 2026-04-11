@@ -57,9 +57,11 @@ describe('Sticker Hit GameState', () => {
 
     game.stateByPlayer[p1.id].stage = {
       stageIndex: 0,
+      isBoss: false,
       stickersTotal: 2,
       stickersRemaining: 2,
       obstacleStickers: [],
+      ringApples: [],
       stuckStickers: [],
       timeline: {
         startedAt: Date.now(),
@@ -69,9 +71,11 @@ describe('Sticker Hit GameState', () => {
     };
     game.stateByPlayer[p2.id].stage = {
       stageIndex: 0,
+      isBoss: false,
       stickersTotal: 2,
       stickersRemaining: 2,
       obstacleStickers: [],
+      ringApples: [],
       stuckStickers: [],
       timeline: {
         startedAt: Date.now(),
@@ -93,9 +97,11 @@ describe('Sticker Hit GameState', () => {
 
     game.stateByPlayer[p1.id].stage = {
       stageIndex: 0,
+      isBoss: false,
       stickersTotal: 2,
       stickersRemaining: 2,
-      obstacleStickers: [{ angle: 270, stickerSeed: 1 }],
+      obstacleStickers: [{ angle: 270, stickerSeed: 1, kind: 'knife' }],
+      ringApples: [],
       stuckStickers: [],
       timeline: {
         startedAt: Date.now(),
@@ -121,9 +127,11 @@ describe('Sticker Hit GameState', () => {
     game.stateByPlayer[p1.id].stageIndex = 0;
     game.stateByPlayer[p1.id].stage = {
       stageIndex: 0,
+      isBoss: false,
       stickersTotal: 1,
       stickersRemaining: 1,
       obstacleStickers: [],
+      ringApples: [],
       stuckStickers: [],
       timeline: {
         startedAt: Date.now(),
@@ -133,9 +141,11 @@ describe('Sticker Hit GameState', () => {
     };
     game.stateByPlayer[p2.id].stage = {
       stageIndex: 0,
+      isBoss: false,
       stickersTotal: 99,
       stickersRemaining: 99,
       obstacleStickers: [],
+      ringApples: [],
       stuckStickers: [],
       timeline: {
         startedAt: Date.now(),
@@ -160,9 +170,11 @@ describe('Sticker Hit GameState', () => {
     game.stateByPlayer[p1.id].stageIndex = last;
     game.stateByPlayer[p1.id].stage = {
       stageIndex: last,
+      isBoss: !!GAME_CONFIG.STAGES[last]?.isBoss,
       stickersTotal: 1,
       stickersRemaining: 1,
       obstacleStickers: [],
+      ringApples: [],
       stuckStickers: [],
       timeline: {
         startedAt: Date.now(),
@@ -176,6 +188,94 @@ describe('Sticker Hit GameState', () => {
     assert.ok(end);
     assert.equal(end.winnerId, p1.id);
     assert.equal(game.stateByPlayer[p1.id].finished, true);
+  });
+
+  it('collecting a ring apple increments apples and removes the apple', () => {
+    const { game, p1, p2 } = createGame();
+    currentGame = game;
+    game.active = true;
+    game.phase = 'playing';
+
+    game.stateByPlayer[p1.id].apples = 0;
+    game.stateByPlayer[p1.id].stage = {
+      stageIndex: 0,
+      isBoss: false,
+      stickersTotal: 2,
+      stickersRemaining: 2,
+      obstacleStickers: [],
+      ringApples: [{ id: 1, angle: 270 }],
+      stuckStickers: [],
+      timeline: {
+        startedAt: Date.now(),
+        initialAngle: 0,
+        segments: [{ atMs: 0, dps: 0 }],
+      },
+    };
+    game.stateByPlayer[p2.id].stage = {
+      stageIndex: 0,
+      isBoss: false,
+      stickersTotal: 99,
+      stickersRemaining: 99,
+      obstacleStickers: [],
+      ringApples: [],
+      stuckStickers: [],
+      timeline: {
+        startedAt: Date.now(),
+        initialAngle: 0,
+        segments: [{ atMs: 0, dps: 0 }],
+      },
+    };
+
+    game.handleAction(p1.id, { type: 'throw-sticker' });
+    assert.equal(game.stateByPlayer[p1.id].apples, 1);
+    assert.equal(game.stateByPlayer[p1.id].stage.ringApples.length, 0);
+    assert.equal(game.stateByPlayer[p1.id].stage.stuckStickers.length, 1);
+    assert.equal(game.stateByPlayer[p1.id].stage.stickersRemaining, 1);
+  });
+
+  it('spike obstacles use a wider collision arc than knives', () => {
+    const { game, p1, p2 } = createGame();
+    currentGame = game;
+    game.active = true;
+    game.phase = 'playing';
+
+    game.stateByPlayer[p1.id].stage = {
+      stageIndex: 0,
+      isBoss: false,
+      stickersTotal: 2,
+      stickersRemaining: 2,
+      obstacleStickers: [{ angle: 0, stickerSeed: 1, kind: 'spike' }],
+      ringApples: [],
+      stuckStickers: [],
+      timeline: {
+        startedAt: Date.now(),
+        initialAngle: 0,
+        segments: [{ atMs: 0, dps: 0 }],
+      },
+    };
+    game.stateByPlayer[p2.id].stage = {
+      stageIndex: 0,
+      isBoss: false,
+      stickersTotal: 99,
+      stickersRemaining: 99,
+      obstacleStickers: [],
+      ringApples: [],
+      stuckStickers: [],
+      timeline: {
+        startedAt: Date.now(),
+        initialAngle: 0,
+        segments: [{ atMs: 0, dps: 0 }],
+      },
+    };
+
+    const rot = 270 - 16;
+    game.stateByPlayer[p1.id].stage.timeline = {
+      startedAt: Date.now(),
+      initialAngle: rot,
+      segments: [{ atMs: 0, dps: 0 }],
+    };
+    game.handleAction(p1.id, { type: 'throw-sticker' });
+    assert.equal(game.stateByPlayer[p1.id].crashed, true);
   });
 });
 

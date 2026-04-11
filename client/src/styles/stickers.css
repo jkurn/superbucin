@@ -282,11 +282,107 @@
 }
 
 .sh-board-wrap {
+  position: relative;
   pointer-events: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.65rem;
+}
+
+.sh-dock-top {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  pointer-events: auto;
+}
+
+.sh-apples {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ffe8c8;
+  text-shadow: 0 0 10px rgba(255, 120, 60, 0.45);
+  padding: 0.2rem 0.45rem;
+  border-radius: 10px;
+  background: rgba(8, 20, 40, 0.65);
+  border: 1px solid rgba(255, 200, 120, 0.25);
+}
+
+.sh-store-btn {
+  font-size: 0.68rem !important;
+  padding: 0.28rem 0.55rem !important;
+  min-height: 36px;
+}
+
+.sh-ammo {
+  align-self: flex-start;
+  margin-left: 0.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  max-width: 140px;
+}
+
+.sh-ammo-dot {
+  width: 10px;
+  height: 18px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #9fffd0 0%, #3ecf8e 100%);
+  box-shadow: 0 0 6px rgba(100, 255, 180, 0.35);
+}
+
+.sh-ammo-dot[data-spent='true'] {
+  background: #2a3d52;
+  box-shadow: none;
+  opacity: 0.45;
+}
+
+.sh-store-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.sh-store-modal[hidden] {
+  display: none !important;
+}
+
+.sh-store-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 10, 22, 0.72);
+}
+
+.sh-store-card {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 360px);
+  padding: 1.1rem 1.2rem;
+  border-radius: 16px;
+  background: linear-gradient(165deg, #152a45 0%, #0c1828 100%);
+  border: 1px solid rgba(140, 200, 255, 0.22);
+  color: #e8f4ff;
+}
+
+.sh-store-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.sh-store-copy {
+  margin: 0 0 1rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #b8d4ec;
 }
 
 .sh-status {
