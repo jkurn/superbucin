@@ -278,6 +278,7 @@ describe('NetworkManager contracts', () => {
       fakeSocket.trigger('bonk-state', { hp: 80 });
       fakeSocket.trigger('cute-aggression-state', { combo: 2 });
       fakeSocket.trigger('sticker-hit-state', { stage: 3 });
+      fakeSocket.trigger('sticker-mash-duel-state', { score: 9 });
 
       assert.ok(emitted.find((e) => e.event === 'game:state'));
       assert.ok(emitted.find((e) => e.event === 'word:state'));
@@ -288,6 +289,7 @@ describe('NetworkManager contracts', () => {
       assert.ok(emitted.find((e) => e.event === 'bonk:state'));
       assert.ok(emitted.find((e) => e.event === 'cute-aggression:state'));
       assert.ok(emitted.find((e) => e.event === 'sticker-hit:state'));
+      assert.ok(emitted.find((e) => e.event === 'sticker-mash-duel:state'));
 
       nm.createRoom('othello');
       nm.createRoom('doodle-guess', ['cat']);
@@ -348,5 +350,23 @@ describe('NetworkManager contracts', () => {
 
     fakeSocket.trigger('room-error', { message: 'Validation failed' });
     assert.equal(navCount, 0);
+  });
+
+  it('sticker-mash-duel reconnect UX shows reconnecting then clears on reconnected', () => {
+    const fakeSocket = new FakeSocket();
+    const nm = new NetworkManager(() => fakeSocket);
+    const ui = makeUI();
+    nm.init(ui, {}, { getIdentity: () => ({}), refreshProfile: () => {} });
+
+    nm.roomGameType = 'sticker-mash-duel';
+    nm.roomCode = 'MASH1';
+    nm._inGame = true;
+
+    fakeSocket.trigger('opponent-disconnected', { reconnecting: true });
+    fakeSocket.trigger('opponent-reconnected');
+
+    const calls = ui.calls.map((c) => c.method);
+    assert.deepEqual(calls, ['showReconnecting', 'hideReconnecting']);
+    assert.equal(nm._inGame, true);
   });
 });

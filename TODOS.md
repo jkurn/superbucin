@@ -133,3 +133,9 @@ Legend: `[x]` shipped in current product direction · `[~]` partial / cosmetic o
   - Regression: `assertAllowedKeysOnly` / `assertRequiredKeys` on `memory-state`, `battleship-state`, `vending-state`, `bonk-state`, `cute-aggression-state` slices in `RoomManager.contracts.test.js`.
 - [x] ~~**Q-02 (0.5d): Extract shared test factories** (`mockSocket`, `createGame`, event helpers) to reduce copy-paste.~~ — Done: `server/test-helpers/roomManagerTestKit.js` (`MockGameState`, `GameFactory` registrations, `mockSocket`, `mockIo`).
 - [x] ~~**Q-03 (0.25d): Add payload schema assertion helpers** for game-state events.~~ — Done: `server/test-helpers/payloadShape.js` + `payloadShape.test.js` (`assertRequiredKeys`, `assertAllowedKeysOnly`).
+
+## Sticker Mash Duel hardening (2026-04-13)
+
+- [x] ~~Add playability invariants for random obstacle generation.~~ — Done: `server/games/sticker-mash-duel/GameState.js` now enforces obstacle min-gap with fallback spacing; tested in `GameState.test.js`.
+- [x] ~~Add reconnect continuity test for sticker-mash-duel socket migration.~~ — Done: `server/rooms/RoomManager.reconnect.test.js` verifies `migrateReconnectSocket(oldId,newId)` call for active mash-duel.
+- [x] ~~Add observability events for dropped taps, crash penalties, and round finish.~~ — Done: `sticker-mash-duel-metric` emitted by GameState and logged in `RoomManager.handleGameEvent`.

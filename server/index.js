@@ -24,6 +24,7 @@ import { GameState as VendingState, GAME_CONFIG as VENDING_CONFIG } from './game
 import { GameState as BonkBrawlState, GAME_CONFIG as BONK_BRAWL_CONFIG } from './games/bonk-brawl/GameState.js';
 import { GameState as CuteAggressionState, GAME_CONFIG as CUTE_AGGRESSION_CONFIG } from './games/cute-aggression/GameState.js';
 import { GameState as StickerHitState, GAME_CONFIG as STICKER_HIT_CONFIG } from './games/sticker-hit/GameState.js';
+import { GameState as StickerMashDuelState, GAME_CONFIG as STICKER_MASH_DUEL_CONFIG } from './games/sticker-mash-duel/GameState.js';
 
 GameFactory.register('pig-vs-chick', GameState, GAME_CONFIG);
 GameFactory.register('word-scramble-race', WordScrambleState, WORD_SCRAMBLE_CONFIG);
@@ -38,6 +39,7 @@ GameFactory.register('vending-machine', VendingState, VENDING_CONFIG);
 GameFactory.register('bonk-brawl', BonkBrawlState, BONK_BRAWL_CONFIG);
 GameFactory.register('cute-aggression', CuteAggressionState, CUTE_AGGRESSION_CONFIG);
 GameFactory.register('sticker-hit', StickerHitState, STICKER_HIT_CONFIG);
+GameFactory.register('sticker-mash-duel', StickerMashDuelState, STICKER_MASH_DUEL_CONFIG);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();

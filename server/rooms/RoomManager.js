@@ -472,6 +472,19 @@ export class RoomManager {
         break;
       }
 
+      case 'sticker-mash-duel-state': {
+        connected.forEach((p) => {
+          const slice = data.byPlayer[p.id];
+          if (slice) p.socket.emit('sticker-mash-duel-state', slice);
+        });
+        break;
+      }
+
+      case 'sticker-mash-duel-metric': {
+        console.info('[sticker-mash-duel-metric]', data);
+        break;
+      }
+
       case 'action-error':
         connected.forEach((p) => {
           if (p.id === data.playerId) {
@@ -654,7 +667,7 @@ export class RoomManager {
       }
     }
 
-    if (room.game && room.gameType === 'sticker-hit' && typeof room.game.migrateReconnectSocket === 'function') {
+    if (room.game && typeof room.game.migrateReconnectSocket === 'function') {
       room.game.migrateReconnectSocket(oldId, socket.id);
     }
 

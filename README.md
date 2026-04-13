@@ -28,6 +28,7 @@ Current server-registered games:
 - **Vending Machine** — versus vending strategy mini-game
 - **Bonk Brawl** — cute real-time brawl mode
 - **Cute Aggression** — virus-vs-virus mini-game set
+- **Sticker Mash Duel** — countdown into endless tap high-score duel
 
 ---
 

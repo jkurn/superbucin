@@ -130,6 +130,16 @@ export const GameFactory = {
       };
     }
 
+    if (gameType === 'sticker-mash-duel') {
+      return {
+        COUNTDOWN_MS: config.COUNTDOWN_MS,
+        ROUND_MS: config.ROUND_MS,
+        TAP_COOLDOWN_MS: config.TAP_COOLDOWN_MS,
+        POINTS_PER_STICK: config.POINTS_PER_STICK,
+        POINTS_PER_CRASH: config.POINTS_PER_CRASH,
+      };
+    }
+
     if (gameType === 'doodle-guess') {
       return {
         ROUND_TIME_MS: config.ROUND_TIME_MS,

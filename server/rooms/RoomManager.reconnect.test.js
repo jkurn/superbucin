@@ -220,6 +220,32 @@ describe('RoomManager — reconnect & disconnect branches', () => {
       assert.deepEqual(migrateCalls, [['host', 'host-new']]);
     });
 
+    it('rejoin sticker-mash-duel playing invokes migrateReconnectSocket with old and new socket ids', () => {
+      const host = mockSocket('host');
+      const joiner = mockSocket('joiner');
+      rm.createRoom(host, { gameType: 'othello' });
+      const code = host.lastEmit('room-created').roomCode;
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+      room.gameType = 'sticker-mash-duel';
+      room.state = 'playing';
+      room.players[0].disconnected = true;
+      const migrateCalls = [];
+      room.game = {
+        p1: room.players[0],
+        p2: room.players[1],
+        stateByPlayer: { host: { score: 5 } },
+        migrateReconnectSocket: (oldId, newId) => {
+          migrateCalls.push([oldId, newId]);
+        },
+        resume: () => {},
+      };
+
+      const re = mockSocket('host-new');
+      rm.rejoinRoom(re, code);
+      assert.deepEqual(migrateCalls, [['host', 'host-new']]);
+    });
+
     it('rematch resets sides and restarts or re-enters side-select', () => {
       const host = mockSocket('host');
       rm.createRoom(host, { gameType: 'memory-match' });

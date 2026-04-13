@@ -12,6 +12,7 @@ const STATE_EVENT_BRIDGE = {
   'bonk-state': 'bonk:state',
   'cute-aggression-state': 'cute-aggression:state',
   'sticker-hit-state': 'sticker-hit:state',
+  'sticker-mash-duel-state': 'sticker-mash-duel:state',
 };
 
 const OUTBOUND_SOCKET_EVENTS = {
