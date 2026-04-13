@@ -3,6 +3,7 @@ import { EventBus } from '../../shared/EventBus.js';
 import { reboundHeadingDegFromImpact, resolveThrowAgainstDisc } from '../../../../shared/sticker-hit/throwResolve.js';
 import { normalizeDeg, targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
 import { GAME_CONFIG } from './config.js';
+import { isStickerHitKnifeFocusMode } from './knifeFocusMode.js';
 import {
   DEFAULT_STICKER_MANIFEST_TIMEOUT_MS,
   fetchStickerManifest,
@@ -11,16 +12,17 @@ import {
 
 const KENNEY_ASSETS = {
   stallBg: '/kenney/shooting-gallery/Stall/bg_wood.png',
-  targetOverlay: '/kenney/shooting-gallery/Objects/target_back.png',
-  crosshair: '/kenney/shooting-gallery/HUD/crosshair_outline_small.png',
-  curtainTop: '/kenney/shooting-gallery/Stall/curtain_top.png',
-  treeOak: '/kenney/shooting-gallery/Stall/tree_oak.png',
-  cloud1: '/kenney/shooting-gallery/Stall/cloud1.png',
   pipOff: '/kenney/boardgame/Pieces%20(Yellow)/pieceYellow_border00.png',
   pipOn: '/kenney/boardgame/Pieces%20(Yellow)/pieceYellow_multi00.png',
 };
 
 const TARGET_RADIUS = 2.05;
+/** Cylinder height (after mesh lays disc in XY); reads as log thickness when tilted edge-on. */
+const LOG_BODY_HEIGHT = 1.08;
+/** Sprites sit just in front of the cap facing the camera (+Z local before group tilt). */
+const LOG_RIM_Z = LOG_BODY_HEIGHT / 2 + 0.07;
+/** Tilt whole target away from camera so the rim reads as a 3D log, not a flat plate. */
+const LOG_PRESENTATION_TILT_X = 0.5;
 
 function backendOrigin() {
   if (window.location.hostname === 'localhost') return 'http://localhost:3000';
@@ -66,7 +68,8 @@ export class StickerHitScene {
     this.textureCache = new Map();
     this.targetStageLabelEl = null;
     this.statusEl = null;
-    this.guideEl = null;
+    this.raceMiniEl = null;
+    this.manifestWarnEl = null;
     this.feedbackEl = null;
     this.progressYouEl = null;
     this.progressOppEl = null;
@@ -95,6 +98,8 @@ export class StickerHitScene {
     /** Smoothed `serverNow - Date.now()` so predicted impact matches server `_throwSticker`. */
     this._serverTimeOffsetMs = 0;
     this._serverClockSynced = false;
+    /** URL `?knifeFocus=1` — minimal chrome for knife-first play (client-only). */
+    this.knifeFocus = isStickerHitKnifeFocusMode();
 
     this._onState = (s) => this.applyState(s);
     this._onShoot = () => this.shoot();
@@ -105,6 +110,16 @@ export class StickerHitScene {
       }
     };
     this._onCanvasTap = () => this.shoot();
+    /** Tap-to-stick on overlay (not on buttons / store). */
+    this._onOverlayTap = (e) => {
+      const t = e.target;
+      if (!t || typeof t.closest !== 'function') return;
+      if (t.closest('button') || t.closest('a')) return;
+      if (t.closest('.sh-store-modal')) return;
+      if (t.closest('.sh-howto')) return;
+      if (!t.closest('.sh-wrap')) return;
+      this.shoot();
+    };
     this._onStoreOpen = () => this._openStoreModal();
     this._onStoreClose = () => this._closeStoreModal();
     this._onStoreListClick = (e) => {
@@ -133,19 +148,33 @@ export class StickerHitScene {
     this.rootEl = document.createElement('div');
     this.rootEl.className = 'sh-layer';
     this.rootEl.innerHTML = `
+      <div class="sh-aim-line" aria-hidden="true">
+        <span class="sh-aim-line__label">Stick lands here</span>
+        <span class="sh-aim-line__tick">▼</span>
+      </div>
       <div class="sh-wrap">
-        <div class="sh-board-wrap">
-          <div class="sh-dock-top">
-            <div class="sh-apples" id="sh-apples" title="Apples this match">🍎 0</div>
-            <button class="btn btn-small sh-store-btn" id="sh-store-btn" type="button">Skins</button>
+        <div class="sh-main-col">
+          <section class="sh-howto" aria-label="How to play">
+            <h2 class="sh-howto__title">Spinning log (knife-hit style)</h2>
+            <p class="sh-howto__body">
+              The log is <strong>tilted toward you</strong> (edge-on) so you see the wood thickness like classic knife-hit.
+              <strong>Tap when a clear gap lines up with the marker at the top of the rim</strong> — your throw always lands there.
+              If that spot has a blade, spike, or a sticker already stuck when your throw lands, you crash. Green dots are bonus apples. First player through every stage wins the race.
+            </p>
+            <p class="sh-howto__warn" id="sh-manifest-warn" hidden></p>
+          </section>
+          <div class="sh-board-wrap">
+            <div class="sh-dock-top">
+              <div class="sh-apples" id="sh-apples" title="Apples this match">🍎 0</div>
+              <button class="btn btn-small sh-store-btn" id="sh-store-btn" type="button">Skins</button>
+            </div>
+            <div class="sh-stage-label" id="sh-stage-label">Stage 1</div>
+            <div class="sh-stage-pips" id="sh-stage-pips"></div>
+            <div class="sh-race-mini" id="sh-race-mini">Race · You 1/5 · Sayang 1/5</div>
+            <div class="sh-status" id="sh-scene-status">Throws left this stage — tap when you see a gap at the top.</div>
+            <div class="sh-feedback" id="sh-feedback"></div>
+            <div class="sh-ammo" id="sh-ammo" aria-label="Throws remaining this stage"></div>
           </div>
-          <div class="sh-stage-label" id="sh-stage-label">Stage 1</div>
-          <div class="sh-stage-pips" id="sh-stage-pips"></div>
-          <div class="sh-guide" id="sh-guide">Throw -> land on empty gap. Hit sticker = crash. First to finish all stages wins.</div>
-          <div class="sh-status" id="sh-scene-status">Throw sticker to empty spaces. First to clear all stages wins.</div>
-          <div class="sh-feedback" id="sh-feedback"></div>
-          <div class="sh-ammo" id="sh-ammo" aria-label="Throws remaining this stage"></div>
-          <button class="btn btn-pink sh-throw-btn" id="sh-throw-btn" type="button">Throw Sticker</button>
         </div>
         <div class="sh-side">
           <div class="sh-progress-card">
@@ -161,6 +190,10 @@ export class StickerHitScene {
             <div class="sh-ghost-disc" id="sh-ghost-disc" aria-hidden="true"></div>
           </div>
         </div>
+        <footer class="sh-footer">
+          <button class="btn btn-pink sh-throw-btn" id="sh-throw-btn" type="button">Tap to stick</button>
+          <p class="sh-footer__hint">Or tap the stage column / 3D board / Space</p>
+        </footer>
       </div>
       <div class="sh-store-modal" id="sh-store-modal" hidden>
         <div class="sh-store-backdrop" id="sh-store-backdrop"></div>
@@ -178,8 +211,14 @@ export class StickerHitScene {
     `;
 
     document.getElementById('ui-overlay')?.appendChild(this.rootEl);
+    if (this.knifeFocus) {
+      this.rootEl.setAttribute('data-knife-focus', 'true');
+      const footHint = this.rootEl.querySelector('.sh-footer__hint');
+      if (footHint) footHint.textContent = 'Tap the board or Space.';
+    }
     this.targetStageLabelEl = this.rootEl.querySelector('#sh-stage-label');
-    this.guideEl = this.rootEl.querySelector('#sh-guide');
+    this.raceMiniEl = this.rootEl.querySelector('#sh-race-mini');
+    this.manifestWarnEl = this.rootEl.querySelector('#sh-manifest-warn');
     this.statusEl = this.rootEl.querySelector('#sh-scene-status');
     this.feedbackEl = this.rootEl.querySelector('#sh-feedback');
     this.progressYouEl = this.rootEl.querySelector('#sh-you-progress');
@@ -198,6 +237,7 @@ export class StickerHitScene {
     this.equipBossBtn = this.rootEl.querySelector('#sh-equip-boss');
 
     this.throwBtnEl?.addEventListener('click', this._onShoot);
+    this.rootEl.addEventListener('pointerdown', this._onOverlayTap);
     this.storeBtnEl?.addEventListener('click', this._onStoreOpen);
     this.storeCloseEl?.addEventListener('click', this._onStoreClose);
     this.storeBackdropEl?.addEventListener('click', this._onStoreClose);
@@ -217,15 +257,18 @@ export class StickerHitScene {
 
   _initThreeScene() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0f1833);
+    this.scene.background = new THREE.Color(0x0a1220);
     const aspect = window.innerWidth / window.innerHeight;
-    this.camera = new THREE.PerspectiveCamera(42, aspect, 0.1, 100);
-    this.camera.position.set(0, 0.8, 12);
-    this.camera.lookAt(0, 0.1, 0);
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.72));
-    const key = new THREE.DirectionalLight(0xfff2cc, 0.9);
-    key.position.set(4, 6, 7);
+    this.camera = new THREE.PerspectiveCamera(40, aspect, 0.1, 100);
+    this.camera.position.set(0, 0.05, 10.35);
+    this.camera.lookAt(0, 0.58, -0.35);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const key = new THREE.DirectionalLight(0xfff2cc, 1.05);
+    key.position.set(2.5, 8.5, 6.2);
     this.scene.add(key);
+    const fill = new THREE.DirectionalLight(0xb8d4ff, 0.35);
+    fill.position.set(-5, 0.5, 4);
+    this.scene.add(fill);
 
     const bgPlane = new THREE.Mesh(
       new THREE.PlaneGeometry(11, 16),
@@ -233,48 +276,33 @@ export class StickerHitScene {
     );
     bgPlane.position.set(0, 0, -2.5);
     this.scene.add(bgPlane);
-    this._applyTextureToPlane(bgPlane, KENNEY_ASSETS.stallBg, 0.34);
-
-    this._addDecorSprite(KENNEY_ASSETS.curtainTop, 0, 5.8, -2.4, 11, 2.8, 0.5);
-    this._addDecorSprite(KENNEY_ASSETS.treeOak, -4.2, -2.2, -2.3, 2.2, 4.2, 0.48);
-    this._addDecorSprite(KENNEY_ASSETS.treeOak, 4.2, -2.2, -2.3, 2.2, 4.2, 0.48);
-    this._addDecorSprite(KENNEY_ASSETS.cloud1, -3.4, 4.2, -2.45, 2.0, 1.0, 0.3);
-    this._addDecorSprite(KENNEY_ASSETS.cloud1, 3.3, 4.0, -2.45, 2.0, 1.0, 0.24);
+    this._applyTextureToPlane(bgPlane, KENNEY_ASSETS.stallBg, 0.2);
 
     this.targetGroup = new THREE.Group();
     this.scene.add(this.targetGroup);
-    this.targetGroup.position.set(0, 0.6, 0);
+    this.targetGroup.position.set(0, 0.62, 0);
+    this.targetGroup.rotation.x = LOG_PRESENTATION_TILT_X;
 
-    const targetGeom = new THREE.CylinderGeometry(TARGET_RADIUS, TARGET_RADIUS, 0.24, 64);
+    const targetGeom = new THREE.CylinderGeometry(TARGET_RADIUS, TARGET_RADIUS, LOG_BODY_HEIGHT, 72);
     const targetMat = new THREE.MeshStandardMaterial({
-      color: 0xf6a126,
-      roughness: 0.48,
-      metalness: 0.08,
-      emissive: 0x2a1500,
-      emissiveIntensity: 0.25,
+      color: 0xd8893a,
+      roughness: 0.52,
+      metalness: 0.06,
+      emissive: 0x1a0d00,
+      emissiveIntensity: 0.18,
     });
     this.targetMesh = new THREE.Mesh(targetGeom, targetMat);
     this.targetMesh.rotation.x = Math.PI / 2;
     this.targetGroup.add(this.targetMesh);
 
     const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(TARGET_RADIUS + 0.24, 0.16, 16, 80),
-      new THREE.MeshStandardMaterial({ color: 0xffdf98, roughness: 0.55, metalness: 0.06 }),
+      new THREE.TorusGeometry(TARGET_RADIUS + 0.22, 0.14, 16, 80),
+      new THREE.MeshStandardMaterial({ color: 0xf5ead0, roughness: 0.45, metalness: 0.05 }),
     );
     ring.rotation.x = Math.PI / 2;
     this.targetGroup.add(ring);
-    this._addDecorSprite(KENNEY_ASSETS.crosshair, 0, 3.6, 0.5, 0.75, 0.75, 0.62);
 
-    this.targetOverlayMesh = this._addDecorSprite(
-      KENNEY_ASSETS.targetOverlay,
-      0,
-      0,
-      0.15,
-      TARGET_RADIUS * 1.3,
-      TARGET_RADIUS * 1.3,
-      0.45,
-      this.targetGroup,
-    );
+    this.targetOverlayMesh = null;
 
     this.sceneManager.setScene(this.scene, this.camera);
   }
@@ -348,13 +376,13 @@ export class StickerHitScene {
   /** World-space rim point for disc-local impact angle (degrees), follows rotating `targetGroup`. */
   _rimWorldAtAngle(impactAngleDeg) {
     if (!this.targetGroup) {
-      return new THREE.Vector3(0, 0.6 + TARGET_RADIUS * 0.96, 0.52);
+      return new THREE.Vector3(0, 0.62 + TARGET_RADIUS * 0.96, LOG_RIM_Z);
     }
     const rad = (Number(impactAngleDeg) * Math.PI) / 180;
     const local = new THREE.Vector3(
       Math.sin(rad) * TARGET_RADIUS * 0.96,
       Math.cos(rad) * TARGET_RADIUS * 0.96,
-      0.52,
+      LOG_RIM_Z,
     );
     return local.applyMatrix4(this.targetGroup.matrixWorld);
   }
@@ -373,7 +401,7 @@ export class StickerHitScene {
 
     this.throwCooldownUntil = Date.now() + 160;
     this.pendingThrows += 1;
-    const flightMs = GAME_CONFIG.THROW_FLIGHT_MS ?? 420;
+    const flightMs = GAME_CONFIG.THROW_FLIGHT_MS ?? 520;
     this.network.sendGameAction({ type: 'throw-sticker', flightMs });
     this._playThrowAnim(flightMs);
     this._showFeedback('THROW!', 'throw');
@@ -394,7 +422,7 @@ export class StickerHitScene {
     const mat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true });
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(0.95, 0.95, 1);
-    sprite.position.set(0, -3.8, 0.8);
+    sprite.position.set(0, -4.35, 1.15);
     const eq = this.state?.you?.equippedSkinId;
     const goldGlow = eq === 'boss_glow' || ((eq === null || eq === undefined) && !!this.state?.you?.bossSkinUnlocked);
     if (sticker?.src) {
@@ -434,17 +462,21 @@ export class StickerHitScene {
       sprite,
       startedAt: performance.now(),
       durationMs: flightMs,
-      start: new THREE.Vector3(0, -3.8, 0.8),
+      start: new THREE.Vector3(0, -4.35, 1.15),
       impactAngleDeg,
     });
   }
 
-  _spawnImpactFx() {
+  _spawnImpactFx(impactAngleDeg) {
     const burst = new THREE.Mesh(
       new THREE.SphereGeometry(0.18, 10, 10),
       new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.95 }),
     );
-    burst.position.set(0, 0.6 + TARGET_RADIUS * 0.98, 0.5);
+    const pos =
+      impactAngleDeg !== null && impactAngleDeg !== undefined
+        ? this._rimWorldAtAngle(impactAngleDeg)
+        : this._rimWorldAtAngle(270);
+    burst.position.copy(pos);
     this.scene.add(burst);
     const start = performance.now();
     const tick = () => {
@@ -529,7 +561,7 @@ export class StickerHitScene {
       ...(stage.stuckStickers || []),
     ];
     const count = Math.max(28, seeds.length * 6);
-    const origin = new THREE.Vector3(0, 0.6, 0.52);
+    const origin = new THREE.Vector3(0, 0, LOG_RIM_Z * 0.35);
     this.targetGroup.localToWorld(origin);
     const pieces = [];
     for (let i = 0; i < count; i += 1) {
@@ -581,7 +613,7 @@ export class StickerHitScene {
     const localHit = new THREE.Vector3(
       Math.sin(rad) * TARGET_RADIUS * 0.98,
       Math.cos(rad) * TARGET_RADIUS * 0.98,
-      0.55,
+      LOG_RIM_Z + 0.02,
     );
     const worldHit = localHit.clone().applyMatrix4(this.targetGroup.matrixWorld);
 
@@ -636,7 +668,7 @@ export class StickerHitScene {
     const local = new THREE.Vector3(
       Math.sin(rad) * TARGET_RADIUS * 1.02,
       Math.cos(rad) * TARGET_RADIUS * 1.02,
-      0.62,
+      LOG_RIM_Z + 0.08,
     );
     const world = local.clone();
     this.targetGroup.localToWorld(world);
@@ -687,7 +719,7 @@ export class StickerHitScene {
       const sprite = new THREE.Sprite(mat);
       sprite.scale.set(0.62, 0.62, 1);
       const rad = (angleDeg * Math.PI) / 180;
-      sprite.position.set(Math.sin(rad) * TARGET_RADIUS, Math.cos(rad) * TARGET_RADIUS, 0.5);
+      sprite.position.set(Math.sin(rad) * TARGET_RADIUS, Math.cos(rad) * TARGET_RADIUS, LOG_RIM_Z);
       if (sticker?.src) {
         try {
           mat.map = this._loadTexture(sticker.src.replace(backendOrigin(), ''));
@@ -704,7 +736,11 @@ export class StickerHitScene {
       const sprite = new THREE.Sprite(mat);
       sprite.scale.set(0.38, 0.38, 1);
       const rad = (angleDeg * Math.PI) / 180;
-      sprite.position.set(Math.sin(rad) * TARGET_RADIUS * 1.02, Math.cos(rad) * TARGET_RADIUS * 1.02, 0.58);
+      sprite.position.set(
+        Math.sin(rad) * TARGET_RADIUS * 1.02,
+        Math.cos(rad) * TARGET_RADIUS * 1.02,
+        LOG_RIM_Z + 0.04,
+      );
       return sprite;
     };
 
@@ -806,12 +842,17 @@ export class StickerHitScene {
         ? `BOSS — Stage ${Math.min(myStage, total)} / ${total}`
         : `Stage ${Math.min(myStage, total)} / ${total}`;
     }
-    if (this.guideEl) {
-      const base = `Race: You ${Math.min(myStage, total)}/${total} vs Opp ${Math.min(oppStage, total)}/${total} | Throw -> gap, sticker hit = crash`;
-      const errLine = this._stickerManifestError
-        ? ` Sticker art: unavailable (${this._stickerManifestError}).`
-        : '';
-      this.guideEl.textContent = base + errLine;
+    if (this.raceMiniEl) {
+      this.raceMiniEl.textContent = `Race · You ${Math.min(myStage, total)}/${total} · Sayang ${Math.min(oppStage, total)}/${total}`;
+    }
+    if (this.manifestWarnEl) {
+      if (this._stickerManifestError) {
+        this.manifestWarnEl.hidden = false;
+        this.manifestWarnEl.textContent = `Sticker art unavailable (${this._stickerManifestError}) — rim still shows blades and apples.`;
+      } else {
+        this.manifestWarnEl.hidden = true;
+        this.manifestWarnEl.textContent = '';
+      }
     }
     if (this.stagePipsEl) {
       const active = Math.max(0, Math.min(total, myStage));
@@ -846,23 +887,23 @@ export class StickerHitScene {
     if (this.applesEl) {
       const y = this.state.you?.apples ?? 0;
       const oy = this.state.opponent?.apples ?? 0;
-      this.applesEl.textContent = `🍎 ${y} · opp ${oy}`;
+      this.applesEl.textContent = this.knifeFocus ? `🍎 ${y}` : `🍎 ${y} · opp ${oy}`;
     }
 
     if (!this.statusEl) return;
     if (this.state.phase === 'countdown') {
-      this.statusEl.textContent = 'Get ready...';
+      this.statusEl.textContent = 'Get ready — watch the top of the log for gaps.';
     } else if (this.state.you?.crashed) {
-      this.statusEl.textContent = 'You crashed on another sticker!';
+      this.statusEl.textContent = 'Crash — that landing spot had a blade or sticker already.';
     } else if (this.state.opponent?.crashed) {
-      this.statusEl.textContent = 'Opponent crashed. Nice pressure!';
+      this.statusEl.textContent = 'Sayang crashed. Keep your rhythm!';
     } else if (this.state.you?.finished) {
       this.statusEl.textContent = 'All stages cleared!';
     } else if (this.state.opponent?.finished) {
-      this.statusEl.textContent = 'Opponent cleared all stages.';
+      this.statusEl.textContent = 'Sayang cleared all stages first.';
     } else {
       const left = this.state.you?.stage?.stickersRemaining ?? 0;
-      this.statusEl.textContent = `${left} sticker${left === 1 ? '' : 's'} left this stage`;
+      this.statusEl.textContent = `${left} throw${left === 1 ? '' : 's'} left — tap when a gap sits at the top marker.`;
     }
 
     this._renderGhostDisc();
@@ -928,8 +969,8 @@ export class StickerHitScene {
       this.camera.position.x += (0 - this.camera.position.x) * Math.min(1, dt * 8);
     }
 
-    const wx = GAME_CONFIG.THROW_WOBBLE_X ?? 0.14;
-    const wy = GAME_CONFIG.THROW_WOBBLE_Y ?? 0.32;
+    const wx = GAME_CONFIG.THROW_WOBBLE_X ?? 0.04;
+    const wy = GAME_CONFIG.THROW_WOBBLE_Y ?? 0.08;
 
     if (this.targetGroup) this.targetGroup.updateMatrixWorld(true);
 
@@ -938,7 +979,7 @@ export class StickerHitScene {
       const eased = 1 - ((1 - t) ** 3);
       const endWorld = p.impactAngleDeg !== null && p.impactAngleDeg !== undefined
         ? this._rimWorldAtAngle(p.impactAngleDeg)
-        : new THREE.Vector3(0, 0.6 + TARGET_RADIUS, 0.6);
+        : this._rimWorldAtAngle(270);
       p.sprite.position.lerpVectors(p.start, endWorld, eased);
       p.sprite.position.x += Math.sin(t * Math.PI) * wx;
       p.sprite.position.y += Math.sin(t * Math.PI) * wy;
@@ -946,7 +987,7 @@ export class StickerHitScene {
       p.sprite.material.rotation += dt * 16;
       if (t >= 1) {
         this.scene.remove(p.sprite);
-        this._spawnImpactFx();
+        this._spawnImpactFx(p.impactAngleDeg);
         return false;
       }
       return true;
@@ -1001,6 +1042,7 @@ export class StickerHitScene {
     EventBus.off('sticker-hit:state', this._onState);
     window.removeEventListener('keydown', this._onKeyDown);
     this.sceneManager.renderer?.domElement.removeEventListener('pointerdown', this._onCanvasTap);
+    this.rootEl?.removeEventListener('pointerdown', this._onOverlayTap);
     if (this.throwBtnEl) this.throwBtnEl.removeEventListener('click', this._onShoot);
     if (this.storeBtnEl) this.storeBtnEl.removeEventListener('click', this._onStoreOpen);
     if (this.storeCloseEl) this.storeCloseEl.removeEventListener('click', this._onStoreClose);

@@ -54,8 +54,9 @@ export function impactAngleAtServerTime(timeline, atMs) {
 }
 
 /**
- * Sample collision along throw flight; first occupied sample wins (crash).
- * Apple is evaluated only at final landing if no crash.
+ * Resolve throw vs rotating rim: by default only **landing** is checked for occupied arc
+ * (knife-hit timing). With `THROW_CHECK_PATH_COLLISION: true`, also samples along flight;
+ * first occupied sample wins (crash). Apple is evaluated only at final landing if no crash.
  *
  * @param {{
  *   timeline: import('./timeline.js').Timeline,
@@ -64,7 +65,7 @@ export function impactAngleAtServerTime(timeline, atMs) {
  *   obstacleStickers: object[],
  *   stuckStickers: object[],
  *   ringApples: { angle: number }[],
- *   cfg: object,
+ *   cfg: { THROW_CHECK_PATH_COLLISION?: boolean } & object,
  *   sampleCount?: number,
  * }} opts
  */
@@ -82,12 +83,15 @@ export function resolveThrowAgainstDisc(opts) {
 
   const sampleCount = Math.max(2, Math.floor(Number(rawN) || 12));
   const ms = Math.max(0, Number(flightMs) || 0);
+  const checkPath = cfg.THROW_CHECK_PATH_COLLISION === true;
 
-  for (let i = 1; i <= sampleCount; i += 1) {
-    const tMs = nowMs + (ms * i) / sampleCount;
-    const impactAngle = impactAngleAtServerTime(timeline, tMs);
-    if (collidesOccupiedStickerHit(impactAngle, obstacleStickers, stuckStickers, cfg)) {
-      return { crash: true, impactAngle, appleIdx: -1 };
+  if (checkPath) {
+    for (let i = 1; i <= sampleCount; i += 1) {
+      const tMs = nowMs + (ms * i) / sampleCount;
+      const impactAngle = impactAngleAtServerTime(timeline, tMs);
+      if (collidesOccupiedStickerHit(impactAngle, obstacleStickers, stuckStickers, cfg)) {
+        return { crash: true, impactAngle, appleIdx: -1 };
+      }
     }
   }
 

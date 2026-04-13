@@ -28,7 +28,7 @@ describe('throwResolve', () => {
     }
   });
 
-  it('detects mid-flight crash that final-only sampling would miss', () => {
+  it('default (landing-only): empty slot at release stays safe even if disc spins through a blade mid-flight', () => {
     const nowMs = 1000;
     const timeline = {
       startedAt: nowMs,
@@ -36,9 +36,8 @@ describe('throwResolve', () => {
       segments: [{ atMs: 0, dps: 360 }],
     };
     const flightMs = 1000;
-    const finalOnly = normalizeDeg(270 - targetRotationDeg(timeline, nowMs + flightMs));
-    assert.equal(finalOnly, 270);
-
+    const finalImpact = normalizeDeg(270 - targetRotationDeg(timeline, nowMs + flightMs));
+    assert.equal(finalImpact, 270);
     const resolved = resolveThrowAgainstDisc({
       timeline,
       nowMs,
@@ -49,9 +48,32 @@ describe('throwResolve', () => {
       cfg: CFG,
       sampleCount: 4,
     });
+    assert.equal(resolved.crash, false);
+    assert.equal(resolved.impactAngle, 270);
+  });
+
+  it('path collision mode: mid-flight occupied sample is a crash when final angle is clear', () => {
+    const nowMs = 1000;
+    const timeline = {
+      startedAt: nowMs,
+      initialAngle: 0,
+      segments: [{ atMs: 0, dps: 360 }],
+    };
+    const flightMs = 1000;
+    const finalOnly = normalizeDeg(270 - targetRotationDeg(timeline, nowMs + flightMs));
+    assert.equal(finalOnly, 270);
+    const resolved = resolveThrowAgainstDisc({
+      timeline,
+      nowMs,
+      flightMs,
+      obstacleStickers: [{ angle: 180, kind: 'knife' }],
+      stuckStickers: [],
+      ringApples: [],
+      cfg: { ...CFG, THROW_CHECK_PATH_COLLISION: true },
+      sampleCount: 4,
+    });
     assert.equal(resolved.crash, true);
     assert.equal(resolved.impactAngle, 180);
-    assert.notEqual(finalOnly, resolved.impactAngle);
   });
 
   it('ring apple counts only at final impact when path is clear', () => {

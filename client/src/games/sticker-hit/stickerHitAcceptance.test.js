@@ -17,9 +17,9 @@ import { StickerHitScene } from './StickerHitScene.js';
 
 const nodePerformance = globalThis.performance;
 
-function installDom() {
+function installDom(url = 'http://localhost:5173/') {
   const dom = new JSDOM('<!DOCTYPE html><html><body><div id="ui-overlay"></div></body></html>', {
-    url: 'http://localhost:5173/',
+    url,
   });
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
@@ -200,8 +200,54 @@ describe('Sticker Hit acceptance — HUD (partial / Done)', () => {
   });
 });
 
-describe('Sticker Hit acceptance — US01 client/server resolver parity (Done)', () => {
-  it('client throw preview uses same multi-sample resolver as server (not final-only)', () => {
+describe('Sticker Hit acceptance — knife focus (?knifeFocus=1)', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    installDom('http://localhost:5173/room/TEST?knifeFocus=1');
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({ stickers: [{ src: '/stickers/t.webp', durationMs: 400 }] }),
+    });
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    EventBus.clear();
+    delete globalThis.window;
+    delete globalThis.document;
+    delete globalThis.localStorage;
+    globalThis.performance = nodePerformance;
+    delete globalThis.requestAnimationFrame;
+    delete globalThis.cancelAnimationFrame;
+  });
+
+  it('createHUD sets data-knife-focus on .sh-hud for reduced top chrome', () => {
+    const overlay = document.getElementById('ui-overlay');
+    const api = stickerHitGame.createHUD(overlay, {}, {});
+    const hudEl = overlay.querySelector('.sh-hud');
+    assert.equal(hudEl?.getAttribute('data-knife-focus'), 'true');
+    api.destroy();
+  });
+
+  it('StickerHitScene sets data-knife-focus and throw still dispatches', async () => {
+    const actions = [];
+    const scene = new StickerHitScene(makeSceneManager(), { sendGameAction: (a) => actions.push(a) }, null, {});
+    scene.init();
+    assert.equal(scene.knifeFocus, true);
+    assert.equal(scene.rootEl.getAttribute('data-knife-focus'), 'true');
+    assert.ok(scene.rootEl.querySelector('.sh-side'));
+    scene.applyState(baseState());
+    await new Promise((r) => setTimeout(r, 0));
+    document.getElementById('sh-throw-btn')?.click();
+    assert.equal(actions.length, 1);
+    assert.equal(actions[0].type, 'throw-sticker');
+    scene.destroy();
+  });
+});
+
+describe('Sticker Hit acceptance — US01 knife-hit throw (Done)', () => {
+  it('resolver matches landing-only default (clear slot at throw = stick)', () => {
     const nowMs = 3000;
     const timeline = {
       startedAt: nowMs,
@@ -209,7 +255,7 @@ describe('Sticker Hit acceptance — US01 client/server resolver parity (Done)',
       segments: [{ atMs: 0, dps: 360 }],
     };
     const flightMs = 1000;
-    const legacyFinal = normalizeDeg(270 - targetRotationDeg(timeline, nowMs + flightMs));
+    const finalImpact = normalizeDeg(270 - targetRotationDeg(timeline, nowMs + flightMs));
     const resolved = resolveThrowAgainstDisc({
       timeline,
       nowMs,
@@ -220,8 +266,8 @@ describe('Sticker Hit acceptance — US01 client/server resolver parity (Done)',
       cfg: STICKER_HIT_GAME_CONFIG,
       sampleCount: STICKER_HIT_GAME_CONFIG.THROW_PATH_SAMPLES,
     });
-    assert.equal(legacyFinal, 270);
-    assert.equal(resolved.crash, true);
-    assert.equal(resolved.impactAngle, 180);
+    assert.equal(finalImpact, 270);
+    assert.equal(resolved.crash, false);
+    assert.equal(resolved.impactAngle, 270);
   });
 });

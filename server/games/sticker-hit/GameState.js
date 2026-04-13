@@ -248,8 +248,8 @@ export class GameState {
     if (!this.active || this.phase !== 'playing') return;
     if (!action || typeof action !== 'object') return;
     if (action.type === 'throw-sticker') {
-      const maxF = GAME_CONFIG.THROW_FLIGHT_MAX_MS ?? 700;
-      const defF = GAME_CONFIG.THROW_FLIGHT_MS ?? 420;
+      const maxF = GAME_CONFIG.THROW_FLIGHT_MAX_MS ?? 750;
+      const defF = GAME_CONFIG.THROW_FLIGHT_MS ?? 520;
       const raw = Number(action.flightMs);
       const flightMs = Number.isFinite(raw)
         ? Math.max(0, Math.min(maxF, raw))

@@ -98,6 +98,8 @@ Legend: `[x]` shipped in current product direction · `[~]` partial / cosmetic o
 
 **Sticker Hit — quality gates (still open)**
 
+- [x] **Knife focus (`?knifeFocus=1`)** — Client-only reduced chrome: hide side/ghost/store/scene race strip; HUD hides Sayang pills + long race line; dock apples `🍎 n` only. `knifeFocusMode.js`, `[data-knife-focus="true"]` on `.sh-layer` / `.sh-hud` in `stickers.css`. Example: `/room/ABCD?knifeFocus=1`.
+
 - [x] ~~Mobile-input contract tests (throw, store, equip buttons) in jsdom or browser harness.~~ — Done: `client/src/games/sticker-hit/StickerHitScene.test.js`.
 - [x] ~~Sticker manifest degradation — runtime timeout + errors; add **automated** tests (see global gate above).~~ — Done: `client/src/games/sticker-hit/stickerManifest.js` + `stickerManifest.test.js`.
 - [x] ~~Fuzz / invariant tests for ring placement (apple vs obstacle angular separation) under worst random draws.~~ — Done: `shared/sticker-hit/stageLayoutInvariants.js` + `stageLayoutInvariants.test.js` + fuzz in `server/games/sticker-hit/GameState.test.js`.

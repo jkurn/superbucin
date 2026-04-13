@@ -6,9 +6,9 @@ import { StickerHitScene } from './StickerHitScene.js';
 
 const nodePerformance = globalThis.performance;
 
-function installDom() {
+function installDom(url = 'http://localhost:5173/') {
   const dom = new JSDOM('<!DOCTYPE html><html><body><div id="ui-overlay"></div></body></html>', {
-    url: 'http://localhost:5173/',
+    url,
   });
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
@@ -163,6 +163,23 @@ describe('StickerHitScene input contracts', () => {
     document.getElementById('sh-store-btn')?.click();
     document.getElementById('sh-equip-boss')?.click();
     assert.ok(actions.some((a) => a.type === 'sticker-equip-skin' && a.skinId === 'boss_glow'));
+    scene.destroy();
+  });
+
+  it('knifeFocus URL sets layer dataset and simplifies dock apples copy', async () => {
+    installDom('http://localhost:5173/room/X?knifeFocus=1');
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({ stickers: [{ src: '/stickers/t.webp', durationMs: 400 }] }),
+    });
+    const scene = new StickerHitScene(makeSceneManager(), { sendGameAction: () => {} }, null, {});
+    scene.init();
+    assert.equal(scene.rootEl.getAttribute('data-knife-focus'), 'true');
+    scene.applyState(playingState());
+    await new Promise((r) => setTimeout(r, 0));
+    const apples = document.getElementById('sh-apples');
+    assert.ok(apples?.textContent?.startsWith('🍎'));
+    assert.ok(!apples?.textContent?.includes('opp'));
     scene.destroy();
   });
 });

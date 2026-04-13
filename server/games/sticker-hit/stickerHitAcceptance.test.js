@@ -96,8 +96,12 @@ describe('Sticker Hit acceptance — runtime invariants after start (Done)', () 
   });
 });
 
-describe('Sticker Hit acceptance — US01 multi-sample flight (Done)', () => {
-  it('mid-arc occupied sample is a crash even when final rim angle is clear', () => {
+describe('Sticker Hit acceptance — US01 knife-hit throw (Done)', () => {
+  it('default config uses landing-only collision (rim at impact)', () => {
+    assert.equal(CFG.THROW_CHECK_PATH_COLLISION, false);
+  });
+
+  it('path collision optional: mid-arc hit when THROW_CHECK_PATH_COLLISION true', () => {
     const nowMs = 2000;
     const timeline = {
       startedAt: nowMs,
@@ -113,7 +117,7 @@ describe('Sticker Hit acceptance — US01 multi-sample flight (Done)', () => {
       obstacleStickers: [{ angle: 180, kind: 'knife' }],
       stuckStickers: [],
       ringApples: [],
-      cfg: CFG,
+      cfg: { ...CFG, THROW_CHECK_PATH_COLLISION: true },
       sampleCount: 4,
     });
     assert.equal(resolved.crash, true);

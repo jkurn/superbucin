@@ -149,11 +149,12 @@ describe('GameFactory', () => {
     assert.equal(word.MIN_WORD_LENGTH, 3);
 
     const sticker = GameFactory.getConfig('sticker-hit');
-    assert.equal(sticker.COLLISION_DEGREES, 14);
+    assert.equal(sticker.COLLISION_DEGREES, 12);
     assert.equal(Array.isArray(sticker.STAGES), true);
     assert.equal(Array.isArray(sticker.SKINS), true);
-    assert.equal(sticker.THROW_FLIGHT_MS, 420);
-    assert.equal(sticker.THROW_FLIGHT_MAX_MS, 700);
+    assert.equal(sticker.THROW_FLIGHT_MS, 520);
+    assert.equal(sticker.THROW_FLIGHT_MAX_MS, 750);
+    assert.equal(sticker.THROW_CHECK_PATH_COLLISION, false);
     assert.equal(sticker.THROW_PATH_SAMPLES, 12);
     assert.equal(sticker.MARATHON_ROUNDS, 1);
 
