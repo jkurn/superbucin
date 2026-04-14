@@ -955,6 +955,265 @@
   }
 }
 
+/* ── Sticker Mash Duel ─────────────────────────────────────────────────── */
+
+/* Arena — single column, centered layout */
+.smd-arena {
+  width: min(100%, 440px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0 0.5rem;
+  pointer-events: auto;
+}
+
+/* Timer bar */
+.smd-timer-bar {
+  position: relative;
+  width: 100%;
+  height: 28px;
+  border-radius: 14px;
+  background: rgba(6, 16, 32, 0.7);
+  border: 1px solid rgba(120, 180, 255, 0.2);
+  overflow: hidden;
+}
+
+.smd-timer-fill {
+  height: 100%;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #3ecf8e, #ffe066);
+  transition: width 100ms linear;
+}
+
+.smd-timer-fill.smd-timer-danger {
+  background: linear-gradient(90deg, #ff6b6b, #ff9b3d);
+}
+
+.smd-timer-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* Score cards — horizontal */
+.smd-scores {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+.smd-score-card {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(7, 17, 34, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  flex: 1;
+  max-width: 180px;
+}
+
+.smd-score-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.smd-score-label {
+  font-size: 0.7rem;
+  color: #9bc0df;
+}
+
+.smd-score-value {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #fff;
+  margin-left: auto;
+}
+
+/* Status */
+.smd-status {
+  font-size: 0.78rem;
+  color: #d9ecff;
+  text-shadow: 0 0 10px rgba(60, 140, 255, 0.35);
+  text-align: center;
+}
+
+/* 3D perspective deck */
+.smd-stage-3d {
+  perspective: 600px;
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem 0;
+}
+
+.smd-deck {
+  position: relative;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.smd-deck__cards {
+  position: relative;
+  width: 100px;
+  height: 130px;
+  transform-style: preserve-3d;
+  transform: rotateX(8deg);
+}
+
+.smd-deck-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 88px;
+  height: 118px;
+  margin: -59px 0 0 -44px;
+  border-radius: 12px;
+  background-color: #1a2f4a;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.35),
+    0 10px 22px rgba(0, 0, 0, 0.45);
+  transform-origin: 50% 80%;
+  pointer-events: none;
+}
+
+.smd-deck-card--placeholder {
+  background-image: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+/* FX layer */
+.smd-fx-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 4;
+}
+
+.smd-fly-sticker {
+  position: absolute;
+  width: 80px;
+  height: 100px;
+  margin: -50px 0 0 -40px;
+  border-radius: 11px;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  animation: smdFlyBurst 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes smdFlyBurst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--smd-fly-dx, 220px), var(--smd-fly-dy, -240px)) rotate(var(--smd-fly-rot, 18deg)) scale(0.88);
+  }
+}
+
+/* Footer */
+.smd-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding-top: 0.25rem;
+  pointer-events: auto;
+}
+
+.smd-tap-btn {
+  width: min(92vw, 380px);
+  min-height: 56px;
+  font-size: 1.15rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.06em;
+}
+
+.smd-footer-hint {
+  margin: 0;
+  font-size: 0.65rem;
+  color: #8fb0d4;
+  text-align: center;
+}
+
+/* Leaderboard */
+.smd-leaderboard {
+  width: 100%;
+  max-width: 360px;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 14px;
+  background: rgba(6, 14, 28, 0.85);
+  border: 1px solid rgba(120, 190, 255, 0.2);
+}
+
+.smd-leaderboard[hidden] {
+  display: none !important;
+}
+
+.smd-lb-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #ffd68c;
+  text-align: center;
+  margin: 0 0 0.5rem;
+}
+
+.smd-lb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+  color: #e8f4ff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.smd-lb-rank {
+  width: 1.5rem;
+  font-weight: 800;
+  color: #ffd68c;
+}
+
+.smd-lb-name {
+  flex: 1;
+}
+
+.smd-lb-score {
+  font-weight: 700;
+  color: #9fffd0;
+}
+
+.smd-lb-empty {
+  text-align: center;
+  font-size: 0.72rem;
+  color: #8fb0d4;
+  padding: 0.5rem 0;
+}
+
 @media (max-width: 760px) {
   .sh-layer {
     padding-left: 0.35rem;

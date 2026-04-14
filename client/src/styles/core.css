@@ -345,6 +345,7 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .game-card-badge {
   display: inline-block;
+  max-width: 100%;
   background: rgba(255, 107, 157, 0.2);
   color: #ff6b9d;
   font-size: 0.65rem;
@@ -353,6 +354,8 @@ canvas { display: block; width: 100%; height: 100%; }
   margin-top: 0.55rem;
   font-weight: 600;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Stage 3 of index.html refactor: remaining inline CSS moved to external stylesheet */

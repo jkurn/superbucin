@@ -136,7 +136,6 @@ export const GameFactory = {
         ROUND_MS: config.ROUND_MS,
         TAP_COOLDOWN_MS: config.TAP_COOLDOWN_MS,
         POINTS_PER_STICK: config.POINTS_PER_STICK,
-        POINTS_PER_CRASH: config.POINTS_PER_CRASH,
       };
     }
 

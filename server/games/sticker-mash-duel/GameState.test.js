@@ -1,13 +1,16 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameState, GAME_CONFIG } from './GameState.js';
-import { angularDistanceDeg, obstacleCenterMinGap } from '../../../shared/sticker-hit/stageLayoutInvariants.js';
 
 function mkPlayers() {
   return [{ id: 'p1' }, { id: 'p2' }];
 }
 
 describe('sticker-mash-duel/GameState', () => {
+  it('ROUND_MS is 30 seconds', () => {
+    assert.equal(GAME_CONFIG.ROUND_MS, 30_000);
+  });
+
   it('starts in countdown and emits per-player state', () => {
     const [p1, p2] = mkPlayers();
     const events = [];
@@ -26,9 +29,24 @@ describe('sticker-mash-duel/GameState', () => {
     gs.start();
     gs.phase = 'playing';
     gs.handleAction(p1.id, { type: 'mash-tap' });
-    const score = gs.stateByPlayer[p1.id].score;
-    assert.ok(Number.isFinite(score));
-    assert.ok(score >= 0);
+    assert.equal(gs.stateByPlayer[p1.id].score, 1);
+    assert.equal(gs.stateByPlayer[p1.id].stuckSeeds.length, 1);
+    gs.stop();
+  });
+
+  it('stuckSeeds accumulate on each tap', () => {
+    const [p1, p2] = mkPlayers();
+    const gs = new GameState(p1, p2, () => {});
+    gs.start();
+    gs.phase = 'playing';
+    // Bypass cooldown by resetting tap timer between taps
+    gs.handleAction(p1.id, { type: 'mash-tap' });
+    gs.nextTapAtByPlayer[p1.id] = 0;
+    gs.handleAction(p1.id, { type: 'mash-tap' });
+    gs.nextTapAtByPlayer[p1.id] = 0;
+    gs.handleAction(p1.id, { type: 'mash-tap' });
+    assert.equal(gs.stateByPlayer[p1.id].stuckSeeds.length, 3);
+    assert.equal(gs.stateByPlayer[p1.id].score, 3);
     gs.stop();
   });
 
@@ -43,6 +61,29 @@ describe('sticker-mash-duel/GameState', () => {
     const after = gs.stateByPlayer[p1.id].tapsAccepted;
     assert.ok(after - before <= 1);
     assert.ok(GAME_CONFIG.TAP_COOLDOWN_MS > 0);
+    gs.stop();
+  });
+
+  it('view includes roundTotalMs', () => {
+    const [p1, p2] = mkPlayers();
+    const events = [];
+    const gs = new GameState(p1, p2, (event, data) => events.push({ event, data }));
+    gs.start();
+    const stateEvent = events.find((e) => e.event === 'sticker-mash-duel-state');
+    assert.equal(stateEvent.data.byPlayer[p1.id].roundTotalMs, 30_000);
+    gs.stop();
+  });
+
+  it('view includes stuckSeeds for each player', () => {
+    const [p1, p2] = mkPlayers();
+    const events = [];
+    const gs = new GameState(p1, p2, (event, data) => events.push({ event, data }));
+    gs.start();
+    gs.phase = 'playing';
+    gs.handleAction(p1.id, { type: 'mash-tap' });
+    const stateEvent = events.filter((e) => e.event === 'sticker-mash-duel-state').pop();
+    assert.ok(Array.isArray(stateEvent.data.byPlayer[p1.id].you.stuckSeeds));
+    assert.equal(stateEvent.data.byPlayer[p1.id].you.stuckSeeds.length, 1);
     gs.stop();
   });
 
@@ -62,22 +103,7 @@ describe('sticker-mash-duel/GameState', () => {
     assert.deepEqual(matchEnd.data.scores, [7, 7]);
   });
 
-  it('enforces obstacle spacing invariants for generated stage', () => {
-    const [p1, p2] = mkPlayers();
-    const gs = new GameState(p1, p2, () => {});
-    gs.start();
-    const stage = gs.stateByPlayer[p1.id].stage;
-    const minGap = obstacleCenterMinGap(GAME_CONFIG);
-    const obs = stage.obstacleStickers || [];
-    for (let i = 0; i < obs.length; i += 1) {
-      for (let j = i + 1; j < obs.length; j += 1) {
-        assert.ok(angularDistanceDeg(obs[i].angle, obs[j].angle) >= minGap);
-      }
-    }
-    gs.stop();
-  });
-
-  it('emits observability metrics for cooldown drops, crash penalties, and finish', () => {
+  it('emits observability metrics for cooldown drops and finish', () => {
     const [p1, p2] = mkPlayers();
     const events = [];
     const gs = new GameState(p1, p2, (event, data) => events.push({ event, data }));
@@ -87,20 +113,6 @@ describe('sticker-mash-duel/GameState', () => {
     gs.nextTapAtByPlayer[p1.id] = Date.now() + 999;
     gs.handleAction(p1.id, { type: 'mash-tap' });
     assert.ok(events.some((e) => e.event === 'sticker-mash-duel-metric' && e.data.kind === 'tap_dropped_cooldown'));
-
-    gs._resolveTap = () => {
-      const ps = gs.stateByPlayer[p1.id];
-      ps.crashCount += 1;
-      ps.score = Math.max(0, ps.score + GAME_CONFIG.POINTS_PER_CRASH);
-      gs._emitTelemetry('tap_crash_penalty', {
-        playerId: p1.id,
-        score: ps.score,
-        crashCount: ps.crashCount,
-      });
-    };
-    gs.nextTapAtByPlayer[p1.id] = 0;
-    gs.handleAction(p1.id, { type: 'mash-tap' });
-    assert.ok(events.some((e) => e.event === 'sticker-mash-duel-metric' && e.data.kind === 'tap_crash_penalty'));
 
     gs._finishMatch();
     assert.ok(events.some((e) => e.event === 'sticker-mash-duel-metric' && e.data.kind === 'round_finished'));
@@ -118,7 +130,6 @@ describe('sticker-mash-duel/GameState', () => {
     try {
       const gs = new GameState(p1, p2, (event, data) => events.push({ event, data }));
       gs.start();
-      // Run countdown callback immediately to move into playing and emit round_started.
       assert.ok(timers.length > 0);
       timers.shift()();
       gs._finishMatch();

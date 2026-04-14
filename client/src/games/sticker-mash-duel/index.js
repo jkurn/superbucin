@@ -4,9 +4,9 @@ import { applyServerConfig } from './config.js';
 export const stickerMashDuelGame = {
   type: 'sticker-mash-duel',
   lobby: {
-    name: 'Sticker Mash Duel',
+    name: 'Sticker Duel',
     icon: '🏷️⚡',
-    badge: 'Countdown + endless tap score race',
+    badge: 'Fast tap duel',
   },
   victoryMessages: {
     win: ['Mash monster. High score secured!'],

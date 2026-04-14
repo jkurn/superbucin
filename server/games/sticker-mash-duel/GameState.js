@@ -1,87 +1,14 @@
 import { randomInt } from 'crypto';
-import { STICKER_HIT_GAME_CONFIG } from '../../../shared/sticker-hit/gameConfig.js';
-import { resolveThrowAgainstDisc } from '../../../shared/sticker-hit/throwResolve.js';
-import { angularDistanceDeg, obstacleCenterMinGap } from '../../../shared/sticker-hit/stageLayoutInvariants.js';
 
 export const GAME_CONFIG = {
   SKIP_SIDE_SELECT: true,
-  COUNTDOWN_MS: STICKER_HIT_GAME_CONFIG.COUNTDOWN_MS,
-  TICK_MS: STICKER_HIT_GAME_CONFIG.TICK_MS,
-  ROUND_MS: 45_000,
+  COUNTDOWN_MS: 3000,
+  TICK_MS: 100,
+  ROUND_MS: 30_000,
   TAP_COOLDOWN_MS: 65,
-  CRASH_STUN_MS: 500,
   POINTS_PER_STICK: 1,
-  POINTS_PER_CRASH: -2,
-  OBSTACLE_COUNT: 5,
-  THROW_FLIGHT_MS: STICKER_HIT_GAME_CONFIG.THROW_FLIGHT_MS,
-  THROW_PATH_SAMPLES: STICKER_HIT_GAME_CONFIG.THROW_PATH_SAMPLES,
-  COLLISION_DEGREES: STICKER_HIT_GAME_CONFIG.COLLISION_DEGREES,
-  SPIKE_EXTRA_DEGREES: STICKER_HIT_GAME_CONFIG.SPIKE_EXTRA_DEGREES,
-  THROW_CHECK_PATH_COLLISION: STICKER_HIT_GAME_CONFIG.THROW_CHECK_PATH_COLLISION,
+  MAX_STACKED_STICKERS: 160,
 };
-
-function secureRandomBool() {
-  return randomInt(0, 2) === 0;
-}
-
-function secureRandomIntInclusive(min, max) {
-  return randomInt(min, max + 1);
-}
-
-function secureRandomAngle() {
-  return randomInt(0, 360_000) / 1000;
-}
-
-function randomSpeed(minDps, maxDps) {
-  const sign = secureRandomBool() ? -1 : 1;
-  return sign * secureRandomIntInclusive(minDps, maxDps);
-}
-
-function buildTimeline() {
-  const stage = STICKER_HIT_GAME_CONFIG.STAGES[0];
-  const segments = [{ atMs: 0, dps: randomSpeed(stage.minDps, stage.maxDps) }];
-  let t = 0;
-  while (t < STICKER_HIT_GAME_CONFIG.TIMELINE_WINDOW_MS) {
-    t += secureRandomIntInclusive(
-      STICKER_HIT_GAME_CONFIG.MIN_SEGMENT_MS,
-      STICKER_HIT_GAME_CONFIG.MAX_SEGMENT_MS,
-    );
-    segments.push({ atMs: t, dps: randomSpeed(stage.minDps, stage.maxDps) });
-  }
-  return {
-    startedAt: Date.now(),
-    initialAngle: secureRandomAngle(),
-    segments,
-  };
-}
-
-function makeObstacleStickers() {
-  const out = [];
-  const minGap = obstacleCenterMinGap(STICKER_HIT_GAME_CONFIG);
-  let guard = 0;
-  while (out.length < GAME_CONFIG.OBSTACLE_COUNT && guard < 8_000) {
-    guard += 1;
-    const cand = secureRandomAngle();
-    if (out.every((x) => angularDistanceDeg(x.angle, cand) >= minGap)) {
-      out.push({
-        angle: cand,
-        stickerSeed: randomInt(0, 2 ** 31),
-        kind: 'knife',
-      });
-    }
-  }
-  if (out.length < GAME_CONFIG.OBSTACLE_COUNT) {
-    // Fallback keeps game playable under pathological random draws.
-    for (let i = out.length; i < GAME_CONFIG.OBSTACLE_COUNT; i += 1) {
-      out.push({
-        angle: (360 / GAME_CONFIG.OBSTACLE_COUNT) * i,
-        stickerSeed: randomInt(0, 2 ** 31),
-        kind: 'knife',
-      });
-    }
-  }
-  return out;
-}
 
 export class GameState {
   constructor(player1, player2, emitCallback, _roomOptions = {}) {
@@ -106,16 +33,8 @@ export class GameState {
     return {
       score: 0,
       tapsAccepted: 0,
-      crashCount: 0,
+      stuckSeeds: [],
       lastFx: null,
-      stage: {
-        stickersTotal: Infinity,
-        stickersRemaining: Infinity,
-        timeline: buildTimeline(),
-        obstacleStickers: makeObstacleStickers(),
-        stuckStickers: [],
-        ringApples: [],
-      },
     };
   }
 
@@ -161,8 +80,6 @@ export class GameState {
     }
     if (this.phase === 'playing') {
       this.roundEndsAtMs += pausedFor;
-      this.stateByPlayer[this.p1.id].stage.timeline.startedAt += pausedFor;
-      this.stateByPlayer[this.p2.id].stage.timeline.startedAt += pausedFor;
       this._startTickLoop();
       this.broadcastState();
     }
@@ -229,39 +146,14 @@ export class GameState {
 
   _resolveTap(playerId) {
     const ps = this.stateByPlayer[playerId];
-    const stage = ps.stage;
-    const resolved = resolveThrowAgainstDisc({
-      timeline: stage.timeline,
-      nowMs: Date.now(),
-      flightMs: GAME_CONFIG.THROW_FLIGHT_MS,
-      obstacleStickers: stage.obstacleStickers,
-      stuckStickers: stage.stuckStickers,
-      ringApples: stage.ringApples,
-      cfg: GAME_CONFIG,
-      sampleCount: GAME_CONFIG.THROW_PATH_SAMPLES,
-    });
-
-    if (resolved.crash) {
-      ps.crashCount += 1;
-      ps.score = Math.max(0, ps.score + GAME_CONFIG.POINTS_PER_CRASH);
-      ps.lastFx = { type: 'crash', impactAngle: resolved.impactAngle, atMs: Date.now() };
-      stage.stuckStickers = [];
-      this.nextTapAtByPlayer[playerId] = Date.now() + GAME_CONFIG.CRASH_STUN_MS;
-      this._emitTelemetry('tap_crash_penalty', {
-        playerId,
-        score: ps.score,
-        crashCount: ps.crashCount,
-      });
-      return;
-    }
-
     ps.tapsAccepted += 1;
     ps.score += GAME_CONFIG.POINTS_PER_STICK;
-    stage.stuckStickers.push({
-      angle: resolved.impactAngle,
-      stickerSeed: randomInt(0, 2 ** 31),
-    });
-    ps.lastFx = { type: 'stick', impactAngle: resolved.impactAngle, atMs: Date.now() };
+    const seed = randomInt(0, 2 ** 31);
+    ps.stuckSeeds.push(seed);
+    if (ps.stuckSeeds.length > GAME_CONFIG.MAX_STACKED_STICKERS) {
+      ps.stuckSeeds = ps.stuckSeeds.slice(-GAME_CONFIG.MAX_STACKED_STICKERS);
+    }
+    ps.lastFx = { type: 'stick', stickerSeed: seed, atMs: Date.now() };
   }
 
   _emitTelemetry(kind, data = {}) {
@@ -289,18 +181,17 @@ export class GameState {
       serverNow: now,
       countdownMsRemaining,
       roundMsRemaining,
+      roundTotalMs: GAME_CONFIG.ROUND_MS,
       you: {
         score: me.score,
         tapsAccepted: me.tapsAccepted,
-        crashCount: me.crashCount,
         lastFx: me.lastFx,
-        stage: me.stage,
+        stuckSeeds: me.stuckSeeds,
       },
       opponent: {
         score: opp.score,
         tapsAccepted: opp.tapsAccepted,
-        crashCount: opp.crashCount,
-        stage: opp.stage,
+        stuckSeeds: opp.stuckSeeds,
       },
     };
   }

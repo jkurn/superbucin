@@ -195,6 +195,50 @@ app.get('/api/sticker-hit/sticker-manifest', async (_req, res) => {
   }
 });
 
+app.get('/api/leaderboard/:gameType', async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.json({ leaderboard: [] });
+  }
+  const { gameType } = req.params;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('user_stats')
+      .select('user_id, total_points, wins, games_played')
+      .eq('game_type', gameType)
+      .order('total_points', { ascending: false })
+      .limit(6);
+
+    if (error || !data || data.length === 0) {
+      return res.json({ leaderboard: [] });
+    }
+
+    const userIds = data.map((r) => r.user_id);
+    const { data: profiles } = await supabaseAdmin
+      .from('profiles')
+      .select('id, username, display_name, avatar_url')
+      .in('id', userIds);
+
+    const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+    const leaderboard = data.map((row) => {
+      const profile = profileMap.get(row.user_id) || {};
+      return {
+        username: profile.username || null,
+        display_name: profile.display_name || null,
+        avatar_url: profile.avatar_url || null,
+        total_points: row.total_points,
+        wins: row.wins,
+        games_played: row.games_played,
+      };
+    });
+
+    res.json({ leaderboard });
+  } catch (err) {
+    logger.error({ err, gameType }, 'Leaderboard fetch failed');
+    res.status(500).json({ leaderboard: [] });
+  }
+});
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
