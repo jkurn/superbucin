@@ -99,12 +99,12 @@ export class StickerMashDuelScene {
         <div class="smd-fx-layer" id="smd-fx-layer" aria-hidden="true"></div>
 
         <div class="smd-leaderboard" id="smd-leaderboard" hidden></div>
-      </div>
 
-      <footer class="smd-footer">
-        <button class="btn btn-pink smd-tap-btn" id="smd-tap-btn" type="button">MASH!</button>
-        <p class="smd-footer-hint">Tap button, swipe up, or press Space</p>
-      </footer>
+        <footer class="smd-footer">
+          <button class="btn btn-pink smd-tap-btn" id="smd-tap-btn" type="button">MASH!</button>
+          <p class="smd-footer-hint">Tap button, swipe up, or press Space</p>
+        </footer>
+      </div>
     `;
     document.getElementById('ui-overlay')?.appendChild(this.rootEl);
 
@@ -130,6 +130,9 @@ export class StickerMashDuelScene {
       src: this._displayStickerUrl(s.src),
     }));
 
+    // Preload images so deck cards and flying stickers render instantly
+    this._preloadStickerImages(this.stickerPool);
+
     if (this.gameData?.stickerMashDuelState) {
       this.applyState(this.gameData.stickerMashDuelState);
     }
@@ -144,8 +147,19 @@ export class StickerMashDuelScene {
     if (!this._alive) return;
     if (stickers && stickers.length > 0) {
       this.stickerPool = stickers;
+      this._preloadStickerImages(stickers);
     }
     this._renderStickerStack();
+  }
+
+  _preloadStickerImages(pool) {
+    if (typeof Image === 'undefined') return;
+    for (const entry of pool) {
+      const url = this._displayStickerUrl(entry.src);
+      if (!url) continue;
+      const img = new Image();
+      img.src = url;
+    }
   }
 
   _backendOrigin() {
