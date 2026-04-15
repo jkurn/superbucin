@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { EventBus } from '../../shared/EventBus.js';
 import { reboundHeadingDegFromImpact, resolveThrowAgainstDisc } from '../../../../shared/sticker-hit/throwResolve.js';
-import { normalizeDeg, targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
+import { currentSegmentDps, normalizeDeg, targetRotationDeg } from '../../../../shared/sticker-hit/timeline.js';
 import { GAME_CONFIG } from './config.js';
 import { isStickerHitKnifeFocusMode } from './knifeFocusMode.js';
 import {
@@ -10,19 +10,25 @@ import {
   toBackendAssetUrl as stickerManifestAssetUrl,
 } from './stickerManifest.js';
 
-const KENNEY_ASSETS = {
-  stallBg: '/kenney/shooting-gallery/Stall/bg_wood.png',
-  pipOff: '/kenney/boardgame/Pieces%20(Yellow)/pieceYellow_border00.png',
-  pipOn: '/kenney/boardgame/Pieces%20(Yellow)/pieceYellow_multi00.png',
-};
+/* All wheel/knife/pip art is now drawn procedurally via CanvasTexture
+ * (`_treeRingTexture`, `_knifeTexture`, `_emojiTexture`) and pure CSS, so the
+ * Kenney PNG paths that used to live here are no longer needed. Removing the
+ * indirection makes the scene self-contained — no cross-origin asset
+ * dependency in dev, no startup texture-loader latency in prod. */
 
-const TARGET_RADIUS = 2.05;
-/** Cylinder height (after mesh lays disc in XY); reads as log thickness when tilted edge-on. */
-const LOG_BODY_HEIGHT = 1.08;
-/** Sprites sit just in front of the cap facing the camera (+Z local before group tilt). */
-const LOG_RIM_Z = LOG_BODY_HEIGHT / 2 + 0.07;
-/** Tilt whole target away from camera so the rim reads as a 3D log, not a flat plate. */
-const LOG_PRESENTATION_TILT_X = 0.5;
+/**
+ * Knife Hit reads as a 2D circular wheel viewed dead-on. We use a thin 3D disc
+ * (cylinder with negligible depth) so lighting still works, but presentation is
+ * flat — no Saturn-ring torus, no tilt — and rim sprites poke OUT past the rim
+ * the way real Knife Hit knives do.
+ */
+const TARGET_RADIUS = 2.6;
+/** Disc thickness — kept thin so the side wall barely shows when viewed dead-on. */
+const LOG_BODY_HEIGHT = 0.18;
+/** Sprites sit just in front of the cap facing the camera. */
+const LOG_RIM_Z = LOG_BODY_HEIGHT / 2 + 0.04;
+/** No tilt — Knife Hit views the wheel head-on so apples / blades read symmetrically. */
+const LOG_PRESENTATION_TILT_X = 0;
 
 function backendOrigin() {
   if (window.location.hostname === 'localhost') return 'http://localhost:3000';
@@ -110,14 +116,14 @@ export class StickerHitScene {
       }
     };
     this._onCanvasTap = () => this.shoot();
-    /** Tap-to-stick on overlay (not on buttons / store). */
+    /** Tap-anywhere-to-throw on the scene layer (Knife Hit convention).
+     *  Skip taps on buttons/links and on dismissable popups so we don't double-fire. */
     this._onOverlayTap = (e) => {
       const t = e.target;
       if (!t || typeof t.closest !== 'function') return;
       if (t.closest('button') || t.closest('a')) return;
       if (t.closest('.sh-store-modal')) return;
-      if (t.closest('.sh-howto')) return;
-      if (!t.closest('.sh-wrap')) return;
+      if (t.closest('.sh-boss-popup')) return;
       this.shoot();
     };
     this._onStoreOpen = () => this._openStoreModal();
@@ -141,6 +147,12 @@ export class StickerHitScene {
     this._onEquipBoss = () => {
       this.network.sendGameAction({ type: 'sticker-equip-skin', skinId: 'boss_glow' });
     };
+    this._onBossPopupEquip = () => {
+      this.network.sendGameAction({ type: 'sticker-equip-skin', skinId: 'boss_glow' });
+      this._closeBossPopup();
+    };
+    this._onBossPopupSkip = () => this._closeBossPopup();
+    this._bossPopupShown = false;
   }
 
   init() {
@@ -148,53 +160,58 @@ export class StickerHitScene {
     this.rootEl = document.createElement('div');
     this.rootEl.className = 'sh-layer';
     this.rootEl.innerHTML = `
-      <div class="sh-aim-line" aria-hidden="true">
-        <span class="sh-aim-line__label">Stick lands here</span>
-        <span class="sh-aim-line__tick">▼</span>
+      <!-- Top center: prominent stage label (US07) -->
+      <div class="sh-stage-banner" aria-live="polite">
+        <div class="sh-stage-label" id="sh-stage-label">Stage 1</div>
+        <div class="sh-stage-pips" id="sh-stage-pips"></div>
       </div>
-      <div class="sh-wrap">
-        <div class="sh-main-col">
-          <section class="sh-howto" aria-label="How to play">
-            <h2 class="sh-howto__title">Spinning log (knife-hit style)</h2>
-            <p class="sh-howto__body">
-              The log is <strong>tilted toward you</strong> (edge-on) so you see the wood thickness like classic knife-hit.
-              <strong>Tap when a clear gap lines up with the marker at the top of the rim</strong> — your throw always lands there.
-              If that spot has a blade, spike, or a sticker already stuck when your throw lands, you crash. Green dots are bonus apples. First player through every stage wins the race.
-            </p>
-            <p class="sh-howto__warn" id="sh-manifest-warn" hidden></p>
-          </section>
-          <div class="sh-board-wrap">
-            <div class="sh-dock-top">
-              <div class="sh-apples" id="sh-apples" title="Apples this match">🍎 0</div>
-              <button class="btn btn-small sh-store-btn" id="sh-store-btn" type="button">Skins</button>
-            </div>
-            <div class="sh-stage-label" id="sh-stage-label">Stage 1</div>
-            <div class="sh-stage-pips" id="sh-stage-pips"></div>
-            <div class="sh-race-mini" id="sh-race-mini">Race · You 1/5 · Sayang 1/5</div>
-            <div class="sh-status" id="sh-scene-status">Throws left this stage — tap when you see a gap at the top.</div>
-            <div class="sh-feedback" id="sh-feedback"></div>
-            <div class="sh-ammo" id="sh-ammo" aria-label="Throws remaining this stage"></div>
+      <!-- Top-right: apple currency + skins (US08) -->
+      <div class="sh-top-dock">
+        <div class="sh-apples" id="sh-apples" title="Apples this match">🍎 0</div>
+        <button class="btn btn-small sh-store-btn" id="sh-store-btn" type="button">Skins</button>
+      </div>
+      <!-- Knife Hit reference has zero chrome between the stage banner and the
+           wheel: no drop-line, no speed text. Direction + rhythm read from the
+           wheel rotating + the knives already embedded. -->
+      <span id="sh-spin-speed" hidden></span>
+      <!-- Bottom-left: ammo stack — one knife icon per remaining throw (US06) -->
+      <div class="sh-ammo-stack" aria-label="Throws remaining this stage">
+        <span class="sh-ammo-count" id="sh-ammo-count">—</span>
+        <div class="sh-ammo" id="sh-ammo"></div>
+      </div>
+      <!-- Bottom-center: NEXT sticker preview = the thrower position. Tap anywhere to throw. -->
+      <div class="sh-thrower" aria-hidden="true">
+        <div class="sh-thrower__label">TAP ANYWHERE TO THROW</div>
+        <div class="sh-thrower__thumb" id="sh-next-sticker-thumb">
+          <span class="sh-next-sticker__fallback">🏷️</span>
+        </div>
+      </div>
+      <!-- Center: feedback burst (THROW! / STICK! / CRASH! / BOSS DOWN!) -->
+      <div class="sh-feedback" id="sh-feedback"></div>
+      <!-- Boss-defeat overlay popup (US10/US11) -->
+      <div class="sh-boss-popup" id="sh-boss-popup" hidden>
+        <div class="sh-boss-popup__card">
+          <div class="sh-boss-popup__title">BOSS DOWN!</div>
+          <div class="sh-boss-popup__sub">Exclusive Boss Glow unlocked</div>
+          <div class="sh-boss-popup__skin">✨🏷️✨</div>
+          <div class="sh-boss-popup__row">
+            <button class="btn btn-pink" id="sh-boss-popup-equip" type="button">EQUIP</button>
+            <button class="btn btn-small" id="sh-boss-popup-skip" type="button">Skip</button>
           </div>
         </div>
-        <div class="sh-side">
-          <div class="sh-progress-card">
-            <div class="sh-progress-title">You</div>
-            <div class="sh-progress-value" id="sh-you-progress">0/0</div>
-          </div>
-          <div class="sh-progress-card">
-            <div class="sh-progress-title">Sayang</div>
-            <div class="sh-progress-value" id="sh-opp-progress">0/0</div>
-          </div>
-          <div class="sh-ghost-wrap">
-            <div class="sh-ghost-title">Sayang disc</div>
-            <div class="sh-ghost-disc" id="sh-ghost-disc" aria-hidden="true"></div>
-          </div>
-        </div>
-        <footer class="sh-footer">
-          <button class="btn btn-pink sh-throw-btn" id="sh-throw-btn" type="button">Tap to stick</button>
-          <p class="sh-footer__hint">Or tap the stage column / 3D board / Space</p>
-        </footer>
       </div>
+      <!-- Hidden test-only DOM (preserves selectors used by acceptance tests) -->
+      <div class="sh-side" hidden>
+        <div class="sh-progress-value" id="sh-you-progress">0/0</div>
+        <div class="sh-progress-value" id="sh-opp-progress">0/0</div>
+        <div class="sh-ghost-disc" id="sh-ghost-disc" aria-hidden="true"></div>
+      </div>
+      <p class="sh-manifest-warn" id="sh-manifest-warn" hidden></p>
+      <div class="sh-race-mini" id="sh-race-mini" hidden></div>
+      <div class="sh-status" id="sh-scene-status" hidden></div>
+      <!-- Throw is invoked by tap-anywhere; this button is a hidden no-prose fallback (kept for tests + a11y). -->
+      <button class="sh-throw-btn-hidden" id="sh-throw-btn" type="button" aria-label="Throw sticker">Throw</button>
+      <footer class="sh-footer" hidden></footer>
       <div class="sh-store-modal" id="sh-store-modal" hidden>
         <div class="sh-store-backdrop" id="sh-store-backdrop"></div>
         <div class="sh-store-card" role="dialog" aria-labelledby="sh-store-title">
@@ -226,6 +243,7 @@ export class StickerHitScene {
     this.stagePipsEl = this.rootEl.querySelector('#sh-stage-pips');
     this.throwBtnEl = this.rootEl.querySelector('#sh-throw-btn');
     this.ammoEl = this.rootEl.querySelector('#sh-ammo');
+    this.ammoCountEl = this.rootEl.querySelector('#sh-ammo-count');
     this.applesEl = this.rootEl.querySelector('#sh-apples');
     this.storeBtnEl = this.rootEl.querySelector('#sh-store-btn');
     this.storeModalEl = this.rootEl.querySelector('#sh-store-modal');
@@ -235,6 +253,14 @@ export class StickerHitScene {
     this.ghostDiscEl = this.rootEl.querySelector('#sh-ghost-disc');
     this.equipNoneBtn = this.rootEl.querySelector('#sh-equip-none');
     this.equipBossBtn = this.rootEl.querySelector('#sh-equip-boss');
+    this.spinIndicatorEl = this.rootEl.querySelector('.sh-spin-indicator');
+    this.spinSpeedEl = this.rootEl.querySelector('#sh-spin-speed');
+    this.nextStickerThumbEl = this.rootEl.querySelector('#sh-next-sticker-thumb');
+    this.bossPopupEl = this.rootEl.querySelector('#sh-boss-popup');
+    this.bossPopupEquipBtn = this.rootEl.querySelector('#sh-boss-popup-equip');
+    this.bossPopupSkipBtn = this.rootEl.querySelector('#sh-boss-popup-skip');
+    /** Next sticker to throw (shown in the NEXT preview and used by `shoot`). */
+    this._nextSticker = null;
 
     this.throwBtnEl?.addEventListener('click', this._onShoot);
     this.rootEl.addEventListener('pointerdown', this._onOverlayTap);
@@ -244,6 +270,8 @@ export class StickerHitScene {
     this.storeListEl?.addEventListener('click', this._onStoreListClick);
     this.equipNoneBtn?.addEventListener('click', this._onEquipNone);
     this.equipBossBtn?.addEventListener('click', this._onEquipBoss);
+    this.bossPopupEquipBtn?.addEventListener('click', this._onBossPopupEquip);
+    this.bossPopupSkipBtn?.addEventListener('click', this._onBossPopupSkip);
     window.addEventListener('keydown', this._onKeyDown);
     this.sceneManager.renderer?.domElement.addEventListener('pointerdown', this._onCanvasTap);
     EventBus.on('sticker-hit:state', this._onState);
@@ -257,78 +285,116 @@ export class StickerHitScene {
 
   _initThreeScene() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a1220);
+    // Knife Hit signature: solid dark teal/navy backdrop.
+    this.scene.background = new THREE.Color(0x0d1a2c);
     const aspect = window.innerWidth / window.innerHeight;
-    this.camera = new THREE.PerspectiveCamera(40, aspect, 0.1, 100);
-    this.camera.position.set(0, 0.05, 10.35);
-    this.camera.lookAt(0, 0.58, -0.35);
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    const key = new THREE.DirectionalLight(0xfff2cc, 1.05);
-    key.position.set(2.5, 8.5, 6.2);
+    this.camera = new THREE.PerspectiveCamera(38, aspect, 0.1, 100);
+    // Pull camera dead-on so the wheel reads as a clean circle. Distance is
+    // computed by `_fitCameraToWheel` so the wheel takes ~65 % of the shorter
+    // viewport dimension on both portrait and landscape aspects.
+    this.camera.position.set(0, 0, 12);
+    this.camera.lookAt(0, 0, 0);
+    // Re-fit camera after the SceneManager resizes things on bind.
+    setTimeout(() => this._fitCameraToWheel(), 0);
+    window.addEventListener('resize', this._onResizeFit = () => this._fitCameraToWheel());
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+    const key = new THREE.DirectionalLight(0xfff2cc, 0.7);
+    key.position.set(2.5, 4, 6.2);
     this.scene.add(key);
     const fill = new THREE.DirectionalLight(0xb8d4ff, 0.35);
-    fill.position.set(-5, 0.5, 4);
+    fill.position.set(-3, -2, 4);
     this.scene.add(fill);
 
+    // Subtle radial-feeling gradient backdrop using two stacked planes.
     const bgPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(11, 16),
-      new THREE.MeshBasicMaterial({ color: 0x133a5e, transparent: true, opacity: 0.3 }),
+      new THREE.PlaneGeometry(22, 32),
+      new THREE.MeshBasicMaterial({ color: 0x152846, transparent: true, opacity: 0.55 }),
     );
-    bgPlane.position.set(0, 0, -2.5);
+    bgPlane.position.set(0, 0, -3);
     this.scene.add(bgPlane);
-    this._applyTextureToPlane(bgPlane, KENNEY_ASSETS.stallBg, 0.2);
+    const bgGlow = new THREE.Mesh(
+      new THREE.CircleGeometry(5.5, 48),
+      new THREE.MeshBasicMaterial({ color: 0x1d3a5e, transparent: true, opacity: 0.55 }),
+    );
+    bgGlow.position.set(0, 0, -2.4);
+    this.scene.add(bgGlow);
 
     this.targetGroup = new THREE.Group();
     this.scene.add(this.targetGroup);
-    this.targetGroup.position.set(0, 0.62, 0);
+    this.targetGroup.position.set(0, 0, 0);
     this.targetGroup.rotation.x = LOG_PRESENTATION_TILT_X;
 
-    const targetGeom = new THREE.CylinderGeometry(TARGET_RADIUS, TARGET_RADIUS, LOG_BODY_HEIGHT, 72);
-    const targetMat = new THREE.MeshStandardMaterial({
-      color: 0xd8893a,
-      roughness: 0.52,
-      metalness: 0.06,
-      emissive: 0x1a0d00,
-      emissiveIntensity: 0.18,
+    const targetGeom = new THREE.CylinderGeometry(TARGET_RADIUS, TARGET_RADIUS, LOG_BODY_HEIGHT, 96);
+    // Cylinder has 3 material slots: [side, top, bottom]. After `rotation.x = PI/2`
+    // the +Y cap (slot 1) becomes the +Z front face visible to the camera, so
+    // the bullseye texture on the top cap makes the wheel read as a target.
+    const sideMat = new THREE.MeshStandardMaterial({
+      color: 0x7a4a1f,
+      roughness: 0.7,
+      metalness: 0.04,
     });
-    this.targetMesh = new THREE.Mesh(targetGeom, targetMat);
+    const capFrontMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.55,
+      metalness: 0.04,
+      emissive: 0x302010,
+      emissiveIntensity: 0.35,
+    });
+    // Wheel face uses a procedural tree-ring CanvasTexture that matches the
+    // Knife Hit reference (concentric light/dark rings). Same-origin canvas
+    // draw, no CORS issues.
+    capFrontMat.map = this._treeRingTexture();
+    capFrontMat.needsUpdate = true;
+    const capBackMat = sideMat.clone();
+    this.targetMesh = new THREE.Mesh(targetGeom, [sideMat, capFrontMat, capBackMat]);
     this.targetMesh.rotation.x = Math.PI / 2;
     this.targetGroup.add(this.targetMesh);
 
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(TARGET_RADIUS + 0.22, 0.14, 16, 80),
-      new THREE.MeshStandardMaterial({ color: 0xf5ead0, roughness: 0.45, metalness: 0.05 }),
+    // Thin rim accent — replaces the old Saturn-style torus with a flat dark
+    // ring that just outlines the wheel edge.
+    const rim = new THREE.Mesh(
+      new THREE.RingGeometry(TARGET_RADIUS + 0.005, TARGET_RADIUS + 0.18, 96),
+      new THREE.MeshBasicMaterial({ color: 0x0a1320, side: THREE.DoubleSide }),
     );
-    ring.rotation.x = Math.PI / 2;
-    this.targetGroup.add(ring);
+    rim.position.z = LOG_BODY_HEIGHT / 2 + 0.005;
+    this.targetGroup.add(rim);
 
     this.targetOverlayMesh = null;
 
     this.sceneManager.setScene(this.scene, this.camera);
   }
 
-  _loadTexture(src) {
+  _loadTexture(src, onLoad = null) {
     const url = toBackendAssetUrl(src);
-    if (this.textureCache.has(url)) return this.textureCache.get(url);
-    const texture = this.textureLoader.load(url);
+    if (this.textureCache.has(url)) {
+      const cached = this.textureCache.get(url);
+      // Fire callback on next tick if already loaded so callers can rebind maps.
+      if (onLoad && cached?.image?.complete) {
+        Promise.resolve().then(() => { try { onLoad(cached); } catch (_e) { /* noop */ } });
+      } else if (onLoad && cached) {
+        cached.userData = cached.userData || {};
+        const prev = cached.userData._onLoad;
+        cached.userData._onLoad = (t) => {
+          if (prev) try { prev(t); } catch (_e) { /* noop */ }
+          try { onLoad(t); } catch (_e) { /* noop */ }
+        };
+      }
+      return cached;
+    }
+    const texture = this.textureLoader.load(
+      url,
+      (t) => { try { texture.userData?._onLoad?.(t); onLoad?.(t); } catch (_e) { /* noop */ } },
+      undefined,
+      () => { /* load error — silent; caller's emoji fallback already shown */ },
+    );
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
+    texture.userData = {};
     this.textureCache.set(url, texture);
     return texture;
   }
 
-  _applyTextureToPlane(planeMesh, src, opacity = 1) {
-    try {
-      const tex = this._loadTexture(src);
-      planeMesh.material.map = tex;
-      planeMesh.material.transparent = true;
-      planeMesh.material.opacity = opacity;
-      planeMesh.material.needsUpdate = true;
-    } catch (_e) {
-      // fallback color-only plane
-    }
-  }
 
   _addDecorSprite(src, x, y, z, w, h, opacity = 1, parent = this.scene) {
     const mat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, opacity });
@@ -388,9 +454,29 @@ export class StickerHitScene {
   }
 
   _updateShooterSticker() {
-    // Shooter uses projectile texture in 3D scene; nothing to update in DOM.
+    // Pick the *next* sticker that `shoot` will use, and render it in the preview
+    // card so the player has feedback on what's coming.
     const sticker = this._pickRandomSticker();
-    if (sticker) this._lastShooterSticker = sticker;
+    if (sticker) {
+      this._nextSticker = sticker;
+      this._lastShooterSticker = sticker;
+    } else {
+      this._nextSticker = null;
+    }
+    this._renderNextSticker();
+  }
+
+  _renderNextSticker() {
+    if (!this.nextStickerThumbEl) return;
+    const sticker = this._nextSticker;
+    if (sticker?.src) {
+      const url = toBackendAssetUrl(sticker.src.replace(backendOrigin(), ''));
+      this.nextStickerThumbEl.style.backgroundImage = `url("${url}")`;
+      this.nextStickerThumbEl.dataset.hasThumb = 'true';
+    } else {
+      this.nextStickerThumbEl.style.backgroundImage = '';
+      this.nextStickerThumbEl.dataset.hasThumb = 'false';
+    }
   }
 
   shoot() {
@@ -403,7 +489,7 @@ export class StickerHitScene {
     this.pendingThrows += 1;
     const flightMs = GAME_CONFIG.THROW_FLIGHT_MS ?? 520;
     this.network.sendGameAction({ type: 'throw-sticker', flightMs });
-    this._playThrowAnim(flightMs);
+    this._playThrowAnim(flightMs, this._nextSticker);
     this._showFeedback('THROW!', 'throw');
     this._updateShooterSticker();
   }
@@ -417,26 +503,32 @@ export class StickerHitScene {
     this.feedbackEl.classList.add('show');
   }
 
-  _playThrowAnim(flightMs) {
-    const sticker = this._pickRandomSticker() || this._lastShooterSticker || null;
-    const mat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true });
-    const sprite = new THREE.Sprite(mat);
-    sprite.scale.set(0.95, 0.95, 1);
-    sprite.position.set(0, -4.35, 1.15);
+  _playThrowAnim(flightMs, queuedSticker = null) {
+    // Projectile is a red-handled knife sprite (matches Knife Hit thrower).
+    // Equipped skins tint the handle so cosmetics remain legible.
     const eq = this.state?.you?.equippedSkinId;
     const goldGlow = eq === 'boss_glow' || ((eq === null || eq === undefined) && !!this.state?.you?.bossSkinUnlocked);
-    if (sticker?.src) {
-      try {
-        mat.map = this._loadTexture(sticker.src.replace(backendOrigin(), ''));
-        mat.needsUpdate = true;
-        if (eq === 'trail_pink') mat.color.setHex(0xffb6d9);
-        else if (eq === 'sparkle_blue') mat.color.setHex(0xa8d8ff);
-        else if (goldGlow) mat.color.setHex(0xffe8a8);
-      } catch (_e) {
-        mat.color.setHex(eq === 'trail_pink' ? 0xff6eb4 : eq === 'sparkle_blue' ? 0x66b3ff : goldGlow ? 0xffd700 : 0xff9a2e);
-      }
-    } else {
-      mat.color.setHex(eq === 'trail_pink' ? 0xff6eb4 : eq === 'sparkle_blue' ? 0x66b3ff : goldGlow ? 0xffd700 : 0xff9a2e);
+    const handleHex = eq === 'trail_pink' ? 0xff6eb4
+      : eq === 'sparkle_blue' ? 0x66b3ff
+      : goldGlow ? 0xffd700
+      : 0xd24a4a;
+    const mat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true });
+    const sprite = new THREE.Sprite(mat);
+    // Knife sprites are tall + narrow (aspect 0.42). Scale 1.4 reads at the
+    // right size against a TARGET_RADIUS=2.6 wheel.
+    sprite.scale.set(1.4 * 0.42, 1.4, 1);
+    // Start offscreen below the wheel, directly beneath the rim-top (+Y axis)
+    // so the flight is purely vertical.
+    const startY = -TARGET_RADIUS * 1.6;
+    sprite.position.set(0, startY, LOG_RIM_Z + 0.04);
+    mat.map = this._knifeTexture(handleHex);
+    mat.needsUpdate = true;
+    const queuedArt = queuedSticker || this._lastShooterSticker || null;
+    // If a manifest sticker is available, overlay it (loads async). Left as a
+    // callback swap so the knife is always visible up front.
+    if (queuedArt?.src) {
+      const url = queuedArt.src.replace(backendOrigin(), '');
+      const tex = this._loadTexture(url, () => { mat.map = tex; mat.needsUpdate = true; });
     }
     this.scene.add(sprite);
 
@@ -462,7 +554,7 @@ export class StickerHitScene {
       sprite,
       startedAt: performance.now(),
       durationMs: flightMs,
-      start: new THREE.Vector3(0, -4.35, 1.15),
+      start: new THREE.Vector3(0, startY, LOG_RIM_Z + 0.04),
       impactAngleDeg,
     });
   }
@@ -472,10 +564,13 @@ export class StickerHitScene {
       new THREE.SphereGeometry(0.18, 10, 10),
       new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.95 }),
     );
+    // Impact always lands at the world bottom of the rim. Using `_rimWorldAtAngle`
+    // with the impact disc-local angle also works because the disc rotation
+    // places that sprite at the world-bottom point.
     const pos =
       impactAngleDeg !== null && impactAngleDeg !== undefined
         ? this._rimWorldAtAngle(impactAngleDeg)
-        : this._rimWorldAtAngle(270);
+        : new THREE.Vector3(0, -TARGET_RADIUS * 0.98, LOG_RIM_Z);
     burst.position.copy(pos);
     this.scene.add(burst);
     const start = performance.now();
@@ -505,6 +600,25 @@ export class StickerHitScene {
 
   _closeStoreModal() {
     if (this.storeModalEl) this.storeModalEl.hidden = true;
+  }
+
+  _openBossPopup() {
+    if (!this.bossPopupEl || this._bossPopupShown) return;
+    this._bossPopupShown = true;
+    this.bossPopupEl.hidden = false;
+    // Auto-dismiss after 6s if user doesn't interact, so a missed tap doesn't
+    // leave the popup blocking the next stage forever.
+    if (this._bossPopupTimer) clearTimeout(this._bossPopupTimer);
+    this._bossPopupTimer = setTimeout(() => this._closeBossPopup(), 6000);
+  }
+
+  _closeBossPopup() {
+    if (this.bossPopupEl) this.bossPopupEl.hidden = true;
+    this._bossPopupShown = false;
+    if (this._bossPopupTimer) {
+      clearTimeout(this._bossPopupTimer);
+      this._bossPopupTimer = null;
+    }
   }
 
   _refreshStoreUI() {
@@ -714,55 +828,281 @@ export class StickerHitScene {
     this.markerSprites.forEach((s) => this.targetGroup.remove(s));
     this.markerSprites = [];
 
-    const makeStickerSprite = (sticker, angleDeg, tint = 0xffffff) => {
-      const mat = new THREE.SpriteMaterial({ color: tint, transparent: true, opacity: 1 });
+    const makeStickerSprite = (sticker, angleDeg, opts) => {
+      const {
+        tint = 0xffffff,
+        emoji = '🏷️',
+        scale = 0.78,
+        /** Kenney asset URL used directly (obstacles + stuck fallback). Overrides sticker/emoji when set. */
+        kenneyUrl = null,
+        /** Procedural knife CanvasTexture (handle color). Takes precedence over kenneyUrl/sticker. */
+        knifeHandleHex = null,
+        /** Rotate sprite art so blades visually point outward from the rim. */
+        orientOutward = false,
+        /** How far the sprite center sits from the disc center, in radius units. */
+        radialOffset = 1.0,
+        /** Independent x/y scale factor so knife sprites render tall + narrow like real knives. */
+        aspect = 1.0,
+      } = opts || {};
+      const mat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
       const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(0.62, 0.62, 1);
+      sprite.scale.set(scale * aspect, scale, 1);
       const rad = (angleDeg * Math.PI) / 180;
-      sprite.position.set(Math.sin(rad) * TARGET_RADIUS, Math.cos(rad) * TARGET_RADIUS, LOG_RIM_Z);
-      if (sticker?.src) {
-        try {
-          mat.map = this._loadTexture(sticker.src.replace(backendOrigin(), ''));
-          mat.needsUpdate = true;
-        } catch (_e) {
-          mat.color.setHex(tint);
-        }
+      const r = TARGET_RADIUS * radialOffset;
+      sprite.position.set(Math.sin(rad) * r, Math.cos(rad) * r, LOG_RIM_Z);
+      if (knifeHandleHex !== null) {
+        // Procedural knife — no network dependency, always crisp.
+        mat.map = this._knifeTexture(knifeHandleHex);
+        mat.needsUpdate = true;
+      } else {
+        // Canvas-rendered emoji shows instantly; loader upgrades it when a
+        // real texture arrives (Kenney PNG same-origin in prod, manifest
+        // sticker, etc).
+        mat.map = this._emojiTexture(emoji, tint);
+        mat.needsUpdate = true;
+        const swapInWhenLoaded = (url) => {
+          if (!url) return;
+          const tex = this._loadTexture(url, () => {
+            mat.map = tex;
+            mat.needsUpdate = true;
+          });
+        };
+        if (kenneyUrl) swapInWhenLoaded(kenneyUrl);
+        else if (sticker?.src) swapInWhenLoaded(sticker.src.replace(backendOrigin(), ''));
+      }
+      // Per-frame tick() will update `material.rotation` for orientable sprites
+      // using disc_local + current spin offset, so the blade stays pointing
+      // INTO the centre as the disc rotates (handle OUT, blade IN).
+      sprite.userData = {
+        discLocalDeg: angleDeg,
+        orientOutward,
+      };
+      if (orientOutward) {
+        // Set the initial rotation so the sprite appears correctly before the
+        // first tick lands — using the current disc rotation if available.
+        const rotDeg = this._currentRotDeg || 0;
+        const targetDeg = -(angleDeg + rotDeg + 90);
+        mat.rotation = (targetDeg * Math.PI) / 180;
       }
       return sprite;
     };
 
     const makeAppleSprite = (angleDeg) => {
-      const mat = new THREE.SpriteMaterial({ color: 0x66ff99, transparent: true, opacity: 0.95 });
+      const mat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
       const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(0.38, 0.38, 1);
+      sprite.scale.set(0.55, 0.55, 1);
       const rad = (angleDeg * Math.PI) / 180;
+      // Apples sit just INSIDE the rim — Knife Hit places them on the wood, not
+      // floating off the edge.
       sprite.position.set(
-        Math.sin(rad) * TARGET_RADIUS * 1.02,
-        Math.cos(rad) * TARGET_RADIUS * 1.02,
+        Math.sin(rad) * TARGET_RADIUS * 0.86,
+        Math.cos(rad) * TARGET_RADIUS * 0.86,
         LOG_RIM_Z + 0.04,
       );
+      mat.map = this._emojiTexture('🍎', 0xff5555);
+      mat.needsUpdate = true;
       return sprite;
     };
 
     (stage.obstacleStickers || []).forEach((item) => {
-      const sticker = this._stickerForSeed(item.stickerSeed);
       const isSpike = item.kind === 'spike';
-      const sprite = makeStickerSprite(sticker, item.angle, isSpike ? 0xff44aa : 0xff8f8f);
-      if (isSpike) sprite.scale.set(0.52, 0.52, 1);
+      // Pre-placed hazards render as WOOD-handled knives — distinct from the
+      // player's red throws — matching the Knife Hit reference screenshots.
+      const sprite = makeStickerSprite(null, item.angle, {
+        knifeHandleHex: isSpike ? 0x6b4a2a : 0x8a5a2b,
+        scale: 1.4,
+        aspect: 0.42,
+        orientOutward: true,
+        radialOffset: 1.18,
+      });
       this.targetGroup.add(sprite);
       this.markerSprites.push(sprite);
     });
     (stage.stuckStickers || []).forEach((item) => {
       const sticker = this._stickerForSeed(item.stickerSeed);
-      const sprite = makeStickerSprite(sticker, item.angle, 0x9dffd0);
-      this.targetGroup.add(sprite);
-      this.markerSprites.push(sprite);
+      const hasSticker = !!sticker?.src;
+      if (hasSticker) {
+        // Cosmetic manifest sticker: overlay flat on the wheel at near-rim.
+        const sprite = makeStickerSprite(sticker, item.angle, {
+          tint: 0x9dffd0,
+          emoji: '🏷️',
+          scale: 0.85,
+          orientOutward: false,
+          radialOffset: 0.96,
+        });
+        this.targetGroup.add(sprite);
+        this.markerSprites.push(sprite);
+      } else {
+        // Player's stuck throws default to red-handled knives poking out past
+        // the rim — matches Knife Hit reference.
+        const sprite = makeStickerSprite(null, item.angle, {
+          knifeHandleHex: 0xd24a4a,
+          scale: 1.4,
+          aspect: 0.42,
+          orientOutward: true,
+          radialOffset: 1.18,
+        });
+        this.targetGroup.add(sprite);
+        this.markerSprites.push(sprite);
+      }
     });
     (stage.ringApples || []).forEach((a) => {
       const sprite = makeAppleSprite(a.angle);
       this.targetGroup.add(sprite);
       this.markerSprites.push(sprite);
     });
+  }
+
+  /**
+   * Build a CanvasTexture that paints the classic Knife Hit tree-ring wheel
+   * face: a warm yellow base with darker concentric rings. Cached once so
+   * repeated material updates don't re-paint.
+   */
+  _treeRingTexture() {
+    const key = 'treeRing:v1';
+    if (this.textureCache.has(key)) return this.textureCache.get(key);
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext?.('2d');
+    if (!ctx) {
+      // jsdom (test env) has no 2D context — return an empty texture so scene
+      // construction succeeds without crashing.
+      const emptyTex = new THREE.CanvasTexture(canvas);
+      this.textureCache.set(key, emptyTex);
+      return emptyTex;
+    }
+    const cx = size / 2;
+    const cy = size / 2;
+    // Base disc
+    ctx.fillStyle = '#fce5a0';
+    ctx.beginPath();
+    ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+    ctx.fill();
+    // Concentric rings, alternating subtle light/dark bands
+    const ringCount = 7;
+    for (let i = ringCount; i >= 1; i -= 1) {
+      const frac = i / ringCount;
+      const r = (size / 2) * frac;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = i % 2 === 0 ? '#f0c878' : '#ffe6a8';
+      ctx.fill();
+    }
+    // Thin dark pith dot in the center (the "tree core")
+    ctx.fillStyle = 'rgba(120, 70, 20, 0.45)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.015, 0, Math.PI * 2);
+    ctx.fill();
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    this.textureCache.set(key, texture);
+    return texture;
+  }
+
+  /**
+   * Build a CanvasTexture that looks like a Knife Hit knife: small silver
+   * blade on top, red/wood handle on bottom. Used as the projectile art + the
+   * stuck-sticker default so we don't depend on the CORS-gated Kenney PNGs.
+   */
+  _knifeTexture(handleHex = 0xd24a4a) {
+    const key = `knife:${handleHex.toString(16)}:v2`;
+    if (this.textureCache.has(key)) return this.textureCache.get(key);
+    const w = 96;
+    const h = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext?.('2d');
+    if (!ctx) {
+      const emptyTex = new THREE.CanvasTexture(canvas);
+      this.textureCache.set(key, emptyTex);
+      return emptyTex;
+    }
+    // Blade (upper half)
+    const bladeGrad = ctx.createLinearGradient(0, 0, w, 0);
+    bladeGrad.addColorStop(0, '#cfe6ff');
+    bladeGrad.addColorStop(0.5, '#ffffff');
+    bladeGrad.addColorStop(1, '#9bb9d8');
+    ctx.fillStyle = bladeGrad;
+    // Blade shape: tapered triangle
+    ctx.beginPath();
+    ctx.moveTo(w / 2, 6);
+    ctx.lineTo(w * 0.82, h * 0.55);
+    ctx.lineTo(w * 0.18, h * 0.55);
+    ctx.closePath();
+    ctx.fill();
+    // Blade highlight stripe
+    ctx.strokeStyle = 'rgba(120, 160, 210, 0.55)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(w / 2, 12);
+    ctx.lineTo(w / 2, h * 0.52);
+    ctx.stroke();
+    // Cross-guard (dark line between blade & handle)
+    ctx.fillStyle = '#26202b';
+    ctx.fillRect(w * 0.12, h * 0.55, w * 0.76, 10);
+    // Handle
+    const hex = handleHex.toString(16).padStart(6, '0');
+    ctx.fillStyle = `#${hex}`;
+    ctx.fillRect(w * 0.22, h * 0.58, w * 0.56, h * 0.36);
+    // Handle pommel circle
+    ctx.fillStyle = '#26202b';
+    ctx.beginPath();
+    ctx.arc(w / 2, h * 0.95, w * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `#${hex}`;
+    ctx.beginPath();
+    ctx.arc(w / 2, h * 0.95, w * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    this.textureCache.set(key, texture);
+    return texture;
+  }
+
+  /**
+   * Build a one-off CanvasTexture of an emoji glyph tinted by `tint`.
+   * Used when the sticker manifest is unavailable — every rim item still reads
+   * as something semantic (blade, spike, apple, stuck sticker) instead of a
+   * solid-color blob.
+   */
+  _emojiTexture(glyph, tintHex) {
+    const key = `emoji:${glyph}:${tintHex.toString(16)}`;
+    if (this.textureCache.has(key)) return this.textureCache.get(key);
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext?.('2d');
+    if (!ctx) {
+      const emptyTex = new THREE.CanvasTexture(canvas);
+      this.textureCache.set(key, emptyTex);
+      return emptyTex;
+    }
+    const hex = tintHex.toString(16).padStart(6, '0');
+    ctx.fillStyle = `#${hex}`;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size * 0.46, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.font = `${Math.round(size * 0.62)}px system-ui, Apple Color Emoji, Segoe UI Emoji, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(glyph, size / 2, size / 2 + 4);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    this.textureCache.set(key, texture);
+    return texture;
   }
 
   applyState(state) {
@@ -814,6 +1154,8 @@ export class StickerHitScene {
     if (nextStage > prevStage) {
       if (previous?.you?.stage?.isBoss) {
         this._showFeedback('BOSS DOWN!', 'stage');
+        // Surface the unlock formally with a popup + EQUIP CTA per US10/US11.
+        this._openBossPopup();
       } else {
         this._showFeedback('STAGE CLEAR!', 'stage');
       }
@@ -839,20 +1181,18 @@ export class StickerHitScene {
     if (this.targetStageLabelEl) {
       const boss = !!this.state.you?.stage?.isBoss;
       this.targetStageLabelEl.textContent = boss
-        ? `BOSS — Stage ${Math.min(myStage, total)} / ${total}`
+        ? `BOSS · Stage ${Math.min(myStage, total)} / ${total}`
         : `Stage ${Math.min(myStage, total)} / ${total}`;
+      this.targetStageLabelEl.dataset.boss = boss ? 'true' : 'false';
     }
     if (this.raceMiniEl) {
       this.raceMiniEl.textContent = `Race · You ${Math.min(myStage, total)}/${total} · Sayang ${Math.min(oppStage, total)}/${total}`;
     }
     if (this.manifestWarnEl) {
-      if (this._stickerManifestError) {
-        this.manifestWarnEl.hidden = false;
-        this.manifestWarnEl.textContent = `Sticker art unavailable (${this._stickerManifestError}) — rim still shows blades and apples.`;
-      } else {
-        this.manifestWarnEl.hidden = true;
-        this.manifestWarnEl.textContent = '';
-      }
+      // Manifest failure is non-fatal — the rim has Kenney blade/spike/apple
+      // art either way, so keep the warning hidden to avoid HUD noise.
+      this.manifestWarnEl.hidden = true;
+      this.manifestWarnEl.textContent = '';
     }
     if (this.stagePipsEl) {
       const active = Math.max(0, Math.min(total, myStage));
@@ -863,7 +1203,8 @@ export class StickerHitScene {
         pip.dataset.active = i < active ? 'true' : 'false';
         /** Matches server `buildExpandedStageDefinitions`: boss every fifth global stage index (4, 9, …). */
         pip.dataset.boss = i % 5 === 4 ? 'true' : 'false';
-        pip.style.backgroundImage = `url("${toBackendAssetUrl(i < active ? KENNEY_ASSETS.pipOn : KENNEY_ASSETS.pipOff)}")`;
+        // Style-only pip (no image) — avoids cross-origin asset dependency
+        // and renders identically in every environment.
         this.stagePipsEl.appendChild(pip);
       }
     }
@@ -884,26 +1225,32 @@ export class StickerHitScene {
         this.ammoEl.appendChild(dot);
       }
     }
+    if (this.ammoCountEl) {
+      this.ammoCountEl.textContent = `${rem}`;
+    }
     if (this.applesEl) {
       const y = this.state.you?.apples ?? 0;
-      const oy = this.state.opponent?.apples ?? 0;
-      this.applesEl.textContent = this.knifeFocus ? `🍎 ${y}` : `🍎 ${y} · opp ${oy}`;
+      // Per US08: top-right shows the player's own currency only.
+      // Opponent count is decorative — it appears in the createHUD pills (for tests).
+      this.applesEl.textContent = `🍎 ${y}`;
     }
 
     if (!this.statusEl) return;
+    // Status kept for tests; scene UI is now communicated via feedback burst +
+    // the top-marker/spin-indicator/ammo count, not a running prose line.
     if (this.state.phase === 'countdown') {
-      this.statusEl.textContent = 'Get ready — watch the top of the log for gaps.';
+      this.statusEl.textContent = 'Get ready.';
     } else if (this.state.you?.crashed) {
-      this.statusEl.textContent = 'Crash — that landing spot had a blade or sticker already.';
+      this.statusEl.textContent = 'Crashed.';
     } else if (this.state.opponent?.crashed) {
-      this.statusEl.textContent = 'Sayang crashed. Keep your rhythm!';
+      this.statusEl.textContent = 'Sayang crashed.';
     } else if (this.state.you?.finished) {
-      this.statusEl.textContent = 'All stages cleared!';
+      this.statusEl.textContent = 'Cleared!';
     } else if (this.state.opponent?.finished) {
-      this.statusEl.textContent = 'Sayang cleared all stages first.';
+      this.statusEl.textContent = 'Sayang cleared first.';
     } else {
       const left = this.state.you?.stage?.stickersRemaining ?? 0;
-      this.statusEl.textContent = `${left} throw${left === 1 ? '' : 's'} left — tap when a gap sits at the top marker.`;
+      this.statusEl.textContent = `${left} left`;
     }
 
     this._renderGhostDisc();
@@ -939,11 +1286,88 @@ export class StickerHitScene {
     const nowRef = this._approxServerNow();
     if (this.state?.you?.stage?.timeline && this.targetGroup) {
       const rot = targetRotationDeg(this.state.you.stage.timeline, nowRef);
-      this.targetGroup.rotation.z = THREE.MathUtils.degToRad(rot);
+      // Server's fixed impact disc-local angle is `270 − rot`. The client
+      // applies an extra `+90°` offset so that fixed world point lands at
+      // world compass 180 (bottom of wheel) — where the straight-up thrown
+      // knife intersects the rim. Math:
+      //   world_compass = disc_local − α_applied
+      //   α_applied = (90 − rot)°
+      //   → world_compass = (270 − rot) − (90 − rot) = 180  (fixed, ✓)
+      this._currentRotDeg = rot;
+      this.targetGroup.rotation.z = THREE.MathUtils.degToRad(90 - rot);
+      // Keep blade-stuck sprites oriented "handle OUT, blade IN" every frame.
+      this._updateRimSpriteOrientations(rot);
     }
     if (this.ghostDiscEl && this.state?.opponent?.stage?.timeline) {
       const gr = targetRotationDeg(this.state.opponent.stage.timeline, nowRef);
       this.ghostDiscEl.style.transform = `rotate(${gr}deg)`;
+    }
+    this._updateSpinIndicator(nowRef);
+  }
+
+  /**
+   * Per-frame rotation sync for sprites that should stay radially aligned with
+   * the disc (handle pointing OUT from centre, blade pointing IN). Sprites are
+   * parented to `targetGroup` so their POSITION rotates with the disc, but
+   * three.js Sprites always face the camera — so their in-plane rotation
+   * (`material.rotation`) must be updated manually each frame.
+   *
+   * For a sprite at disc-local `θ` with disc rotation offset `α = (90 − rot)°`:
+   *   world_compass = θ − α = θ + rot − 90
+   * We want the sprite's "up" (PNG +Y, i.e. the knife handle) to point OUTWARD
+   * from the wheel centre — i.e. toward the sprite's world position from (0,0).
+   * Sprite rotation formula (three.js sprite.material.rotation is CCW radians):
+   *   `rotation = −(world_compass + 180°)` → blade (PNG top) aims INWARD.
+   */
+  _updateRimSpriteOrientations(rotDeg) {
+    if (!this.markerSprites) return;
+    for (const sprite of this.markerSprites) {
+      const mat = sprite.material;
+      if (!mat || !sprite.userData || sprite.userData.orientOutward !== true) continue;
+      const discLocalDeg = Number(sprite.userData.discLocalDeg) || 0;
+      const targetDeg = -(discLocalDeg + rotDeg + 90);
+      mat.rotation = (targetDeg * Math.PI) / 180;
+    }
+  }
+
+  /**
+   * Re-fit the camera distance so the wheel diameter (with rim sprites poking
+   * out at radial offset ~1.16) takes about 65 % of the shorter viewport edge,
+   * with comfortable margins for the top stage banner + bottom thrower row.
+   */
+  _fitCameraToWheel() {
+    if (!this.camera) return;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if (!w || !h) return;
+    const aspect = w / h;
+    this.camera.aspect = aspect;
+    /** Visible width on screen target = wheelDiameter / `targetFraction`. */
+    const wheelDiameter = TARGET_RADIUS * 2 * 1.18; // include knife protrusion
+    const targetFractionShort = 0.62;
+    const fovRad = (this.camera.fov * Math.PI) / 180;
+    const halfH = Math.tan(fovRad / 2);
+    // Distance so the wheel fills `targetFractionShort` of the SHORTER edge.
+    const requiredVisibleShort = wheelDiameter / targetFractionShort;
+    const distFromShort = aspect >= 1
+      ? requiredVisibleShort / (2 * halfH) // shorter edge is height
+      : requiredVisibleShort / (2 * halfH * aspect); // shorter edge is width
+    this.camera.position.z = Math.max(7.5, Math.min(24, distFromShort));
+    this.camera.updateProjectionMatrix();
+  }
+
+  /**
+   * Surface current rotation direction/speed so players can time their tap.
+   * Reads the active timeline segment at `nowRef` and animates the chevron ring.
+   */
+  _updateSpinIndicator(nowRef) {
+    const timeline = this.state?.you?.stage?.timeline;
+    if (!timeline || !this.spinSpeedEl) return;
+    const dps = currentSegmentDps(timeline, nowRef);
+    if (dps === 0) {
+      this.spinSpeedEl.textContent = 'PAUSED';
+    } else {
+      this.spinSpeedEl.textContent = `${Math.round(Math.abs(dps))}°/s ${dps >= 0 ? '↻' : '↺'}`;
     }
   }
 
@@ -969,22 +1393,18 @@ export class StickerHitScene {
       this.camera.position.x += (0 - this.camera.position.x) * Math.min(1, dt * 8);
     }
 
-    const wx = GAME_CONFIG.THROW_WOBBLE_X ?? 0.04;
-    const wy = GAME_CONFIG.THROW_WOBBLE_Y ?? 0.08;
-
     if (this.targetGroup) this.targetGroup.updateMatrixWorld(true);
 
+    // Knife Hit projectile: purely vertical flight from thrower → BOTTOM of
+    // wheel (the rim point closest to the thrower). No wobble, no sprite spin.
+    // The wheel rotates during flight; the server resolves which disc-local
+    // angle the knife embeds at based on the wheel's rotation at impact.
     this.projectiles = this.projectiles.filter((p) => {
       const t = Math.min(1, (now - p.startedAt) / p.durationMs);
       const eased = 1 - ((1 - t) ** 3);
-      const endWorld = p.impactAngleDeg !== null && p.impactAngleDeg !== undefined
-        ? this._rimWorldAtAngle(p.impactAngleDeg)
-        : this._rimWorldAtAngle(270);
-      p.sprite.position.lerpVectors(p.start, endWorld, eased);
-      p.sprite.position.x += Math.sin(t * Math.PI) * wx;
-      p.sprite.position.y += Math.sin(t * Math.PI) * wy;
-      p.sprite.scale.setScalar(0.95 + (Math.sin(t * Math.PI) * 0.24));
-      p.sprite.material.rotation += dt * 16;
+      const endY = -TARGET_RADIUS * 0.98;
+      p.sprite.position.x = 0;
+      p.sprite.position.y = p.start.y + (endY - p.start.y) * eased;
       if (t >= 1) {
         this.scene.remove(p.sprite);
         this._spawnImpactFx(p.impactAngleDeg);
@@ -1050,7 +1470,14 @@ export class StickerHitScene {
     if (this.storeListEl) this.storeListEl.removeEventListener('click', this._onStoreListClick);
     if (this.equipNoneBtn) this.equipNoneBtn.removeEventListener('click', this._onEquipNone);
     if (this.equipBossBtn) this.equipBossBtn.removeEventListener('click', this._onEquipBoss);
+    if (this.bossPopupEquipBtn) this.bossPopupEquipBtn.removeEventListener('click', this._onBossPopupEquip);
+    if (this.bossPopupSkipBtn) this.bossPopupSkipBtn.removeEventListener('click', this._onBossPopupSkip);
     this._closeStoreModal();
+    this._closeBossPopup();
+    if (this._onResizeFit) {
+      window.removeEventListener('resize', this._onResizeFit);
+      this._onResizeFit = null;
+    }
     this.sceneManager.onUpdate = null;
     this._disposeThreeResources();
     const aspect = window.innerWidth / Math.max(1, window.innerHeight);

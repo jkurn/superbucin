@@ -10,6 +10,25 @@ export function normalizeDeg(v) {
 }
 
 /**
+ * Current active segment's rotation speed (degrees per second, signed).
+ * Positive = CW in disc-local frame, negative = CCW. Returns 0 if no segment applies.
+ *
+ * @param {{ startedAt: number, segments: { atMs: number, dps: number }[] } | null | undefined} timeline
+ * @param {number} [now]
+ */
+export function currentSegmentDps(timeline, now = Date.now()) {
+  if (!timeline) return 0;
+  const elapsed = Math.max(0, now - timeline.startedAt);
+  const segments = timeline.segments || [];
+  let active = 0;
+  for (let i = 0; i < segments.length; i += 1) {
+    if (elapsed >= segments[i].atMs) active = segments[i].dps;
+    else break;
+  }
+  return active;
+}
+
+/**
  * @param {{ startedAt: number, initialAngle: number, segments: { atMs: number, dps: number }[] }} timeline
  * @param {number} [now]
  */

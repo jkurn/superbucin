@@ -24,6 +24,7 @@ function installDom(url = 'http://localhost:5173/') {
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
   globalThis.localStorage = dom.window.localStorage;
+  globalThis.sessionStorage = dom.window.sessionStorage;
   globalThis.performance = { now: () => Date.now() };
   globalThis.requestAnimationFrame = () => 0;
   globalThis.cancelAnimationFrame = () => {};
@@ -104,9 +105,11 @@ describe('Sticker Hit acceptance — HUD (partial / Done)', () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     EventBus.clear();
+    try { globalThis.sessionStorage?.removeItem?.('stickerHitKnifeFocus'); } catch (_e) { /* noop */ }
     delete globalThis.window;
     delete globalThis.document;
     delete globalThis.localStorage;
+    delete globalThis.sessionStorage;
     globalThis.performance = nodePerformance;
     delete globalThis.requestAnimationFrame;
     delete globalThis.cancelAnimationFrame;
@@ -198,6 +201,29 @@ describe('Sticker Hit acceptance — HUD (partial / Done)', () => {
     assert.equal(pips[0].dataset.boss, 'false');
     scene.destroy();
   });
+
+  // Regression for QA ISSUE-002: stage pips used cross-origin Kenney PNGs
+  // that ORB-blocked in dev. Pips must now style themselves purely via CSS
+  // data attributes — no inline backgroundImage URL leaking from JS.
+  it('AC US07 (regression): stage pips never set inline backgroundImage to a Kenney URL', async () => {
+    const scene = new StickerHitScene(makeSceneManager(), { sendGameAction: () => {} }, null, {});
+    scene.init();
+    scene.applyState(baseState({
+      totalStages: 5,
+      you: { ...baseState().you, stageIndex: 2 },
+    }));
+    await new Promise((r) => setTimeout(r, 0));
+    const pips = scene.rootEl.querySelectorAll('#sh-stage-pips .sh-stage-pip');
+    assert.equal(pips.length, 5);
+    pips.forEach((pip, i) => {
+      // Inline style.backgroundImage must be empty — pip visuals come from CSS.
+      assert.equal(pip.style.backgroundImage, '', `pip[${i}] should have no inline backgroundImage`);
+      // Data attributes drive CSS — sanity check.
+      assert.ok(['true', 'false'].includes(pip.dataset.active));
+      assert.ok(['true', 'false'].includes(pip.dataset.boss));
+    });
+    scene.destroy();
+  });
 });
 
 describe('Sticker Hit acceptance — knife focus (?knifeFocus=1)', () => {
@@ -214,9 +240,11 @@ describe('Sticker Hit acceptance — knife focus (?knifeFocus=1)', () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     EventBus.clear();
+    try { globalThis.sessionStorage?.removeItem?.('stickerHitKnifeFocus'); } catch (_e) { /* noop */ }
     delete globalThis.window;
     delete globalThis.document;
     delete globalThis.localStorage;
+    delete globalThis.sessionStorage;
     globalThis.performance = nodePerformance;
     delete globalThis.requestAnimationFrame;
     delete globalThis.cancelAnimationFrame;
@@ -243,6 +271,38 @@ describe('Sticker Hit acceptance — knife focus (?knifeFocus=1)', () => {
     assert.equal(actions.length, 1);
     assert.equal(actions[0].type, 'throw-sticker');
     scene.destroy();
+  });
+
+  // Regression for QA ISSUE-001: Router strips `?knifeFocus=1` when navigating
+  // from `/?knifeFocus=1` → `/room/{code}`. The flag must persist via
+  // sessionStorage so the scene mounted on the room URL still gets the
+  // reduced-chrome layout.
+  it('knifeFocus persists across `/` → `/room/{code}` navigation (sessionStorage)', async () => {
+    // 1. First scene mounts on `/?knifeFocus=1` (this beforeEach already loads
+    //    that URL). Confirm data-knife-focus is set + cache is populated.
+    const sceneOnLobby = new StickerHitScene(makeSceneManager(), { sendGameAction: () => {} }, null, {});
+    sceneOnLobby.init();
+    assert.equal(sceneOnLobby.knifeFocus, true);
+    assert.equal(globalThis.sessionStorage.getItem('stickerHitKnifeFocus'), '1');
+    sceneOnLobby.destroy();
+
+    // 2. Simulate navigation: tear down + reinstall DOM at the room URL with
+    //    NO query string (Router strips it). sessionStorage carries over in a
+    //    real tab — emulate that by re-using the same key.
+    const cachedFlag = globalThis.sessionStorage.getItem('stickerHitKnifeFocus');
+    delete globalThis.window;
+    delete globalThis.document;
+    delete globalThis.localStorage;
+    delete globalThis.sessionStorage;
+    installDom('http://localhost:5173/room/ABCD'); // no ?knifeFocus
+    globalThis.sessionStorage.setItem('stickerHitKnifeFocus', cachedFlag);
+
+    // 3. New scene on the room URL must still detect knifeFocus from the cache.
+    const sceneOnRoom = new StickerHitScene(makeSceneManager(), { sendGameAction: () => {} }, null, {});
+    sceneOnRoom.init();
+    assert.equal(sceneOnRoom.knifeFocus, true, 'knifeFocus should survive Router-stripped query');
+    assert.equal(sceneOnRoom.rootEl.getAttribute('data-knife-focus'), 'true');
+    sceneOnRoom.destroy();
   });
 });
 

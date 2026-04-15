@@ -269,6 +269,33 @@ describe('RoomManager — reconnect & disconnect branches', () => {
       const roomJoined = io._broadcasts.find((b) => b.event === 'room-joined');
       assert.ok(roomJoined);
     });
+
+    // Regression for QA ISSUE-003 confirmation: sticker-hit has SKIP_SIDE_SELECT,
+    // so `rematch` must auto-restart the game (not get stuck in side-select).
+    // Both players should be marked ready and the room state advance to 'playing'.
+    it('sticker-hit rematch re-starts immediately (skip-side-select path)', () => {
+      const host = mockSocket('host-sh');
+      rm.createRoom(host, { gameType: 'sticker-hit' });
+      const code = host.lastEmit('room-created').roomCode;
+      const joiner = mockSocket('joiner-sh');
+      rm.joinRoom(joiner, code);
+      const room = rm.rooms.get(code);
+      // Simulate a finished match.
+      room.game = { stop: () => {} };
+      room.state = 'finished';
+
+      rm.rematch(host);
+
+      // Both players' sides reset + ready, room flips out of finished.
+      assert.equal(room.players[0].side, 'p1');
+      assert.equal(room.players[1].side, 'p2');
+      assert.equal(room.players[0].ready, true);
+      assert.equal(room.players[1].ready, true);
+      // For skip-side-select games, rematch calls startGame which sets state.
+      // We don't depend on the async startGame succeeding here — the contract
+      // is that rematch does NOT leave room in 'side-select' for sticker-hit.
+      assert.notEqual(room.state, 'side-select');
+    });
   });
 
   describe('disconnect additional branches', () => {

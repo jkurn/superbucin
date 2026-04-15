@@ -28,6 +28,8 @@ GameFactory.register('word-scramble-race', MockGameState, MOCK_CONFIG);
 GameFactory.register('connect-four', MockGameState, MOCK_CONFIG);
 GameFactory.register('bonk-brawl', MockGameState, MOCK_CONFIG);
 GameFactory.register('cute-aggression', MockGameState, MOCK_CONFIG);
+// Sticker-hit registered with skip-side-select for rematch regression coverage.
+GameFactory.register('sticker-hit', MockGameState, MOCK_SKIP_CONFIG);
 
 export function mockSocket(id) {
   const emitted = [];
