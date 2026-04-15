@@ -4,10 +4,17 @@
     {
       "name": "superbucin-client",
       "runtimeExecutable": "/opt/homebrew/bin/node",
-      "runtimeArgs": ["node_modules/.bin/vite", "--host"],
-      "port": 5173,
-      "autoPort": true,
+      "runtimeArgs": ["node_modules/.bin/vite", "--host", "--port", "5180", "--strictPort"],
+      "port": 5180,
+      "autoPort": false,
       "cwd": "client"
+    },
+    {
+      "name": "superbucin-server",
+      "runtimeExecutable": "/opt/homebrew/bin/node",
+      "runtimeArgs": ["index.js"],
+      "port": 3000,
+      "cwd": "server"
     }
   ]
 }

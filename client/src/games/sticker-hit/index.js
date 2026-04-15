@@ -5,6 +5,13 @@ import { StickerHitScene } from './StickerHitScene.js';
 import { applyServerConfig } from './config.js';
 import { isStickerHitKnifeFocusMode } from './knifeFocusMode.js';
 
+// Side effect: capture `?knifeFocus=…` from the URL at module load so the flag
+// persists into sessionStorage BEFORE the Router navigates `/` → `/room/{code}`
+// (which strips query strings). Without this, the flag is lost because the
+// scene only consults the URL when it mounts — and that's after navigation.
+// Runs once per page load; safe in test envs (gracefully handles no window).
+isStickerHitKnifeFocusMode();
+
 /** @type {GameDefinition} */
 export const stickerHitGame = {
   type: 'sticker-hit',

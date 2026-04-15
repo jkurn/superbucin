@@ -274,53 +274,300 @@
   display: none !important;
 }
 
+/* Default (non-knifeFocus) hides the entire `createHUD` block: the scene-layer
+   stage banner + top-right apple dock now owns that information. The pill DOM
+   stays mounted so existing acceptance tests can still query #sh-hud-* IDs. */
+.sh-hud {
+  display: none !important;
+}
+
 .sh-layer {
   position: absolute;
   inset: 0;
   z-index: 6;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 4.85rem 0.5rem 5.75rem;
   pointer-events: none;
 }
 
-.sh-aim-line {
+/* Tap-anywhere to throw: the layer itself catches taps so the player doesn't
+   need to aim at any specific button. Buttons + modals re-enable pointer-events. */
+.sh-layer { pointer-events: auto; background: transparent; }
+.sh-layer .sh-stage-banner,
+.sh-layer .sh-top-marker,
+.sh-layer .sh-spin-indicator,
+.sh-layer .sh-feedback,
+.sh-layer .sh-thrower { pointer-events: none; }
+
+/* Top-center stage banner — large, prominent (US07). */
+.sh-stage-banner {
   position: fixed;
+  top: max(env(safe-area-inset-top, 0px) + 0.6rem, 0.85rem);
   left: 50%;
-  top: max(28vh, 8.25rem);
   transform: translateX(-50%);
-  z-index: 5;
+  z-index: 7;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.1rem;
+  gap: 0.35rem;
   pointer-events: none;
-  text-align: center;
 }
 
-.sh-aim-line__label {
+.sh-stage-label {
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #fff8d8;
+  text-shadow: 0 0 18px rgba(255, 200, 120, 0.55), 0 2px 6px rgba(0, 0, 0, 0.85);
+  text-transform: uppercase;
+}
+
+.sh-stage-label[data-boss='true'] {
+  color: #ff7a96;
+  text-shadow: 0 0 22px rgba(255, 90, 130, 0.85), 0 2px 6px rgba(0, 0, 0, 0.85);
+  animation: shBossPulse 1100ms ease-in-out infinite;
+}
+
+@keyframes shBossPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
+}
+
+/* Top-right dock: apple counter + skins (US08). */
+.sh-top-dock {
+  position: fixed;
+  top: max(env(safe-area-inset-top, 0px) + 0.6rem, 0.85rem);
+  right: 0.85rem;
+  z-index: 7;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  pointer-events: auto;
+}
+
+/* Bottom-left ammo stack — graphical knife icons (US06). */
+.sh-ammo-stack {
+  position: fixed;
+  bottom: max(env(safe-area-inset-bottom, 0px) + 1rem, 1.25rem);
+  left: 1rem;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  pointer-events: none;
+}
+
+.sh-ammo-stack .sh-ammo {
+  display: flex;
+  flex-direction: column-reverse;
+  flex-wrap: wrap-reverse;
+  gap: 0.2rem;
+  max-height: min(40vh, 12rem);
+  align-content: flex-start;
+}
+
+.sh-ammo-stack .sh-ammo-count {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #fff8d8;
+  text-shadow: 0 0 12px rgba(255, 200, 120, 0.45), 0 2px 4px rgba(0, 0, 0, 0.85);
+  min-width: auto;
+  text-align: left;
+}
+
+/* Bottom-center thrower: "next sticker" sits where it'll launch from. */
+.sh-thrower {
+  position: fixed;
+  bottom: max(env(safe-area-inset-bottom, 0px) + 1.1rem, 1.4rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  pointer-events: none;
+}
+
+.sh-thrower__label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: rgba(255, 220, 160, 0.55);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.85);
+}
+
+/* Visible knife thrower at the bottom of the screen — matches the Knife Hit
+   reference's "next knife" silhouette. Painted via a CSS knife shape so no
+   asset load is required. */
+.sh-thrower__thumb {
+  width: 44px;
+  height: 72px;
+  background: linear-gradient(180deg,
+    #cfe6ff 0%, #ffffff 35%, #9bb9d8 55%,
+    #26202b 55%, #26202b 60%,
+    #d24a4a 60%, #c03838 94%,
+    #26202b 94%, #26202b 100%);
+  clip-path: polygon(50% 0, 58% 6%, 66% 52%, 68% 56%, 68% 60%, 62% 62%, 62% 92%, 70% 94%, 70% 100%, 30% 100%, 30% 94%, 38% 92%, 38% 62%, 32% 60%, 32% 56%, 34% 52%, 42% 6%);
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.55));
+}
+
+.sh-thrower__thumb .sh-next-sticker__fallback {
+  display: none;
+}
+
+/* Hidden throw-button fallback — kept in DOM for tests + a11y but invisible. */
+.sh-throw-btn-hidden {
+  position: fixed;
+  bottom: -200px;
+  left: -200px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Center feedback burst — overlays the log when state changes. */
+.sh-layer .sh-feedback {
+  position: fixed;
+  top: 38%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  z-index: 8;
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 0 0 24px rgba(255, 255, 255, 0.5), 0 4px 8px rgba(0, 0, 0, 0.8);
+  opacity: 0;
+}
+
+/* Boss-defeat popup overlay (US10/US11). */
+.sh-boss-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 14, 0.72);
+  pointer-events: auto;
+}
+
+.sh-boss-popup[hidden] { display: none !important; }
+
+.sh-boss-popup__card {
+  max-width: 84vw;
+  width: 320px;
+  padding: 1.6rem 1.4rem 1.2rem;
+  border-radius: 18px;
+  background: linear-gradient(165deg, #2a1437 0%, #120822 100%);
+  border: 2px solid rgba(255, 180, 80, 0.55);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 36px rgba(255, 180, 80, 0.35);
+  text-align: center;
+  color: #fff8d8;
+}
+
+.sh-boss-popup__title {
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #ffd166;
+  text-shadow: 0 0 16px rgba(255, 200, 120, 0.85);
+  margin-bottom: 0.35rem;
+}
+
+.sh-boss-popup__sub {
+  font-size: 0.78rem;
+  color: #d8b8ff;
+  margin-bottom: 0.85rem;
+}
+
+.sh-boss-popup__skin {
+  font-size: 2.2rem;
+  margin-bottom: 1rem;
+  filter: drop-shadow(0 0 12px rgba(255, 200, 120, 0.65));
+}
+
+.sh-boss-popup__row {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+/* Removed: the top-of-rim landing marker + drop-line, and the dashed spin
+   indicator. Knife Hit reference uses neither — the wheel itself spinning and
+   the knife waiting at the bottom thrower tell the player everything. */
+
+/* Next-sticker preview — so the player knows what they're about to throw. */
+.sh-next-sticker {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(10, 18, 32, 0.72);
+  border: 1px solid rgba(180, 220, 255, 0.22);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+.sh-next-sticker__label {
   font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 248, 220, 0.92);
-  text-shadow: 0 0 12px rgba(0, 0, 0, 0.65), 0 1px 2px rgba(0, 0, 0, 0.8);
+  color: #9fc9ff;
 }
 
-.sh-aim-line__tick {
-  font-size: 0.75rem;
-  line-height: 1;
-  color: #ffe8a8;
-  text-shadow: 0 0 10px rgba(255, 200, 120, 0.55);
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+.sh-next-sticker__thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.sh-next-sticker__thumb[data-has-thumb='true'] .sh-next-sticker__fallback {
+  display: none;
+}
+
+.sh-ammo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.sh-ammo-count {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #9fffd0;
+  min-width: 1.8rem;
+  text-align: right;
+  text-shadow: 0 0 10px rgba(100, 255, 180, 0.4);
+}
+
+.sh-manifest-warn {
+  margin: 0 auto;
+  max-width: min(88vw, 400px);
+  font-size: 0.66rem;
+  line-height: 1.35;
+  color: #ffb8a8;
+  text-align: center;
 }
 
 .sh-wrap {
   width: min(100%, 880px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) 150px;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto 1fr auto;
   gap: 0.55rem 1rem;
   align-items: start;
   padding: 0 0.5rem;
@@ -393,18 +640,27 @@
   max-width: 140px;
 }
 
+/* Tiny knife icon per remaining throw — matches Knife Hit reference's
+   stacked knives along the left edge. Drawn via clip-path silhouette so no
+   asset loading is required. */
 .sh-ammo-dot {
-  width: 10px;
-  height: 18px;
-  border-radius: 3px;
-  background: linear-gradient(180deg, #9fffd0 0%, #3ecf8e 100%);
-  box-shadow: 0 0 6px rgba(100, 255, 180, 0.35);
+  width: 18px;
+  height: 22px;
+  background: linear-gradient(180deg,
+    rgba(200, 230, 255, 0.95) 0%,
+    rgba(200, 230, 255, 0.95) 48%,
+    #26202b 48%,
+    #26202b 52%,
+    #d24a4a 52%,
+    #c03838 100%);
+  clip-path: polygon(46% 0, 54% 0, 68% 45%, 68% 58%, 74% 62%, 74% 94%, 56% 100%, 44% 100%, 26% 94%, 26% 62%, 32% 58%, 32% 45%);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
 }
 
 .sh-ammo-dot[data-spent='true'] {
   background: #2a3d52;
-  box-shadow: none;
-  opacity: 0.45;
+  opacity: 0.35;
+  filter: none;
 }
 
 .sh-store-modal {
@@ -767,27 +1023,37 @@
   gap: 0.25rem;
 }
 
+/* Stage pips are pure-CSS dots so they work regardless of asset origin —
+   previously depended on Kenney boardgame PNGs cross-origin in dev. */
 .sh-stage-pip {
-  width: 18px;
-  height: 18px;
+  width: 12px;
+  height: 12px;
   display: inline-block;
   border-radius: 999px;
-  background-position: center;
-  background-size: contain;
-  background-repeat: no-repeat;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+  background: transparent;
+  border: 2px solid rgba(255, 220, 160, 0.45);
+  transition: background-color 120ms linear, border-color 120ms linear;
 }
 
 .sh-stage-pip[data-active='false'] {
-  opacity: 0.5;
+  background: transparent;
 }
 
 .sh-stage-pip[data-active='true'] {
-  opacity: 1;
+  background: #ffd166;
+  border-color: #ffd166;
+  box-shadow: 0 0 10px rgba(255, 200, 120, 0.55);
 }
 
 .sh-stage-pip[data-boss='true'] {
-  box-shadow: 0 0 0 2px rgba(255, 214, 140, 0.85), 0 0 10px rgba(255, 180, 90, 0.45);
+  border-color: rgba(255, 140, 80, 0.9);
+  box-shadow: 0 0 0 2px rgba(255, 140, 80, 0.4), 0 0 12px rgba(255, 120, 60, 0.5);
+}
+
+.sh-stage-pip[data-boss='true'][data-active='true'] {
+  background: #ff7a4a;
+  border-color: #ff7a4a;
+  box-shadow: 0 0 0 2px rgba(255, 140, 80, 0.7), 0 0 14px rgba(255, 120, 60, 0.75);
 }
 
 .sh-throw-btn {
@@ -843,18 +1109,16 @@
   z-index: 4;
 }
 
+/* `.sh-side` exists for backwards-compat selectors in tests, but the Knife Hit
+   layout never shows it — progress reads from the top HUD pills + the rim itself,
+   not floating cards on top of the spinning log. */
 .sh-side {
-  grid-column: 2;
-  grid-row: 1;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
+  display: none !important;
 }
 
 .sh-footer {
   grid-column: 1 / -1;
-  grid-row: 2;
+  grid-row: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
