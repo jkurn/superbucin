@@ -21,7 +21,7 @@
     "{client/src,server,shared}/**/*.js": "eslint --fix"
   },
   "dependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^9.2.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
