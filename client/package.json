@@ -12,7 +12,7 @@
     "@supabase/supabase-js": "^2.101.1",
     "posthog-js": "^1.365.1",
     "socket.io-client": "^4.7.5",
-    "three": "^0.170.0"
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "vite": "^6.0.0"
