@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
-    "posthog-js": "^1.365.1",
+    "posthog-js": "^1.372.5",
     "socket.io-client": "^4.7.5",
     "three": "^0.170.0"
   },
